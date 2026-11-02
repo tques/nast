@@ -473,6 +473,7 @@ body.padNav .swatch:focus, body.padNav .vol input[type=range]:focus, body.padNav
 /* the pad stepping through the track screen (padSync): the open step's setting is not shown as picked until A confirms it,
    and the difficulty bar keeps its room but stays out of sight until a track is picked */
 body.padPick-pick .diffChips, body.padPick-pick .cupDiff { visibility: hidden; }
+body.padPick-pick .tcard, body.padPick-pick .ccard { transition: none; }   /* (no fade: a card picked as the screen opens never shows amber, even for a moment) */
 body.padPick-pick .tcard[aria-pressed="true"], body.padPick-pick .ccard[aria-pressed="true"] { color: var(--ink); background: var(--plate); box-shadow: inset 0 0 0 2px var(--rim), inset 0 -3px 0 var(--rim-lo); }
 body.padPick-diff .diffChips .chip[aria-pressed="true"], body.padPick-diff .cupDiff .chip[aria-pressed="true"], body.padPick-laps .sideActions .chip[aria-pressed="true"] { color: var(--mute); background: var(--plate); box-shadow: inset 0 0 0 2px var(--rim), inset 0 -2px 0 var(--rim-lo); }
 body.padNav.padPick-pick .tcard:focus, body.padNav.padPick-pick .ccard:focus { box-shadow: inset 0 0 0 2px #8ff3ff, inset 0 -3px 0 var(--rim-lo); }
@@ -12272,6 +12273,7 @@ function showCup() {
   });
   renderCup();
   showScreen('cup'); placeHangar('cup'); $('cupGo').focus({ preventScroll: true });
+  padScreenOpened();
 }
 /* Keeping a cup close (nothing is shown: the player just finds a title race on their hands). Each cup, two rivals
    picked at random are a touch quicker all cup (the contenders); and before each race, a rival ahead of the rest of the
@@ -12538,6 +12540,14 @@ const padPrev = () => padStage(PAD_STEPS[PAD_STEPS.indexOf(PADNAV.stage) - 1]);
 function padSync() {
   const cl = document.body.classList, st = PAD.on && padFlow(padShowing()) ? PADNAV.stage : null;
   for (const k of ['pick', 'diff', 'laps']) cl.toggle('padPick-' + k, st === k);
+}
+/* a stepped screen just opened (called by showTracks / showCup, after they have set it up): with the pad in use, its
+   steps and their look are set at once, before the screen is ever drawn, so the difficulty bar or an amber pick
+   never flashes up for a frame before the pad's look hides it */
+function padScreenOpened() {
+  const scr = padShowing(), F = padFlow(scr);
+  if (!F || !PAD.on) return;
+  PADNAV.scr = scr; padFlowOpened(F);
 }
 function padFlowOpened(F) {
   PADNAV.stage = 'pick';
@@ -13273,7 +13283,7 @@ function drawDots(now) {
 function showTracks() {
   $('tracksTitle').textContent = PLAY === 'trial' ? 'Time trial' : 'Tracks';
   document.querySelector('.diffChips').hidden = PLAY === 'trial';   // (a time trial is you alone: no rivals to set)
-  $('raceBtn').textContent = PLAY === 'trial' ? 'Start trial' : 'Race'; if (pickIx < 0 || pickIx >= TRACKS.length) pickIx = Math.max(0, trackIx); syncCustomBar(); syncTrackCards(); showScreen('tracks'); placeHangar('tracks'); $('raceBtn').focus(); }
+  $('raceBtn').textContent = PLAY === 'trial' ? 'Start trial' : 'Race'; if (pickIx < 0 || pickIx >= TRACKS.length) pickIx = Math.max(0, trackIx); syncCustomBar(); syncTrackCards(); showScreen('tracks'); placeHangar('tracks'); $('raceBtn').focus(); padScreenOpened(); }
 const BEST_KEY = 'gatebreaker.best.v1';
 function loadBest() { try { return JSON.parse(localStorage.getItem(BEST_KEY)) || {}; } catch (e) { return {}; } }
 function recordBest(p) {
