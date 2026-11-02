@@ -668,7 +668,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
         <div class="ctl"><span><kbd>Start</kbd></span><span>Pause</span></div>
         <div class="ctl"><span><kbd>D-pad</kbd></span><span>Move in menus</span></div>
         <div class="ctl"><span><kbd>A</kbd><kbd>B</kbd></span><span>Select / back</span></div>
-        <div class="ctl"><span><kbd>LB</kbd><kbd>RB</kbd></span><span>Change speeder</span></div>
+        <div class="ctl"><span><kbd>LB</kbd><kbd>RB</kbd></span><span>Speeder colour</span></div>
       </div>
     </div>
     </div>
@@ -12467,7 +12467,7 @@ function padFrame() {
 
 /* ---------- gamepad on the menus ----------
    D-pad or left stick: move between buttons (held, it repeats). A: press the one picked. B: back (or cancel a
-   confirm box). LB / RB: the previous / next speeder, on the screens that show one. Right stick: scroll.
+   confirm box). LB / RB: the previous / next colour for your speeder, on the screens that show one. Right stick: scroll.
    The track and cup screens go in steps (PADNAV.stage), each holding the pad to its own buttons, A moving on to the
    next: 'pick' (the track cards, opening on Kessler Loop; or the cups, opening on the first) -> 'diff' (the difficulty
    bar; a time trial has none and skips it) -> 'speeder' (your speeder and its colour) -> 'laps' -> 'race' (Race, or
@@ -12638,8 +12638,8 @@ function padMenu(g) {
   }
   if (hit(1)) padBack(scope, scr);
   if ((hit(4) || hit(5)) && padFlow(scr)) {
-    const d = hit(5) ? 1 : -1, k = HULL_INFO.findIndex((h) => h.id === PLAYER_HULL), n = HULL_INFO.length;
-    pickMachine(HULL_INFO[(k + d + n) % n].id);
+    const d = hit(5) ? 1 : -1, k = COL_CHOICES.findIndex((q) => q.col === PLAYER_COL), n = COL_CHOICES.length;
+    pickColour(COL_CHOICES[(k + d + n) % n].col);   // (the previous / next colour for your speeder)
   }
   // the right stick scrolls whatever holds the picked button (or the screen)
   const ry = g.axes[3] || 0;
