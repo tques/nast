@@ -130,6 +130,12 @@ body.cover #stage { position: fixed; left: 50%; top: 50%; transform: translate(-
 #pass[hidden] { display: none; }
 #toast { position: absolute; left: 50%; top: 3cqh; transform: translateX(-50%); max-width: 70cqw; text-align: center; font: 700 2.3cqw/1.1 var(--display); padding: 0.8cqh 1.6cqw; background: rgba(10, 8, 26, 0.7); border: 1px solid var(--edge); border-radius: 3px; opacity: 0; transition: opacity 0.25s; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.06em; }
 #toast.on { opacity: 1; }
+/* a rival's line: their colour for an avatar, their name, what they said */
+#chat { --pc: #ffb04a; position: absolute; left: 2.4cqw; top: 25cqh; max-width: 30cqw; display: flex; align-items: center; gap: 1cqw; padding: 0.9cqh 1.2cqw 0.9cqh 0.9cqh; background: rgba(10, 8, 26, 0.78); border: 1px solid var(--edge); border-left: 3px solid var(--pc); border-radius: 3px; opacity: 0; transform: translateX(-1.5cqw); transition: opacity 0.2s, transform 0.2s; }
+#chat.on { opacity: 1; transform: none; }
+#chat .av { flex: none; width: 4.4cqw; height: 4.4cqw; border-radius: 3px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.3)), var(--pc); box-shadow: 0 0 8px var(--pc); }
+#chat b { display: block; font: 700 0.8em/1.1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--pc); }
+#chat span { display: block; margin-top: 0.3cqh; font-size: 0.9em; line-height: 1.25; color: var(--ink); }
 #count { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font: 700 20cqw/1 var(--numbers); color: var(--ink); text-shadow: 0 0.6cqw 0 rgba(0, 0, 0, 0.5), 0 0 3cqw rgba(255, 176, 74, 0.6); text-transform: uppercase; letter-spacing: 0.06em; }
 #count.go { color: var(--amber); }
 #wrong { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); font: 700 3.4cqw/1 var(--display); color: var(--rose); letter-spacing: 0.1em; text-transform: uppercase; }
@@ -489,7 +495,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
 .pickbar { background: linear-gradient(0deg, rgba(8, 6, 20, 0.97) 70%, rgba(8, 6, 20, 0)); }
 .foot kbd { --n: 2px; }
 @media (max-width: 560px) { .ctl { grid-template-columns: 1fr; gap: 2px; } }
-@media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+@media (prefers-reduced-motion: reduce) { #toast, #chat { transition: none; } }
 </style>
 
 <main>
@@ -515,6 +521,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       </div>
       <div id="pass" hidden></div>
       <div id="toast" role="status"></div>
+      <div id="chat" aria-live="polite"><i class="av" aria-hidden="true"></i><div><b id="chatWho"></b><span id="chatSay"></span></div></div>
       <div id="count" hidden></div>
       <div id="wrong" hidden>WRONG WAY</div>
     </div>
@@ -564,6 +571,13 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       <span class="chips" role="group" aria-label="Race your best time trial's ghost">
         <button class="chip" type="button" data-ghost="on" aria-pressed="true" title="In a time trial, your best run on that track and number of laps races beside you">On</button>
         <button class="chip" type="button" data-ghost="off" aria-pressed="false">Off</button>
+      </span>
+    </div>
+    <div class="optRow">
+      <h2>Pilot chatter</h2>
+      <span class="chips" role="group" aria-label="Rival pilots' messages in races">
+        <button class="chip" type="button" data-chatter="on" aria-pressed="true" title="Rivals say something when they lead, hit you, get hit and more">On</button>
+        <button class="chip" type="button" data-chatter="off" aria-pressed="false">Off</button>
       </span>
     </div>
     <div class="optRow">
@@ -1579,7 +1593,7 @@ const ROSTER = [
   { name: 'Moth',    col: '#a493ff', skill: 0.92,  hull: 'moth' },
   { name: 'Orrery',  col: '#e9dd6a', skill: 0.92,  hull: 'twin' },
   { name: 'Slate',   col: '#79a6ff', skill: 0.915, hull: 'hammer' },
-  { name: 'Jinx',    col: '#9be35a', skill: 0.92,  hull: 'wasp',    smart: 1.2, agg: 0.9 },    // darts for every shortcut going
+  { name: 'Bitsy',   col: '#9be35a', skill: 0.92,  hull: 'wasp',    smart: 1.2, agg: 0.9 },    // darts for every shortcut going
   { name: 'Pyre',    col: '#ff5a5f', skill: 0.925, hull: 'flare',   agg: 1.1 },                // all boost, all the time
   { name: 'Marlowe', col: '#9fe8ff', skill: 0.92,  hull: 'manta',   agg: 0.8, smart: 1.05 },   // clean lines, keeps out of trouble
   { name: 'Sabre',   col: '#d65cff', skill: 0.925, hull: 'lancer',  agg: 1.15, smart: 0.9 },   // fast and reckless
@@ -12697,6 +12711,7 @@ function applyDifficulty() {
 let PLAY = 'race';   // 'race' (against the field) or 'trial' (a time trial: alone, against the clock)
 function startRace() {
   audioInit();
+  chatReset();
   // (a single race: five rivals at random; a cup race: the cup's own five, whatever the menu's demo races drew since)
   if (TOUR && TOUR.rivals) { RIVALS = TOUR.rivals.slice(); RACERS.length = 1; RACERS.push(...RIVALS); } else pickRivals();
   // (every racer's turning frames made now, at the start, rather than mid-race the first time each is drawn)
@@ -13396,6 +13411,264 @@ function drawBay(now) {
 }
 
 /* ---------- events from the simulation ---------- */
+/* ---------- pilot chatter: the rivals talk ----------
+   Things that happen in a race give a rival something to say, shown in a bubble with their colour as an avatar. One at
+   a time: the most important waiting line goes next, a common one (a pass, a crash) only some of the time, and a pilot
+   who just spoke waits a while. Lines are '|'-separated; one is picked at random, never the same one twice running.
+     grid      on the grid, as the countdown starts        lead      takes the race lead
+     stingYou  stings you                                  stung     you sting them
+     shieldDown  you knock their shield out                swipeYou  sideswipes you
+     crash     wrecks, falls off or ends up in the drink   passYou   overtakes you
+     passed    you overtake them                           mineYou   you hit their mine
+     mineThem  they hit your mine                          win       wins the race     lose  second, when you win */
+const CHAT_RULE = {   // [priority, chance it is said at all]
+  grid: [1, 1], lead: [3, 0.8], stingYou: [5, 1], stung: [5, 1], shieldDown: [4, 0.9], swipeYou: [4, 0.8],
+  crash: [3, 0.55], passYou: [2, 0.4], passed: [2, 0.4], mineYou: [4, 1], mineThem: [4, 1], win: [6, 1], lose: [6, 1]
+};
+const CHAT = {
+  Vesper: {   // vain, cool, an ice queen
+    grid: "Try to keep up. Or don't. It's all the same to me.|Cameras ready? Good. They'll want my left side.|Another race, another trophy for the cabinet.",
+    lead: "As it should be.|Front of the field. The light is better here.|Admire the view. It's mostly me.",
+    stingYou: "Stay down, darling.|Spin for me. Gracefully, if you can manage it.|That's what reaching for me gets you.",
+    stung: "You'll pay for that paintwork.|How dare you.|Cheap. Utterly cheap.",
+    shieldDown: "My shield? You'll regret that.|Do you know what that finish cost?|Bold. And stupid.",
+    swipeYou: "Out of my light.|Move.|Don't take it personally. Do take it.",
+    crash: "That did not happen.|Nobody saw that.|Ugh. The cameras saw that.",
+    passYou: "Excuse me. Actually, don't.|Mind the exhaust.|You were in my way.",
+    passed: "Enjoy it. It won't last.|Savour the moment. It's the only one you'll get.|I'm letting you have this one.",
+    mineYou: "Watch where you fly.|I left that one for you. You're welcome.|Predictable.",
+    mineThem: "Mines? How common.|You'll answer for that.|Disgusting little toy.",
+    win: "Naturally.|Hold the applause. No, keep it going.|Was there ever any doubt?",
+    lose: "The judges must be blind.|An off day. One.|Enjoy your little moment."
+  },
+  Kestrel: {   // a bird-lizard hunter; he talks in fragments, hisses and clicks
+    grid: "Kssss. Hungry.|Many prey. Good hunting.|Krrk. Smell fear.",
+    lead: "Front of flock. Kssss.|Kestrel leads. Others follow.|Open sky. Mine.",
+    stingYou: "Krraa! Caught!|Prey spins. Ha!|Bite! Got you.",
+    stung: "Ssss! Prey bites back!|Krrk! Kestrel remembers you.|Hurts. Now I hunt you.",
+    shieldDown: "Scales cracked! Krrk!|Hssss. Angry now.|You wound. I hunt.",
+    swipeYou: "Claw!|Out of hunt path!|Kssss. Shove.",
+    crash: "Krrk... wing hurts.|Ground bit Kestrel.|Ssss. Not again.",
+    passYou: "Prey slow. Kssss.|Swooping by.|Passing. Still hungry.",
+    passed: "Prey runs? Prey tires.|Kestrel follows. Always.|Krrk. I see your tail.",
+    mineYou: "Nest-trap! Kssss!|Egg go boom. Ha!|Step in trap. Clever Kestrel.",
+    mineThem: "Krraa! Trap-maker!|Sneaky prey. Hsss.|Burns! Tracking you.",
+    win: "KRRAAAAH! Feast!|Best hunter. Kssss.|Kestrel eats first.",
+    lose: "Prey escapes... this time.|Hssss. Next hunt.|Krrk. Kestrel remembers your scent."
+  },
+  Moth: {   // a cute bug girl who doesn't understand humans
+    grid: "Is everyone excited? I'm excited! Is that right?|Hello! Are we friends or are we racing? Both?|Why are the lights counting down? Oh! It's a game!",
+    lead: "Everyone is behind me! Is this a parade?|I'm first! Do I get a lamp?|Hello from the front! It's so bright here!",
+    stingYou: "Oh! Was that the wrong button?|Sorry! Is spinning fun for humans?|I think I stung you. Is that a greeting?",
+    stung: "Ow! Is that how humans say hello?|Why do humans sting? I thought only we did that.|Ow! My wings are dizzy!",
+    shieldDown: "My shiny shield! It was so pretty!|Ow! Was that rude? Or a compliment?|Hey! That was my nice glow!",
+    swipeYou: "Oops! I bumped you! Is this a hug?|Sorry! I wanted to see your lights!|Bonk! Humans like that, yes?",
+    crash: "I flew into the shiny thing again.|Everything is upside down! Wheee!|Ow. Not like the lamp at home.",
+    passYou: "Your engine is so pretty! I'm going past it!|Bye! Your lights are lovely!|Excuse me! Is that the polite word?",
+    passed: "Ooh, your engine is so bright! May I follow it?|Wait! I want to look at your lights!|You're shiny AND fast!",
+    mineYou: "Did you like my present?|Oh no! I left that there by accident! I think!|Boom! Pretty! Sorry!",
+    mineThem: "You left me a present! It exploded!|Was that for me? Thank you?|Ow! Human gifts are confusing!",
+    win: "I won? Do I get to keep the shiny thing?|Everyone clap! Is that what you do?|Yay! Can we do it again?",
+    lose: "That was fun! Did I lose? Is that bad?|You're very fast. Do humans have secret wings?|You won! I'm happy for you! I think?"
+  },
+  Orrery: {   // a fluffy smuggler: adorable, and the only one who doesn't know it
+    grid: "Clean run. No questions. No inspections.|Cargo's secure. Don't ask what cargo.|Nobody touches my hold. Nobody.",
+    lead: "Nobody catches the Orrery.|Out front with a full hold. Professional.|Smooth. Like a dead-of-night drop.",
+    stingYou: "Nothing personal. Business.|You saw nothing.|That's the toll on this route.",
+    stung: "You're on my list now. My very scary list.|Hey! That's coming out of your cut!|Ow! Do you know who I fly for?",
+    shieldDown: "Don't look at me like that. I'm DANGEROUS.|My shield! I stole that fair and square!|You'll be hearing from my associates.",
+    swipeYou: "Out of my shipping lane.|Move it. I've got a schedule.|Customs check. You failed.",
+    crash: "Lost some cargo. Nobody saw anything.|That's... fine. All insured. Probably.|Ugh, my fur's going to smell of smoke for days.",
+    passYou: "Smuggler's line. Learn it.|Passing through. Don't scan me.|Fast hold, faster pilot.",
+    passed: "Lucky. Very lucky.|Enjoy the lead. It's on loan.|Take a head start. You'll need it.",
+    mineYou: "Contraband. Don't touch.|That's what happens to snitches.|Rigged it myself.",
+    mineThem: "Hey! That's MY trick!|A mine? On my route? Rude.|Who sold you that? I want names.",
+    win: "Delivered. On time. No questions.|Payday. Don't pet me.|Another clean job.",
+    lose: "The deal's not done yet.|Stop calling me cute. I lost. It's not cute.|I'll get you on the next drop."
+  },
+  Slate: {   // a robot who lives by honour and the rulebook
+    grid: "Regulations loaded. Begin.|Race with honour. Or be judged.|All systems lawful.",
+    lead: "Lead acquired. Lawfully.|Position one. As earned.|Order is restored.",
+    stingYou: "Penalty administered.|Lawful countermeasure.|Justice. Swift.",
+    stung: "Violation logged.|Unsporting. Noted.|Your record grows.",
+    shieldDown: "Shield lost. A fair hit. Respect.|Clean strike. Acknowledged.|Damage within regulations.",
+    swipeYou: "Contact. Within regulations.|Yield.|Lane enforcement.",
+    crash: "Error. Rebooting dignity.|Malfunction. Embarrassing.|Hull integrity compromised.",
+    passYou: "Overtaking. Signalled.|Passing. Legally.|Move aside. By order.",
+    passed: "Clean pass. Respect.|Well executed.|Logged. I will respond.",
+    mineYou: "Hazard deployed. Lawfully.|You failed to observe the hazard.|The warning was implicit.",
+    mineThem: "Mine deployment noted. Dishonourable.|Cowardly ordnance.|That is not honourable racing.",
+    win: "Victory. By the book.|Justice is served.|Result: lawful.",
+    lose: "A fair defeat. Respect.|You raced with honour.|Acknowledged. Victory is yours."
+  },
+  Bitsy: {   // an AI and a trickster: the track is a game she is speedrunning
+    grid: "Speedrun timer started!|Loading prank.exe... ready!|Hiii! Let's break this track!",
+    lead: "First place! New personal best!|Leaderboard updated: me!|Hehe, top of the chart!",
+    stingYou: "Gotcha! Hehe!|Spin cycle activated!|Lol. Recorded that one.",
+    stung: "Ow! Rude! Logging that.|Hey! Bug report filed!|Error 404: manners not found.",
+    shieldDown: "My shield! I'm telling the admin!|Rude! Reverting to my last save!|Ow! That's a bannable offence!",
+    swipeYou: "Boop!|Collision test passed!|Shove! Physics is fun!",
+    crash: "Clipped through the floor. Oops!|That's a glitch, not a crash!|Respawning... teehee.",
+    passYou: "Byeee!|Skip! Hehe!|Found an exploit! Byeee!",
+    passed: "Hey! I was gonna speedrun that!|Cheater! ...Oh, you're just good.|Not fair, I lagged!",
+    mineYou: "Surprise!|Trap card!|booby_trap.exe! Hehe!",
+    mineThem: "Ow! Who put that there!|Exploit used against me! Rude!|Hey, that's my kind of trick!",
+    win: "GG! World record!|Speedrun complete! Hehe!|Leaderboard: me, me and me!",
+    lose: "Rematch! I wasn't buffering!|Aw. Reloading save...|Okay okay, GG. Rematch?"
+  },
+  Pyre: {   // a little green alien kid pretending to be a grown-up racer
+    grid: "Ok I'm an ADULT racer btw.|Get ready to get destroyed.|I've been racing for like 30 years. Ok, 30 days.",
+    lead: "Number one! Ez!|Who's the best? ME.|You guys are SO bad lol.",
+    stingYou: "GET REKT!|Ez! Get spun!|Lol noob.",
+    stung: "THAT WAS LAG!|Hacker! You're HACKING!|That doesn't count!!",
+    shieldDown: "Mom said I could- I mean, NO FAIR!|My shield! Reported!|Ok you're just camping.",
+    swipeYou: "Outta my way, noob!|BONK lol.|Get shoved, scrub!",
+    crash: "Controller disconnected!|That was ON PURPOSE.|My thumb slipped!!",
+    passYou: "Bye noob!|Too slow lol!|See ya, grandpa!",
+    passed: "You're SO lucky.|Whatever. I'm letting you.|Ok I wasn't even trying.",
+    mineYou: "Get mined lol!|Ha! Free kill!|Ez trap ez win.",
+    mineThem: "WHO DID THAT?!|Cheap mines! Cheap!|That's so unfair!!",
+    win: "GG EZ!|Clip it! CLIP IT!|I'm literally the best ever.",
+    lose: "Rematch. NOW.|You're hacking. I'm telling.|...I have to go to bed soon anyway."
+  },
+  Marlowe: {   // young, hoof-footed, old-fashioned manners and a little girly
+    grid: "Good luck, everyone! Do race kindly.|My, what a lovely field today.|Hooves crossed for all of you!",
+    lead: "Oh! I'm in front? How thrilling!|Leading, darlings! Do keep up.|How delightful. A front-row view.",
+    stingYou: "Oh dear, I am sorry!|Pardon me! Truly!|Forgive me, it slipped.",
+    stung: "Oh! How could you?|That was terribly unkind.|My poor ship! You brute!",
+    shieldDown: "You've scuffed my finish! How dreadful.|My shield! I'd only just polished it!|Ohh, really now.",
+    swipeYou: "Oh! Excuse me!|Terribly sorry about that!|Pardon the nudge, dear.",
+    crash: "Oh, my hooves! How embarrassing.|I've ruined my trim.|Oh dear, oh dear.",
+    passYou: "Pardon me, darling, coming through!|Excuse me! Mind the hooves!|Just slipping by, thank you!",
+    passed: "Oh, well done you!|Ever so quick! Bravo!|How gallant. Do carry on.",
+    mineYou: "Oh no! I didn't mean for you to find that!|Sorry! That one wasn't for you. Well, it was.|Oh dear, was that mine?",
+    mineThem: "Oh! How rude!|A mine? Honestly!|That was beneath you, truly.",
+    win: "Oh my! I won? How lovely!|Thank you, thank you! You were all wonderful.|What a splendid day!",
+    lose: "Beautifully raced. Bravo, truly.|Congratulations, darling.|You won fair and square. Well done!"
+  },
+  Sabre: {   // a human-cyborg bounty hunter: everyone has a price
+    grid: "Contracts on all of you.|Bounty board's full today.|Targets acquired. All of them.",
+    lead: "Clear of the pack. Hunting forward.|Point position. Tracking.|Nobody gets behind a hunter.",
+    stingYou: "Bounty collected.|Tagged and bagged.|That's one.",
+    stung: "Cybernetics took that. Not me.|Your bounty just went up.|Mistake.",
+    shieldDown: "Shield's spent. I'm not.|You'll want to run.|That doubled your price.",
+    swipeYou: "Out of my line.|Collateral.|Hold still.",
+    crash: "Systems rebooting. Still hunting.|A scratch. Merely a scratch.|Just a flesh wound. Half-flesh.",
+    passYou: "Target overtaken.|Closing the contract.|Passing. You're still marked.",
+    passed: "Enjoy the lead. I'm right behind.|Your price just went up.|Run. It makes it fun.",
+    mineYou: "Trap sprung.|Snared.|Bounty secured.",
+    mineThem: "Cheap trick. Noted.|You're worth more now.|That'll cost you.",
+    win: "Contract closed.|Payday.|Hunt's over.",
+    lose: "Contract extended.|You got lucky. Next time, I collect.|This isn't over."
+  },
+  Rook: {   // a rock alien and the bruiser; he booms
+    grid: "ROOK IS READY. ROOK IS ROCK.|SMALL SHIPS. BIG ROOK.|ROOK WILL CRUSH.",
+    lead: "ROOK IS MOUNTAIN. MOUNTAIN IS FIRST.|NOTHING PASSES ROOK.|LANDSLIDE.",
+    stingYou: "ROOK HITS. YOU FALL.|HA. PEBBLE SPINS.|CRUMBLE.",
+    stung: "THAT TICKLED.|ROOK FEELS NOTHING. ...MOSTLY.|HM. MY TURN.",
+    shieldDown: "HM. CHIPPED.|EROSION. SLOW. ROOK WAITS.|STILL ROCK.",
+    swipeYou: "ROCKSLIDE!|SMASH!|MOVE, PEBBLE.",
+    crash: "ROOK IS... GRAVEL.|AVALANCHE. OOPS.|ROOK FELL. ROOK GETS UP.",
+    passYou: "ROOK ROLLS ON.|BOULDER COMING THROUGH.|OUT OF WAY.",
+    passed: "SMALL THINGS ARE FAST. HMPH.|ROOK WILL CATCH YOU. ROOK IS PATIENT.|RUN, PEBBLE.",
+    mineYou: "BOOM. HA.|ROOK LEAVES GIFTS.|STONE TRAP.",
+    mineThem: "HM. DUST.|ROOK STEPPED IN SOMETHING.|THAT WAS A GOOD BOOM.",
+    win: "ROOK IS VICTORY. ROOK IS ROCK.|THE MOUNTAIN STANDS.|ALL PEBBLES BOW.",
+    lose: "ROOK WILL REMEMBER. ROCKS REMEMBER LONG.|ERODED. THIS TIME.|HMPH. GOOD RACE, PEBBLE."
+  },
+  Nyx: {   // a harpy with a third eye: sly, patient, speaks in omens
+    grid: "My third eye has seen the finish.|I know how this ends.|The omens favour me tonight.",
+    lead: "As foretold.|The eye saw this hour.|Behind me, all of you. As it was written.",
+    stingYou: "I saw that coming. You didn't.|Fate spins you.|The eye never misses.",
+    stung: "I foresaw that. I let it happen.|Curious. The eye did not show me that.|You'll pay, in a future you can't see.",
+    shieldDown: "A bad omen. For you.|My feathers are ruffled. Yours will burn.|You think you've hurt me?",
+    swipeYou: "Talons.|Feel the wing.|Did you see that? I did.",
+    crash: "The eye blinked.|A minor prophecy. Ignore it.|Feathers... everywhere.",
+    passYou: "I was behind you the whole time.|Shadows pass quietly.|You never saw me.",
+    passed: "Go on. I've seen where you end.|Enjoy it. Briefly.|This was written.",
+    mineYou: "The eye placed that for you.|Your path always led there.|Fated.",
+    mineThem: "I chose to fly there. Clearly.|The eye was looking elsewhere.|You'll regret that. In three laps.",
+    win: "Exactly as I saw it.|The prophecy is fulfilled.|Did you think it would end any other way?",
+    lose: "The eye... was mistaken.|An omen I misread. Once.|Enjoy it. The eye remembers."
+  },
+  Corin: {   // a human, once a NAST cameraman, now racing in it
+    grid: "Usually I'm filming this bit!|Never thought I'd be on this side of the lens.|Okay. Deep breath. Rolling.",
+    lead: "I'm leading? Somebody get this shot!|Wide shot of me, in front! Beautiful.|I've never had this angle before!",
+    stingYou: "Sorry! Great shot though.|Ooh, that's a highlight-reel moment.|Cut! ...Sorry.",
+    stung: "Ow! I've filmed that hit a hundred times. Hurts more in person.|Nice one. I'd have used that in the replay.|Oof. That's going in the highlights.",
+    shieldDown: "Shield's gone! Good camera angle though.|You're getting great footage of me losing.|Oof. Okay, close-up on my shame.",
+    swipeYou: "Sorry! Gotta get my shot!|Excuse me! Old habit, jostling for position!|Bump! Just like the camera pit!",
+    crash: "Great angle on that crash. Sorry, old habit.|Did anyone get that? Please say no.|That's the blooper reel sorted.",
+    passYou: "Tracking shot!|Pan left! Passing!|And Corin moves up! Sorry, I narrate.",
+    passed: "Lovely line. Wish I had a camera.|You'd look great on the broadcast.|Good move! I'll catch you.",
+    mineYou: "Sorry! I saw a pro do that once.|Boom! Great shot!|That'll look great in slow-mo.",
+    mineThem: "Should've zoomed in on that one.|Didn't see that in frame!|Ow! Nice one.",
+    win: "Somebody's filming this, right?!|I won! Mom's watching! Hi Mom!|From the camera pit to the podium!",
+    lose: "Great race! I've seen worse from the pros.|Fair play. You looked great out there.|That's a wrap. Good race."
+  }
+};
+let CHAT_ON = true;
+try { CHAT_ON = localStorage.getItem('gatebreaker.chatter') !== 'off'; } catch (e) { /* on */ }
+const CH = { clock: 0, cur: null, t: 0, gap: 0, pend: null, last: {}, said: {}, ahead: null, leader: null, leadT: 0, grid: false };
+function chatReset() {
+  Object.assign(CH, { clock: 0, cur: null, t: 0, gap: 0, pend: null, last: {}, said: {}, ahead: null, leader: null, leadT: 0, grid: false });
+  const el = $('chat'); if (el) el.classList.remove('on');
+}
+/* a rival has something to say (it waits its turn, and may be dropped for something more important) */
+function chat(s, ev) {
+  if (!CHAT_ON || !s || s.isPlayer || mode !== 'race' || PLAY === 'trial' || !W || W.ships.length < 2) return;
+  const lines = CHAT[s.name] && CHAT[s.name][ev], rule = CHAT_RULE[ev];
+  if (!lines || !rule || Math.random() > rule[1]) return;
+  if (rule[0] < 4 && CH.last[s.name] > CH.clock - 8) return;   // (a pilot who just spoke lets the small stuff go)
+  if (CH.pend && CH.pend.pr >= rule[0]) return;
+  CH.pend = { s, ev, pr: rule[0], exp: CH.clock + (rule[0] >= 5 ? 2.5 : 1.2) };
+}
+function chatShow(p) {
+  const all = CHAT[p.s.name][p.ev].split('|'), k = p.s.name + p.ev;
+  let i = Math.floor(Math.random() * all.length);
+  if (all.length > 1 && i === CH.said[k]) i = (i + 1) % all.length;
+  CH.said[k] = i; CH.last[p.s.name] = CH.clock;
+  const text = all[i];
+  $('chatWho').textContent = p.s.name; $('chatSay').textContent = text;
+  const el = $('chat'); el.style.setProperty('--pc', p.s.col); el.classList.add('on');
+  CH.cur = p; CH.t = clamp(2.2 + text.length * 0.035, 2.6, 4.5);
+}
+/* once a step of the race: who has passed whom, who leads, and the bubble's own timing */
+function chatTick(dt) {
+  const el = $('chat');
+  if (mode !== 'race' || !CHAT_ON || PLAY === 'trial' || !W || W.ships.length < 2) { if (CH.cur) { el.classList.remove('on'); CH.cur = null; } return; }
+  CH.clock += dt;
+  const R = W.race, me = W.ships[0];
+  if (R.state === 'countdown' && !CH.grid) { CH.grid = true; chat(W.ships[1 + Math.floor(Math.random() * (W.ships.length - 1))], 'grid'); }
+  if (R.state === 'go' && R.t > 4 && !me.finished) {
+    const lead = W.order[0];
+    if (CH.leader && lead !== CH.leader && !lead.finished && CH.clock > CH.leadT) { chat(lead, 'lead'); CH.leadT = CH.clock + 25; }   // (a lead swapping back and forth gets one line)
+    CH.leader = lead;
+    const ahead = W.ships.map((o) => o.rank < me.rank);
+    if (CH.ahead) for (let i = 1; i < W.ships.length; i++) {
+      const o = W.ships[i];
+      if (ahead[i] === CH.ahead[i] || o.finished || o.wreck > 0 || Math.hypot(o.x - me.x, o.y - me.y) > 260) continue;
+      chat(o, ahead[i] ? 'passYou' : 'passed');
+    }
+    CH.ahead = ahead;
+  }
+  if (CH.pend && CH.pend.exp < CH.clock) CH.pend = null;
+  if (CH.cur) {
+    CH.t -= dt;
+    // (something important cuts a passing remark short)
+    if (CH.pend && CH.pend.pr >= 4 && CH.cur.pr <= 2 && CH.t < 3.5) CH.t = 0;
+    if (CH.t <= 0) { el.classList.remove('on'); CH.cur = null; CH.gap = 0.7; }
+  } else if (CH.gap > 0) CH.gap -= dt;
+  else if (CH.pend) { chatShow(CH.pend); CH.pend = null; }
+}
+function setChatter(on) {
+  CHAT_ON = on;
+  try { localStorage.setItem('gatebreaker.chatter', on ? 'on' : 'off'); } catch (e) { /* not kept */ }
+  document.querySelectorAll('.chip[data-chatter]').forEach((c) => c.setAttribute('aria-pressed', (c.dataset.chatter === 'on') === on ? 'true' : 'false'));
+}
+document.querySelectorAll('.chip[data-chatter]').forEach((b) => b.addEventListener('click', () => setChatter(b.dataset.chatter === 'on')));
+setChatter(CHAT_ON);
+
 function handleEvents() {
   const live = mode === 'race' || mode === 'results';
   for (const e of W.ev) {
@@ -13435,12 +13708,14 @@ function handleEvents() {
         if (e.a.isPlayer && live) { SFX.pickup(); }
         break;
       case 'wreck':
+        if (!e.a.isPlayer) chat(e.a, 'crash');
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.wreck();
         if (e.a.isPlayer && mode === 'race') { W.shake = 1.4; if (!e.a.gateCrash) toast(e.a.wipedBy ? 'Wiped out by ' + e.a.wipedBy.name : 'Wrecked! Out of power'); }
         e.a.gateCrash = false;
         e.a.wipedBy = null;
         break;
       case 'shieldhit':
+        if (e.b && e.b.isPlayer && !e.a.isPlayer && e.a.shield <= 0) chat(e.a, 'shieldDown');
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.wall(60);
         if (e.a.isPlayer && mode === 'race') { W.shake = 0.5; if (e.a.shield <= 0) toast('Shield down!'); }
         break;
@@ -13455,12 +13730,14 @@ function handleEvents() {
         break;
       case 'swipe': if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.swipe(); break;
       case 'swipehit':
+        if (e.a.isPlayer && !e.b.isPlayer) chat(e.b, 'swipeYou');
         if (live && (e.a.isPlayer || e.b.isPlayer || near(e.a.x, e.a.y))) SFX.thud();
         if (e.a.isPlayer && mode === 'race') { W.shake = 0.9; }
         else if (e.b.isPlayer && mode === 'race') W.shake = 0.5;
         break;
       case 'mine': if (live && e.a.isPlayer) SFX.mineDrop(); break;
       case 'minehit':
+        if (e.b && e.a.isPlayer && !e.b.isPlayer) chat(e.b, 'mineYou'); else if (e.b && e.b.isPlayer && !e.a.isPlayer) chat(e.a, 'mineThem');
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.blast();
         if (e.a.isPlayer && mode === 'race') { W.shake = 1; }
         else if (e.b && e.b.isPlayer && mode === 'race') toast(e.a.name + ' hit your mine!');
@@ -13471,7 +13748,7 @@ function handleEvents() {
         if (e.a.isPlayer && mode === 'race') { if (e.b === 'lap') toast('Guns, shortcuts and barricades go live on lap 2'); else if (e.b === 'slowed') { SFX.denied(); toast('Weapons offline while your engine recovers'); } else SFX.denied(); }
         break;
       case 'stingout': break;
-      case 'splash': if (e.a.isPlayer && mode === 'race') toast(SET.id === 'volcano' ? 'Into the lava!' : 'Into the water!'); if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.fall(); break;
+      case 'splash': if (!e.a.isPlayer) chat(e.a, 'crash'); if (e.a.isPlayer && mode === 'race') toast(SET.id === 'volcano' ? 'Into the lava!' : 'Into the water!'); if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.fall(); break;
       case 'respawn': if (e.a.isPlayer && mode === 'race') toast('Back in the race'); break;
       case 'jump': if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.jump(); break;
       case 'land':
@@ -13483,6 +13760,7 @@ function handleEvents() {
       case 'rollback': if (e.a.isPlayer && mode === 'race') { SFX.denied(); toast('Too slow! Rolling back down'); } break;
       case 'rolledout': if (e.a.isPlayer && mode === 'race') toast('Turn round, build speed and try again'); break;
       case 'fall':
+        if (!e.a.isPlayer) chat(e.a, 'crash');
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.fall();
         if (e.a.isPlayer && mode === 'race') toast('Fell off! Back on past the gap');
         break;
@@ -13491,6 +13769,7 @@ function handleEvents() {
         if (mode === 'race' && e.a.energy <= 0.001) { SFX.warn(); toast('Low power'); }
         break;
       case 'stun':
+        if (e.b && e.a.isPlayer && !e.b.isPlayer) chat(e.b, 'stingYou'); else if (e.b && e.b.isPlayer && !e.a.isPlayer) chat(e.a, 'stung');
         if (e.a.isPlayer && live) { SFX.stun(); W.shake = 1; toast('Stinger! Spun out by ' + (e.b ? e.b.name : 'a rival')); }
         else if (e.b && e.b.isPlayer && live) SFX.target();
         break;
@@ -13498,7 +13777,9 @@ function handleEvents() {
       case 'beep': if (mode === 'race') SFX.beep(e.a); break;
       case 'go': if (mode === 'race') { SFX.go(); goT = 0.9; if (SONGS[SET.id]) musicPlay(SET.id, 4); } break;   // (straight into the theme, on GO)
       case 'lap': if (e.a.isPlayer && mode === 'race') { SFX.lap(); toast('Lap ' + e.a.lapsDone + ' Complete - Time: ' + fmt(e.b)); } break;
-      case 'finish': if (e.a.isPlayer && mode === 'race') { SFX.finish(); toast('Finished ' + ord(e.a.finPos)); } break;
+      case 'finish':
+        if (!e.a.isPlayer && e.a.finPos === 1) chat(e.a, 'win'); else if (e.a.isPlayer && e.a.finPos === 1 && W.order[1]) chat(W.order[1], 'lose');
+        if (e.a.isPlayer && mode === 'race') { SFX.finish(); toast('Finished ' + ord(e.a.finPos)); } break;
       case 'results':
         if (mode === 'race') showResults();
         else if (mode === 'menu') attractT = 2.5;
@@ -13636,7 +13917,7 @@ function frame(now) {
     const racing = mode === 'race' || mode === 'results';
     updateCamera(dt, mode === 'race' ? mouse : null, racing ? W.ships[0] : W.order[0], false);
     let n = 0;
-    while (acc >= STEP && n < 5) { prepInput(); stepWorld(STEP); handleEvents(); acc -= STEP; n++; }
+    while (acc >= STEP && n < 5) { prepInput(); stepWorld(STEP); handleEvents(); chatTick(STEP); acc -= STEP; n++; }
     if (mode === 'results') renderBoard();
     if (n === 5) acc = 0;
     if (mode === 'menu' && attractT > 0) { attractT -= dt; if (attractT <= 0) { startAttract(); const l = W.order[0]; CAM.x = l.x; CAM.y = l.y; } }
