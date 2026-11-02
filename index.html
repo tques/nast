@@ -7081,7 +7081,7 @@ function drawRun(run, time) {
   }
   L.globalCompositeOperation = 'source-over';
   runEdges(L, v0, v1, hw + 1, COL.rim, 2, 1);
-  { const RC = railCols(); for (let k = 1; k <= RAIL.n; k++) runRail(L, v0, v1, hw + 1, RAIL.h * k / RAIL.n, k === RAIL.n ? COL.rim : RC.side, 2, 1); }   // (its edges standing up as walls)
+  { const RC = railCols(); for (let k = 1; k <= RAIL.rn; k++) runRail(L, v0, v1, hw + 1, RAIL.h * k / RAIL.rn, k === RAIL.rn ? COL.rim : RC.side, 2, 1); }   // (its edges standing up as walls)
   // centre dashes and chevrons
   L.strokeStyle = '#8fa6ff'; L.lineWidth = 2; L.globalAlpha = 0.22; L.beginPath();
   for (let q = v0; q < v1; q++) {
@@ -8017,7 +8017,7 @@ function lockGlyph(x, y, col) {
    heights, each scaled about the middle of the screen by its own height (so the further out from the middle, the more
    of a wall's side shows), the lowest in a shaded tone of its colour, the top one in its full colour with the glow on
    it, and a soft shadow cast on the deck away from the sun (down and to the right). */
-const RAIL = { h: 0.05, n: 5, gate: 0.1, cols: null, colsFor: null, chunks: null, key: null };
+const RAIL = { h: 0.05, n: 5, rn: 3, gate: 0.1, cols: null, colsFor: null, chunks: null, key: null };
 function railCols() {
   if (RAIL.colsFor !== SET.id) { RAIL.colsFor = SET.id; RAIL.cols = { side: mixHex(COL.rim, COL.side, 0.55), sideHex: COL.rim }; }
   return RAIL.cols;
@@ -8055,9 +8055,9 @@ function drawRails() {
   lc.setTransform(f0, 0, 0, f0, VW / 2 - f0 * CX + 3, VH / 2 - f0 * CY + 4);
   lc.strokeStyle = 'rgba(0,0,0,0.32)'; lc.lineWidth = 3; for (const c of vis) lc.stroke(c.p);
   // the wall, slice by slice, then its lit top and the glow on it
-  for (let k = 1; k <= RAIL.n; k++) {
-    setScale(fscale(RAIL.h * k / RAIL.n));
-    lc.strokeStyle = k === RAIL.n ? COL.rim : C.side; lc.lineWidth = 2;
+  for (let k = 1; k <= RAIL.rn; k++) {   // (three slices: at this height no gap shows between them)
+    setScale(fscale(RAIL.h * k / RAIL.rn));
+    lc.strokeStyle = k === RAIL.rn ? COL.rim : C.side; lc.lineWidth = 2;
     for (const c of vis) lc.stroke(c.p);
   }
   ec.globalAlpha = 0.45; ec.strokeStyle = COL.rim; ec.lineWidth = 3; for (const c of vis) ec.stroke(c.p); ec.globalAlpha = 1;
@@ -9903,7 +9903,6 @@ void main() {
     TR3.prog = p;
     for (const n of ['cam', 'halfV', 'A', 'ground', 'pass', 'hw', 'D', 'time', 'dOff', 'VHp', 'grain', 'shoulder', 'rim', 'road', 'roadHi', 'line', 'rockLo', 'rockHi', 'band', 'bankLo', 'bankHi', 'side', 'railSide']) TR3.loc[n] = gl.getUniformLocation(p, n);
   } catch (e) { console.warn('3D trenches unavailable:', e.message); TR3.failed = true; return false; }
-  TR3.out = mkCanvas(VW, VH); TR3.mask = mkCanvas(VW, VH);
   return true;
 }
 /* the mesh of every sunken stretch on this track, built once per track: the floors (or deck tops) first, then the walls
@@ -9962,7 +9961,6 @@ function tr3Grain() {
 }
 // (T is rebuilt in place for each track: which track and world it now holds)
 const tr3Key = () => TRACK.id + ':' + T.N + ':' + SET.id + ':' + T.runs.length;
-const tr3Copy = (dst) => { const o = dst.getContext('2d'); o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'copy'; o.drawImage(G3.cv, 0, G3.cv.height - VH, VW, VH, 0, 0, VW, VH); o.globalCompositeOperation = 'source-over'; };
 /* every sunken stretch this frame, onto the scene */
 function drawTrenches3D(time) {
   if (TR3.key !== tr3Key()) tr3Build();
@@ -9998,14 +9996,13 @@ function drawTrenches3D(time) {
     gl.drawElements(gl.TRIANGLES, TR3.nTop, gl.UNSIGNED_INT, 0);
   }
   if (nRail) gl.drawElements(gl.TRIANGLES, nRail, gl.UNSIGNED_INT, offR);   // (the rails on the road's edges)
-  tr3Copy(TR3.out);
-  // the walls alone (the floor still in depth, so only the walls in front of it), to hide the road's glowing edge behind them
-  if (GR && rest) { gl.clear(gl.COLOR_BUFFER_BIT); gl.uniform1i(L.pass, 1); gl.drawElements(gl.TRIANGLES, rest, gl.UNSIGNED_INT, off); tr3Copy(TR3.mask); }
   gl.bindVertexArray(null);
-  lc.setTransform(1, 0, 0, 1, 0, 0); lc.drawImage(TR3.out, 0, 0);
+  // (straight from the GL canvas onto the scene: one copy back from the graphics card a frame, the costly part of this)
+  const cy0 = G3.cv.height - VH;
+  lc.setTransform(1, 0, 0, 1, 0, 0); lc.drawImage(G3.cv, 0, cy0, VW, VH, 0, 0, VW, VH);
   ec.setTransform(1, 0, 0, 1, 0, 0);
   // (a deck dims the glow of anything under it, by as much as its dots cover)
-  if (!GR) { ec.globalCompositeOperation = 'destination-out'; ec.globalAlpha = 0.7; ec.drawImage(TR3.out, 0, 0); ec.globalAlpha = 1; ec.globalCompositeOperation = 'source-over'; }
+  if (!GR) { ec.globalCompositeOperation = 'destination-out'; ec.globalAlpha = 0.7; ec.drawImage(G3.cv, 0, cy0, VW, VH, 0, 0, VW, VH); ec.globalAlpha = 1; ec.globalCompositeOperation = 'source-over'; }
   setScale(1);
   // the glowing edges of the road, in pieces between the gaps
   ec.strokeStyle = COL.rim; ec.lineWidth = 2.5; ec.globalAlpha = 0.55; ec.lineJoin = 'round';
@@ -10024,7 +10021,6 @@ function drawTrenches3D(time) {
     }
   }
   ec.globalAlpha = 1;
-  if (GR && rest) { ec.setTransform(1, 0, 0, 1, 0, 0); ec.globalCompositeOperation = 'destination-out'; ec.drawImage(TR3.mask, 0, 0); ec.globalCompositeOperation = 'source-over'; setScale(1); }
   // the edges of the deck where a gap crosses it (hazard bands and warning lights)
   lc.setTransform(1, 0, 0, 1, VW / 2 - CX, VH / 2 - CY);
   for (const g of T.gaps) {
