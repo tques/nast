@@ -552,6 +552,13 @@ body.padNav .swatch:focus, body.padNav .vol input[type=range]:focus, body.padNav
       </span>
     </div>
     <div class="optRow">
+      <h2>Frame rate</h2>
+      <span class="chips" role="group" aria-label="Frame rate limit">
+        <button class="chip" type="button" data-fpscap="on" aria-pressed="true" title="At most 60 frames a second: less work on a fast screen">60 cap</button>
+        <button class="chip" type="button" data-fpscap="off" aria-pressed="false" title="As many frames as the screen shows">Uncapped</button>
+      </span>
+    </div>
+    <div class="optRow">
       <h2>FPS counter</h2>
       <span class="chips" role="group" aria-label="Show frames per second">
         <button class="chip" type="button" data-fps="on" aria-pressed="false">On</button>
@@ -12742,8 +12749,25 @@ function setFps(on) {
 }
 document.querySelectorAll('.chip[data-fps]').forEach((b) => b.addEventListener('click', () => setFps(b.dataset.fps === 'on')));
 setFps(FPS_ON);
+/* the frame-rate cap (on by default): on a screen faster than 60 Hz, frames are skipped so the game draws at most 60 a
+   second. Each frame is due a 60th of a second after the last was due (not after it was drawn), so on a 144 Hz screen
+   the frames drawn still average 60 rather than dropping to every third (48). */
+let FPS_CAP = true, capNext = 0;
+try { FPS_CAP = localStorage.getItem('gatebreaker.fpscap') !== 'off'; } catch (e) { /* capped */ }
+function setFpsCap(on) {
+  FPS_CAP = on; capNext = 0;
+  try { localStorage.setItem('gatebreaker.fpscap', on ? 'on' : 'off'); } catch (e) { /* this visit only */ }
+  document.querySelectorAll('.chip[data-fpscap]').forEach((c) => c.setAttribute('aria-pressed', (c.dataset.fpscap === 'on') === on ? 'true' : 'false'));
+}
+document.querySelectorAll('.chip[data-fpscap]').forEach((b) => b.addEventListener('click', () => setFpsCap(b.dataset.fpscap === 'on')));
+setFpsCap(FPS_CAP);
 function frame(now) {
   requestAnimationFrame(frame);
+  if (FPS_CAP) {
+    const iv = 1000 / 60;
+    if (now < capNext - 1) return;   // (a millisecond's grace, for the screen's own timing jitter)
+    capNext = now - capNext > iv ? now + iv : capNext + iv;   // (fallen behind, say after a pause: start afresh from now)
+  }
   padFrame();
   fpsTick(now);
   const dt = Math.min(0.05, Math.max(0, (now - lastT) / 1000));
