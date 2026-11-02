@@ -1,0 +1,1434 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta charset="utf-8">
+<title>Gatebreaker Track Editor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Pixelify+Sans:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: a drafting table. Tools and checks in a left rail, the track drawn to true lane width on a starfield grid filling the rest. */
+:root {
+  color-scheme: dark;
+  --void: #0a0918;
+  --rail: #110e27;
+  --well: #171436;
+  --ink: #efe9f7;
+  --mute: #a9a3c4;
+  --edge: rgba(160, 170, 255, 0.2);
+  --amber: #ffb04a;
+  --amber-ink: #2a1500;
+  --teal: #4fd1c5;
+  --cyan: #8ff3ff;
+  --rose: #f0629f;
+  --warn: #ffd166;
+  --bad: #ff6b81;
+  --ok: #7ee0a8;
+  --display: 'Pixelify Sans', 'Silkscreen', ui-monospace, 'Courier New', monospace;
+  --body: 'Barlow Semi Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--void); color: var(--ink); font: 500 15px/1.4 var(--body); overflow: hidden; }
+#app { height: 100%; display: grid; grid-template-columns: 330px 1fr; }
+#side {
+  min-width: 0; overflow-y: auto; background: var(--rail); border-right: 1px solid var(--edge);
+  padding-block: 18px 24px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: 16px;
+  display: grid; gap: 18px; align-content: start;
+}
+.brand { display: grid; gap: 2px; }
+.brand b { font: 700 26px/1 var(--display); color: var(--amber); letter-spacing: -0.01em; }
+.brand span { font: 600 12px/1 var(--body); letter-spacing: 0.18em; text-transform: uppercase; color: var(--mute); }
+h2 { margin: 0 0 8px; font: 700 12px/1 var(--body); letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
+section { min-width: 0; }
+label.field { display: grid; gap: 4px; font-size: 13px; color: var(--mute); }
+input[type="text"], textarea, select {
+  width: 100%; color: var(--ink); background: var(--well); border: 1px solid var(--edge); border-radius: 4px;
+  font: 500 15px/1.3 var(--body); padding: 8px 10px;
+}
+textarea { font: 500 12px/1.45 var(--mono); resize: vertical; min-height: 84px; }
+input:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tool {
+  display: flex; align-items: center; gap: 8px; padding: 9px 10px; text-align: left; cursor: pointer;
+  color: var(--ink); background: var(--well); border: 1px solid var(--edge); border-radius: 4px; font: 600 15px/1 var(--body);
+}
+.tool:hover { background: #221d4a; }
+.tool[aria-pressed="true"] { border-color: var(--amber); background: #2a2459; color: var(--amber); }
+.tool kbd { margin-left: auto; font: 600 11px/1 var(--mono); color: var(--mute); border: 1px solid var(--edge); border-radius: 3px; padding: 2px 5px; }
+.tool i { width: 10px; height: 10px; flex: none; transform: rotate(45deg); }
+.hint { margin: 8px 0 0; padding: 9px 11px; font-size: 14px; color: var(--ink); background: rgba(255, 176, 74, 0.08); border-left: 3px solid var(--amber); border-radius: 0 4px 4px 0; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; }
+select { flex: 1; min-width: 0; padding: 7px 8px; }
+.btn {
+  padding: 8px 12px; cursor: pointer; color: var(--ink); background: transparent; border: 1px solid var(--edge); border-radius: 4px;
+  font: 600 14px/1 var(--body);
+}
+.btn:hover { background: rgba(255, 255, 255, 0.07); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn.go { color: var(--amber-ink); background: var(--amber); border-color: var(--amber); font: 700 16px/1 var(--display); padding: 10px 14px; }
+.btn.go:hover { background: #ffc16e; }
+.btn.danger { color: var(--bad); border-color: rgba(255, 107, 129, 0.45); }
+.sel { padding: 10px 11px; background: var(--well); border: 1px solid var(--edge); border-radius: 4px; display: grid; gap: 8px; font-size: 14px; }
+.sel[hidden] { display: none; }
+.stats { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-size: 14px; }
+.stats dt { color: var(--mute); }
+.stats dd { margin: 0; font-variant-numeric: tabular-nums; }
+.checks { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 5px; }
+.checks li button {
+  width: 100%; display: grid; grid-template-columns: 14px 1fr; gap: 8px; text-align: left; cursor: pointer;
+  padding: 7px 9px; color: var(--ink); background: var(--well); border: 1px solid var(--edge); border-radius: 4px; font: 500 14px/1.3 var(--body);
+}
+.checks li button:hover { background: #221d4a; }
+.checks i { width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; }
+.checks .bad i { background: var(--bad); }
+.checks .warn i { background: var(--warn); }
+.checks .ok i { background: var(--ok); }
+.checks .info i { background: #b6ff6a; }
+.verdict { padding: 8px 10px; border-radius: 4px; font-weight: 700; }
+.verdict.good { background: rgba(126, 224, 168, 0.12); color: var(--ok); }
+.verdict.poor { background: rgba(255, 107, 129, 0.12); color: var(--bad); }
+.small { font-size: 13px; color: var(--mute); margin: 6px 0 0; }
+#stage { position: relative; min-width: 0; min-height: 0; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+#cv.grab { cursor: grabbing; }
+.legend {
+  position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px;
+  padding: 8px 12px; font-size: 13px; color: var(--mute); background: rgba(10, 9, 24, 0.82); border: 1px solid var(--edge); border-radius: 4px;
+}
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 18px; height: 8px; border-radius: 2px; }
+.viewbtns { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: 12px; display: flex; gap: 6px; }
+.viewbtns .btn { background: rgba(10, 9, 24, 0.82); }
+#toast {
+  position: absolute; left: 50%; top: 14px; transform: translateX(-50%); padding: 8px 14px; font-weight: 700;
+  background: rgba(10, 9, 24, 0.9); border: 1px solid var(--amber); border-radius: 4px; color: var(--amber);
+  opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap;
+}
+#toast.on { opacity: 1; }
+@media (max-width: 760px) {
+  body { overflow: auto; }
+  #app { grid-template-columns: 1fr; grid-template-rows: 62vh auto; height: auto; }
+  #stage { order: -1; height: 62vh; }
+  #side { border-right: 0; border-top: 1px solid var(--edge); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+</style>
+
+<div id="app">
+  <aside id="side">
+    <div class="brand"><b>Track Editor</b><span>Gatebreaker</span></div>
+
+    <section>
+      <label class="field" for="name">Track name<input type="text" id="name" maxlength="40" autocomplete="off"></label>
+      <label class="field" for="setting" style="margin-top: 8px">Setting<select id="setting"></select></label>
+    </section>
+
+    <section>
+      <h2>Tools</h2>
+      <div class="tools" role="group" aria-label="Tools">
+        <button class="tool" type="button" data-tool="shape" aria-pressed="true"><i style="background: var(--teal)"></i>Shape<kbd>1</kbd></button>
+        <button class="tool" type="button" data-tool="shortcut" aria-pressed="false"><i style="background: var(--amber)"></i>Shortcut<kbd>2</kbd></button>
+        <button class="tool" type="button" data-tool="raise" aria-pressed="false"><i style="background: #ffc478"></i>Raise<kbd>3</kbd></button>
+        <button class="tool" type="button" data-tool="sink" aria-pressed="false"><i style="background: #6f7dff"></i>Sink<kbd>4</kbd></button>
+        <button class="tool" type="button" data-tool="barricade" aria-pressed="false"><i style="background: var(--cyan)"></i>Barricade<kbd>5</kbd></button>
+        <button class="tool" type="button" data-tool="start" aria-pressed="false"><i style="background: #f4efe6"></i>Start line<kbd>6</kbd></button>
+        <button class="tool" type="button" data-tool="jump" aria-pressed="false"><i style="background: #b6ff6a"></i>Jump<kbd>7</kbd></button>
+        <button class="tool" type="button" data-tool="gap" aria-pressed="false"><i style="background: #0a0918; box-shadow: inset 0 0 0 2px #ffc24a"></i>Gap<kbd>8</kbd></button>
+        <button class="tool" type="button" data-tool="loop" aria-pressed="false"><i style="background: #0a0918; border-radius: 50%; box-shadow: inset 0 0 0 3px #62d6cc"></i>Loop<kbd>9</kbd></button>
+      </div>
+      <p class="hint" id="hint"></p>
+    </section>
+
+    <section class="sel" id="sel" hidden aria-live="polite">
+      <div id="selText"></div>
+      <div class="row" id="selBtns"></div>
+    </section>
+
+    <section>
+      <h2>Edit</h2>
+      <div class="row">
+        <button class="btn" type="button" id="undo" title="Ctrl+Z">Undo</button>
+        <button class="btn" type="button" id="redo" title="Ctrl+Shift+Z">Redo</button>
+        <button class="btn" type="button" id="reverse">Reverse direction</button>
+      </div>
+      <div class="row" style="margin-top: 6px">
+        <button class="btn" type="button" id="newTrack">New track</button>
+        <button class="btn" type="button" id="example">Load Kessler Loop</button>
+      </div>
+      <div class="row" id="confirmRow" hidden style="margin-top: 6px">
+        <span id="confirmText" style="align-self: center; font-size: 14px"></span>
+        <button class="btn danger" type="button" id="confirmYes">Replace</button>
+        <button class="btn" type="button" id="confirmNo">Keep editing</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Checks</h2>
+      <dl class="stats" id="stats"></dl>
+      <div class="verdict" id="verdict" style="margin-top: 10px"></div>
+      <ul class="checks" id="checks"></ul>
+    </section>
+
+    <section>
+      <h2>Track code</h2>
+      <div class="row"><button class="btn go" type="button" id="copy">Copy track code</button></div>
+      <p class="small">Paste this to Claude to have the track built into the game. Pickups and asteroids are placed automatically.</p>
+      <textarea id="code" readonly rows="5" aria-label="Track code"></textarea>
+      <h2 style="margin-top: 14px">Edit a game track</h2>
+      <div class="row"><select id="lib" aria-label="Game tracks"></select><button class="btn" type="button" id="libLoad">Edit</button></div>
+      <h2 style="margin-top: 14px">Load a track</h2>
+      <textarea id="loadCode" rows="3" placeholder="Paste track code here" aria-label="Track code to load"></textarea>
+      <div class="row" style="margin-top: 6px"><button class="btn" type="button" id="load">Load</button></div>
+      <p class="small" id="loadMsg" role="status"></p>
+    </section>
+  </aside>
+
+  <main id="stage">
+    <canvas id="cv" aria-label="Track drawing"></canvas>
+    <div class="viewbtns">
+      <button class="btn" type="button" id="fit" title="F">Fit</button>
+      <button class="btn" type="button" id="zin" aria-label="Zoom in">+</button>
+      <button class="btn" type="button" id="zout" aria-label="Zoom out">−</button>
+    </div>
+    <div class="legend" aria-hidden="true">
+      <span><i style="background: #2d3a6e; box-shadow: inset 0 0 0 2px var(--teal)"></i>Ground</span>
+      <span><i style="background: #4a3524; box-shadow: inset 0 0 0 2px #ffc478"></i>Raised</span>
+      <span><i style="background: #161a52; box-shadow: inset 0 0 0 2px #6f7dff"></i>Sunken</span>
+      <span><i style="background: rgba(255, 176, 74, 0.5)"></i>Shortcut</span>
+      <span><i style="background: var(--cyan)"></i>Barricade</span>
+      <span><i style="background: #b6ff6a"></i>Jump</span>
+      <span><i style="background: #0a0918; box-shadow: inset 0 0 0 2px #ffc24a"></i>Gap</span>
+      <span><i style="background: #20476a; box-shadow: inset 0 0 0 2px #62d6cc"></i>Loop</span>
+    </div>
+    <div id="toast" role="status"></div>
+  </main>
+</div>
+
+<script>
+'use strict';
+/* ================= geometry: identical to the game, so what you see here is what you race ================= */
+const STEP = 12, HW = 70, CHW = 30, RAMP = 144, SUB = 48, MIN_R = 90;
+const AIR = { H: 1.25, RISE: 3.6, HOLD: 0.7, G: 5.5 };   // jump flight, as in the game
+// loop-de-loops, as in the game (the Loop tool places them)
+const LOOP = { R: 220, G: 232, ACC: 0.2, GRIP: 0.25, SHIFT: 164, EASE: 30, MIN_R: 160, MAX_R: 300 };
+/* where a loop's ring stands on the ground (the game splices it into the lap there: the lane edges over by SHIFT/2,
+   climbs the ring and comes down SHIFT to the other side, then edges back onto the line) */
+function loopFoot(li, q, th, l) {
+  const a = q.r * Math.sin(th), lat = (q.side === 'left' ? -1 : 1) * LOOP.SHIFT * (th / TAU - 0.5) + l;
+  return [G.x[li] + G.tx[li] * a + G.nx[li] * lat, G.y[li] + G.ty[li] * a + G.ny[li] * lat];
+}
+function loopNeed(r) {
+  const a = LOOP.ACC * 780, g = LOOP.G;
+  let w = 0;
+  for (let th = 0; th <= TAU; th += 0.01) w = Math.max(w, 2 * g * r * (1 - Math.cos(th)) - 2 * a * r * th + g * r * (LOOP.GRIP - Math.cos(th)));
+  return Math.sqrt(w);
+}
+const SPD = { cruise: 250, full: 300, boost: 440, slow: 200 };   // m/s: comfortable, flat out, boosting, slowest flight shown
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const cyc = (v, n) => ((v % n) + n) % n;
+
+function catmull(a, b, c, d, t) {
+  const t2 = t * t, t3 = t2 * t;
+  return [
+    0.5 * (2 * b[0] + (-a[0] + c[0]) * t + (2 * a[0] - 5 * b[0] + 4 * c[0] - d[0]) * t2 + (-a[0] + 3 * b[0] - 3 * c[0] + d[0]) * t3),
+    0.5 * (2 * b[1] + (-a[1] + c[1]) * t + (2 * a[1] - 5 * b[1] + 4 * c[1] - d[1]) * t2 + (-a[1] + 3 * b[1] - 3 * c[1] + d[1]) * t3)
+  ];
+}
+function segPoint(P, k, u) {
+  const n = P.length;
+  return catmull(P[cyc(k - 1, n)], P[cyc(k, n)], P[cyc(k + 1, n)], P[cyc(k + 2, n)], u);
+}
+/* resample the loop into evenly spaced samples, like the game's buildTrack */
+function buildGeom(P) {
+  const n = P.length, dense = [];
+  for (let i = 0; i < n; i++) for (let k = 0; k < SUB; k++) dense.push(segPoint(P, i, k / SUB));
+  const m = dense.length, cum = new Float64Array(m + 1);
+  for (let i = 0; i < m; i++) { const p = dense[i], q = dense[(i + 1) % m]; cum[i + 1] = cum[i] + Math.hypot(q[0] - p[0], q[1] - p[1]); }
+  const L = cum[m], N = Math.max(8, Math.round(L / STEP)), step = L / N;
+  const G = { n, m, dense, cum, L, N, step, x: new Float64Array(N), y: new Float64Array(N), tx: new Float64Array(N), ty: new Float64Array(N), nx: new Float64Array(N), ny: new Float64Array(N), h: new Float64Array(N) };
+  let j = 0;
+  for (let i = 0; i < N; i++) {
+    const d = i * step;
+    while (cum[j + 1] < d) j++;
+    const f = (d - cum[j]) / (cum[j + 1] - cum[j] || 1), p = dense[j], q = dense[(j + 1) % m];
+    G.x[i] = p[0] + (q[0] - p[0]) * f; G.y[i] = p[1] + (q[1] - p[1]) * f;
+  }
+  for (let i = 0; i < N; i++) {
+    const a = cyc(i - 1, N), b = cyc(i + 1, N);
+    let dx = G.x[b] - G.x[a], dy = G.y[b] - G.y[a];
+    const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    G.tx[i] = dx; G.ty[i] = dy; G.nx[i] = -dy; G.ny[i] = dx;
+  }
+  return G;
+}
+/* features are pinned to the curve itself: control segment k, parameter u in [0, 1) */
+function anchorArc(G, a) {
+  const j = clamp(a.k, 0, G.n - 1) * SUB + clamp(a.u, 0, 0.99999) * SUB, j0 = Math.floor(j), t = j - j0;
+  return G.cum[j0] + (G.cum[j0 + 1] - G.cum[j0]) * t;
+}
+const anchorFrac = (G, a) => anchorArc(G, a) / G.L;
+const anchorIdx = (G, a) => cyc(Math.round(anchorFrac(G, a) * G.N), G.N);
+function fracToAnchor(G, f) {
+  const d = cyc(f, 1) * G.L;
+  let lo = 0, hi = G.m;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (G.cum[mid] <= d) lo = mid; else hi = mid; }
+  const t = (d - G.cum[lo]) / (G.cum[lo + 1] - G.cum[lo] || 1), j = lo + t;
+  return { k: Math.floor(j / SUB), u: (j % SUB) / SUB };
+}
+/* closest spot on the curve to a world point */
+function nearestAnchor(G, x, y) {
+  let best = 1e18, bj = 0;
+  for (let j = 0; j < G.m; j++) { const p = G.dense[j], d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < best) { best = d; bj = j; } }
+  // refine along the neighbouring dense segment
+  let bt = 0, bd = best;
+  for (const jj of [bj - 1, bj]) {
+    const a = G.dense[cyc(jj, G.m)], b = G.dense[cyc(jj + 1, G.m)], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1;
+    const t = clamp(((x - a[0]) * dx + (y - a[1]) * dy) / l2, 0, 1), px = a[0] + dx * t - x, py = a[1] + dy * t - y, d = px * px + py * py;
+    if (d < bd) { bd = d; bj = cyc(jj, G.m); bt = t; }
+  }
+  const j = bj + bt;
+  return { k: Math.floor(j / SUB) % G.n, u: (j % SUB) / SUB, dist: Math.sqrt(bd) };
+}
+function nearestSample(G, x, y, hint, win) {
+  let best = 1e18, bi = 0;
+  const lo = hint < 0 ? 0 : -win, hi = hint < 0 ? G.N - 1 : win;
+  for (let k = lo; k <= hi; k++) {
+    const i = hint < 0 ? k : cyc(hint + k, G.N), d = (G.x[i] - x) ** 2 + (G.y[i] - y) ** 2;
+    if (d < best) { best = d; bi = i; }
+  }
+  return { i: bi, d: Math.sqrt(best) };
+}
+
+/* ================= the design being edited ================= */
+/* every track in the game, in track-code form (kept in step with the game by its build script) */
+const LIBRARY = /*LIB*/[{"format":"gatebreaker-track","version":1,"name":"Kessler Loop","km":"7.2","points":[[300,0],[560,0],[715,-25],[790,-110],[808,-240],[868,-338],[1025,-338],[1092,-240],[1100,-110],[1170,-10],[1310,30],[1580,10],[1860,80],[2080,340],[2020,570],[1730,715],[1450,715],[1290,712],[1205,790],[1182,900],[1112,1032],[968,1032],[898,900],[875,790],[790,712],[660,706],[420,712],[160,724],[-90,724],[-203,677],[-250,564],[-250,420],[-250,300],[-250,135],[-284,54],[-365,20],[-446,54],[-480,135],[-446,216],[-365,250],[-250,250],[-170,250],[-85,215],[-50,130],[-50,100],[-21,29],[50,0],[150,0]],"shortcuts":[{"from":[560,0],"to":[1340,30],"via":[[653,113],[747,209],[842,274],[939,300],[1037,282],[1137,224],[1238,135]]},{"from":[1384,711],"to":[660,706],"via":[[1294,620],[1204,544],[1114,492],[1024,474],[933,491],[842,541],[751,617]]}],"elevation":[{"from":0.07142857142857142,"to":0.16777408637873753,"level":1,"rocks":true},{"from":0.48172757475083056,"to":0.584717607973422,"level":-1,"canopy":"ice"},{"from":0.8538205980066446,"to":0.9534883720930233,"level":1,"rocks":true}],"barricades":[0.2840531561461794,0.7059800664451827],"setting":"space","jumps":[],"gaps":[],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"Industrial","km":"12.9","points":[[150,-20],[-715,-735],[-1340,-1015],[-1150,-1530],[-700,-1470],[-515,-1030],[-145,-685],[235,-765],[500,-555],[680,-230],[855,60],[635,330],[335,565],[0,620],[-575,537],[-1360,550],[-1385,130],[-1545,-195],[-1455,-470],[-1175,-520],[-1000,-240],[-690,905],[-205,870],[160,1020],[415,385]],"shortcuts":[{"from":[-1003,-862],"to":[-557,-1112],"via":[[-1090,-906],[-1156,-977],[-1194,-1067],[-1199,-1164],[-1171,-1257],[-1112,-1335],[-1031,-1388],[-936,-1409],[-839,-1398],[-753,-1353],[-686,-1282]],"target":[0.11101,57]}],"elevation":[{"from":0.74086,"to":0.97584,"level":1,"rocks":true},{"from":0.30193,"to":0.44049,"level":-1,"canopy":"ice"}],"barricades":[0.51355,0.16995],"setting":"volcano","jumps":[{"at":0.63947}],"gaps":[{"from":0.64391,"to":0.66242}],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"Ion Foundry","km":"18.5","points":[[425,-827],[405,-535],[225,-415],[80,-165],[-35,-40],[-230,30],[-480,-60],[-660,205],[-390,625],[-315,875],[-640,1130],[-850,1295],[-1065,1395],[-1250,1225],[-1420,995],[-1590,715],[-1325,470],[-895,95],[-770,-225],[-1070,-305],[-1335,-90],[-1560,-125],[-1595,-695],[-1510,-915],[-1310,-1100],[-1165,-1485],[-895,-1675],[-680,-1495],[-325,-1525],[-190,-1245],[-370,-1040],[-325,-835],[-225,-695],[-45,-520],[115,-370],[440,-285],[490,65],[275,245],[85,380],[135,570],[410,735],[565,975],[740,1210],[960,1395],[1230,1380],[1385,1140],[1270,785],[1520,580],[1545,290],[1545,0],[1530,-290],[1455,-440],[1330,-540],[1125,-655],[1100,-900],[1430,-1035],[1520,-1215],[1350,-1430],[1055,-1470],[940,-1100],[500,-1150]],"shortcuts":[{"from":[-32,-42],"to":[-318,881],"via":[[-90,385]]}],"elevation":[{"from":0.2948,"to":0.39272,"level":-1},{"from":0.43095,"to":0.66386,"level":1,"rocks":true},{"from":0.68618,"to":0.74042,"level":1}],"barricades":[0.22108,0.8063,0.11226],"setting":"dunes","jumps":[],"gaps":[],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"Lagrange Knot","km":"15.9","points":[[405,85],[265,345],[100,585],[-100,800],[-325,985],[-640,960],[-855,1220],[-1145,1230],[-1265,1100],[-1215,880],[-1410,740],[-1705,775],[-1790,565],[-1620,235],[-1325,95],[-970,45],[-850,-240],[-575,-345],[-290,-405],[0,-425],[290,-405],[575,-345],[850,-240],[1100,-90],[1320,100],[1490,335],[1760,295],[1905,470],[1565,900],[1390,1130],[1135,1410],[810,1260],[555,1125],[305,975],[80,790],[-110,570],[-275,330],[-410,70],[-515,-200],[-590,-485],[-540,-780],[-620,-1065],[-565,-1355],[-455,-1620],[-265,-1840],[5,-1930],[275,-1830],[460,-1605],[570,-1335],[620,-1050],[625,-967],[530,-745],[585,-465],[510,-185]],"shortcuts":[{"from":[-560,-1370],"to":[602,-918],"via":[[-393,-1446],[-251,-1548],[-97,-1616],[65,-1634],[218,-1583],[337,-1479],[419,-1344],[465,-1199]]}],"elevation":[{"from":0.36058,"to":0.4148,"level":-1,"canopy":"ice"},{"from":0.62938,"to":0.6836,"level":-1,"canopy":"gas"},{"from":0.70394,"to":0.76023,"level":-1,"canopy":"ice"},{"from":0.07408,"to":0.23187,"level":-1,"canopy":"gas"},{"from":0.46155,"to":0.61111,"level":1,"rocks":true},{"from":0.29709,"to":0.33366,"level":1}],"barricades":[0.26619,0.78],"setting":"forest","jumps":[{"at":0.43135}],"gaps":[{"from":0.43889,"to":0.45145},{"from":0.70544,"to":0.71297}],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"Rime Belt","km":"17.4","points":[[1030,-1645],[745,-1590],[680,-1335],[380,-1215],[60,-1085],[-75,-830],[-135,-550],[-115,-260],[0,0],[210,200],[475,305],[765,315],[1035,215],[1170,-30],[1015,-255],[740,-345],[455,-320],[190,-200],[-5,10],[-120,275],[-140,560],[-85,845],[145,1020],[235,1320],[535,1345],[735,1600],[1020,1655],[1305,1650],[1590,1600],[2005,1195],[1905,820],[1665,805],[1335,820],[1155,575],[1380,265],[1685,345],[1780,645],[1675,890],[1765,1115],[2095,1280],[2365,1215],[2580,1025],[2770,805],[2420,275],[2850,-30],[2990,-165],[3045,-370],[2815,-545],[2780,-810],[2425,-895],[2380,-1225],[2140,-1385],[1895,-1395],[1783,-1396],[1485,-1425],[1320,-1650]],"shortcuts":[{"from":[2420,274],"to":[1505,-1416],"via":[[2245,-165],[2350,-525],[2065,-945],[1680,-1120]]}],"elevation":[{"from":0.28129,"to":0.32405,"level":1,"rocks":true},{"from":0.56771,"to":0.71068,"level":1},{"from":0.35458,"to":0.53261,"level":-1},{"from":0.81493,"to":0.9484,"level":1}],"barricades":[0.09493,0.76174],"setting":"arctic","jumps":[],"gaps":[],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"Perihelion","km":"19.3","points":[[155,1685],[-65,1685],[-405,1815],[-650,1495],[-1000,1620],[-1255,1365],[-1010,1095],[-1170,870],[-1520,925],[-1800,1225],[-1945,1250],[-2235,1170],[-2530,990],[-2565,635],[-2280,380],[-2230,70],[-2505,-125],[-2470,-375],[-2370,-545],[-2220,-730],[-2020,-940],[-2090,-1435],[-1610,-1700],[-1250,-1445],[-985,-1515],[-745,-1610],[-465,-1685],[-175,-1725],[110,-1730],[655,-1650],[735,-1105],[945,-870],[1250,-1075],[1455,-1225],[1715,-1100],[1980,-990],[2245,-870],[2495,-730],[2715,-540],[2830,-280],[2770,0],[2590,225],[2370,410],[2135,585],[1930,785],[1775,1030],[1620,1275],[1415,1475],[920,1020],[670,995],[540,1190],[755,1415],[750,1645],[450,1685]],"shortcuts":[{"from":[1972,-993],"to":[2124,595],"via":[[2325,-250]],"target":[0.66958,-57]}],"elevation":[{"from":0.82287,"to":0.88346,"level":1,"rocks":true},{"from":0.18794,"to":0.36515,"level":1}],"barricades":[0.71338],"setting":"vegas","jumps":[{"at":0.58601}],"gaps":[{"from":0.5933,"to":0.61708}],"loops":[{"at":0.49927,"r":220,"side":"right"}]},{"format":"gatebreaker-track","version":1,"name":"Slag Run","km":"20.1","points":[[469,846],[425,770],[280,515],[140,260],[-145,-50],[-530,125],[-750,-145],[-425,-770],[-575,-1020],[-695,-1275],[-945,-1475],[-1185,-1315],[-1425,-1355],[-1550,-1160],[-1620,-875],[-1665,-585],[-1690,-295],[-1700,0],[-1695,290],[-1670,585],[-1630,875],[-1560,1155],[-1435,1420],[-1200,1580],[-940,1460],[-805,1225],[-390,1195],[-195,900],[-275,505],[-135,250],[210,60],[145,-265],[285,-525],[430,-780],[580,-1025],[750,-1265],[950,-1480],[1215,-1595],[1440,-1430],[1555,-1160],[1620,-875],[1265,-310],[1325,215],[1510,595],[1870,695],[1995,485],[1710,-135],[1995,-345],[2315,-195],[2395,135],[1685,295],[1665,585],[1625,875],[1555,1160],[1440,1425],[1210,1585],[945,1470],[745,1255],[575,1020]],"shortcuts":[{"from":[492,-885],"to":[1307,-409],"via":[[850,-1015],[1035,-1090],[1175,-1130],[1270,-1130],[1330,-1065],[1355,-930],[1280,-715]]},{"from":[-461,-907],"to":[-1659,-635],"via":[[-640,-1030],[-830,-1110],[-1013,-1168],[-1150,-1155],[-1275,-1090],[-1395,-940],[-1485,-795]]}],"elevation":[{"from":0.45382,"to":0.50814,"level":1,"rocks":true},{"from":0.33214,"to":0.43405,"level":-1,"canopy":"ice"},{"from":0.54418,"to":0.63562,"level":1},{"from":0.69222,"to":0.81979,"level":1},{"from":0.87238,"to":0.90859,"level":-1},{"from":0.91848,"to":0.97453,"level":-1},{"from":0.15109,"to":0.22825,"level":1}],"barricades":[0.06784,0.31088],"setting":"gale","jumps":[{"at":0.26311}],"gaps":[{"from":0.27028,"to":0.28163},{"from":0.50039,"to":0.50512}],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"Tether Yards","km":"17.1","points":[[2076,-469],[2250,-370],[2490,-210],[2535,95],[2785,270],[2700,540],[2490,740],[2235,885],[1840,645],[1605,925],[1415,1185],[1140,1275],[855,1345],[570,1390],[280,1395],[-10,1365],[-295,1305],[-770,1060],[-700,860],[-380,935],[-200,830],[-280,615],[-640,410],[-1170,460],[-1385,890],[-1705,960],[-1950,800],[-2115,565],[-2170,280],[-2215,-10],[-2320,-280],[-2430,-550],[-2460,-835],[-2345,-1100],[-2115,-1275],[-1875,-1320],[-1695,-1225],[-1400,-805],[-1055,-885],[-985,-1325],[-630,-1450],[-355,-1340],[-110,-1240],[180,-1250],[475,-1265],[650,-580],[1080,-625],[1300,-1040],[1655,-1000],[1745,-660],[1995,-515]],"shortcuts":[{"from":[-1053,-887],"to":[-120,-1242],"target":[0.7178,42]}],"elevation":[{"from":0.19254,"to":0.24833,"level":1},{"from":0.81292,"to":0.96255,"level":-1}],"barricades":[0.41354,0.65439],"setting":"space","jumps":[{"at":0.27422},{"at":0.46471,"side":"left"},{"at":0.51589,"side":"left"}],"gaps":[{"from":0.2819,"to":0.29597},{"from":0.24271,"to":0.24763},{"from":0.47096,"to":0.47699},{"from":0.51982,"to":0.52651}],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"Mirage Basin","km":"15.8","points":[[734,0],[1003,0],[1268,-26],[1483,-183],[1682,-362],[1809,-592],[1755,-850],[1551,-1018],[1415,-1295],[1083,-1281],[841,-1392],[579,-1357],[328,-1263],[165,-1070],[-174,-1075],[-377,-911],[-392,-650],[-318,-392],[-244,-134],[-170,124],[-97,382],[-2,631],[219,772],[480,833],[741,894],[1003,956],[1264,1018],[1472,1180],[1639,1389],[1757,1625],[1673,1872],[1437,1988],[1177,2056],[918,2125],[658,2193],[394,2222],[132,2167],[-131,2113],[-345,1860],[-656,2003],[-919,1949],[-1182,1894],[-1423,1785],[-1569,1563],[-1683,1320],[-1796,1077],[-1875,823],[-1794,573],[-1580,416],[-1420,120],[-1106,163],[-869,37],[-607,0],[-339,0],[-71,0],[198,0],[485,165]],"shortcuts":[{"from":[1344,1067],"to":[1033,2094],"via":[[1422,1149],[1469,1253],[1487,1372],[1479,1499],[1448,1629],[1396,1756],[1326,1871],[1240,1971],[1142,2047]]}],"elevation":[{"from":0.27526,"to":0.35408,"level":-1,"canopy":"storm"},{"from":0.69274,"to":0.73821,"level":1,"rocks":true},{"from":0.06983,"to":0.22683,"level":1,"rocks":true}],"barricades":[0.7799,0.58647,0.5334],"setting":"dunes","jumps":[{"at":0.39652}],"gaps":[{"from":0.40714,"to":0.41471}],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"Frostline","km":"17.8","points":[[-255,-56],[13,-50],[505,50],[980,-5],[1480,130],[1825,30],[2100,150],[1910,605],[1700,1080],[1715,1525],[1845,1890],[2140,2115],[2210,2360],[2095,2535],[1880,2635],[1590,2590],[1375,2435],[1295,2245],[1195,1900],[785,1970],[675,2280],[550,2555],[220,2455],[-60,1875],[-1028,1737],[-1160,1210],[-1391,1049],[-1643,957],[-1896,868],[-2151,783],[-2385,662],[-2448,411],[-2420,40],[-2065,-270],[-1750,120],[-2100,1355],[-1635,1535],[-1420,220],[-1060,-77],[-792,-70],[-524,-63]],"shortcuts":[{"from":[824,1947],"to":[-83,1863]}],"elevation":[{"from":0.22192,"to":0.27938,"level":1,"rocks":true},{"from":0.66316,"to":0.90389,"level":1},{"from":0.50282,"to":0.587,"level":-1,"canopy":"blizzard"}],"barricades":[0.4119,0.64297],"setting":"arctic","jumps":[],"gaps":[],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"Briar Hollow","km":"20.5","points":[[671,0],[941,0],[1210,0],[1478,-12],[1708,-149],[1928,-306],[2159,-439],[2405,-354],[2624,-197],[2874,-133],[3058,-316],[3178,-557],[3257,-810],[3148,-1053],[3010,-1284],[2871,-1515],[2711,-1730],[2461,-1816],[2260,-1840],[1955,-1735],[1680,-1790],[1350,-1920],[1132,-1812],[946,-1618],[720,-1460],[515,-1380],[380,-1235],[280,-985],[255,-796],[147,-550],[39,-303],[-69,-56],[-177,191],[-285,438],[-830,605],[-1105,710],[-1095,1035],[-450,1065],[-185,1170],[-140,1460],[-245,1800],[-445,1905],[-855,2030],[-1145,1918],[-1412,1952],[-1680,1973],[-1825,1510],[-1960,1240],[-2090,1095],[-2430,1230],[-2590,1014],[-2615,751],[-2340,530],[-2383,266],[-2256,29],[-2100,-170],[-1620,-505],[-1340,-105],[-1575,155],[-1565,310],[-1320,415],[-1120,280],[-1105,-10],[-860,-95],[-676,0],[-407,0],[-137,0],[132,0],[402,0]],"shortcuts":[{"from":[2334,-391],"to":[3052,-1215],"via":[[2447,-361],[2566,-375],[2687,-426],[2802,-506],[2907,-609],[2994,-727],[3058,-853],[3093,-982],[3093,-1105]]}],"elevation":[{"from":0.36713,"to":0.42611,"level":1},{"from":0.20813,"to":0.24732,"level":-1,"canopy":"mist"},{"from":0.79177,"to":0.93484,"level":-1,"canopy":"mist"}],"barricades":[0.13543,0.71364],"setting":"forest","jumps":[{"at":0.30242}],"gaps":[{"from":0.31089,"to":0.3195}],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"Cinder Coil","km":"19.3","points":[[-745,15],[-519,0],[-247,0],[40,-165],[296,0],[640,-175],[839,0],[1110,0],[1371,54],[1529,267],[1579,534],[1628,801],[1520,1015],[1375,1125],[1370,1335],[1620,1425],[1680,1640],[1440,1770],[1155,1550],[935,1650],[576,1745],[305,1751],[34,1758],[-238,1764],[-509,1771],[-965,1760],[-1125,2105],[-1430,2070],[-1470,1795],[-1245,1630],[-1265,1405],[-1518,1254],[-1536,983],[-1489,723],[-1252,613],[-981,604],[-710,595],[-438,585],[-167,576],[104,567],[376,557],[638,600],[765,830],[776,1096],[574,1260],[304,1277],[33,1291],[-239,1306],[-510,1320],[-779,1303],[-1048,1262],[-1316,1222],[-1585,1182],[-1853,1142],[-2113,1073],[-2256,851],[-2334,591],[-2318,328],[-2113,159],[-1850,135],[-1590,385],[-1165,345],[-1050,65]],"shortcuts":[],"elevation":[{"from":0.77573,"to":0.84255,"level":1,"rocks":true},{"from":0.62002,"to":0.66546,"level":-1,"canopy":"smoke"}],"barricades":[0.25017,0.87931],"setting":"volcano","jumps":[{"at":0.71492},{"at":0.16617},{"at":0.91525,"side":"left"},{"at":0.56837}],"gaps":[{"from":0.72427,"to":0.73029},{"from":0.17553,"to":0.17978},{"from":0.57453,"to":0.58844}],"loops":[{"at":0.33492,"r":220,"side":"right"}]},{"format":"gatebreaker-track","version":1,"name":"Thermal Rise","km":"17.8","points":[[895,-510],[1085,-280],[1190,-165],[1335,-60],[1565,-15],[1715,-175],[1710,-495],[1968,-682],[1984,-945],[1785,-1160],[1770,-1437],[1552,-1584],[1288,-1559],[1031,-1480],[774,-1401],[572,-1237],[595,-980],[435,-855],[180,-940],[-40,-675],[30,-310],[-115,-83],[-259,144],[-293,402],[-249,667],[-205,932],[-110,1177],[160,1370],[445,1495],[675,1555],[960,1510],[1200,1405],[1300,1115],[1472,930],[1373,688],[1173,518],[913,571],[657,653],[401,734],[145,816],[-111,897],[-367,979],[-626,1049],[-893,1084],[-1159,1120],[-1425,1155],[-1689,1135],[-1864,940],[-1963,691],[-1951,429],[-1756,253],[-1512,142],[-1310,310],[-1150,285],[-1125,140],[-1270,-95],[-1205,-220],[-1035,-240],[-905,-25],[-734,0],[-565,-240],[-330,-200],[-196,0],[175,-85],[400,-535],[705,-675]],"shortcuts":[{"from":[-1127,1116],"to":[-1759,255],"via":[[-1700,600]]}],"elevation":[{"from":0.59765,"to":0.66241,"level":1},{"from":0.40334,"to":0.49464,"level":-1},{"from":0.28421,"to":0.35488,"level":1}],"barricades":[0.24131,0.51658],"setting":"gale","jumps":[{"at":0.17454},{"at":0.55585}],"gaps":[{"from":0.18397,"to":0.18938},{"from":0.56529,"to":0.57136}],"loops":[]},{"format":"gatebreaker-track","version":1,"name":"High Roller","km":"16.4","points":[[-1451,0],[-1179,0],[-906,0],[-634,0],[-362,0],[-90,0],[182,0],[454,0],[726,0],[998,0],[1257,-54],[1385,-291],[1493,-541],[1733,-630],[2005,-630],[2256,-562],[2347,-307],[2425,-47],[2484,217],[2308,411],[2084,565],[2073,815],[2194,1059],[2277,1312],[2097,1502],[1866,1646],[1616,1723],[1430,1534],[1272,1312],[1058,1170],[786,1170],[537,1242],[457,1500],[390,1764],[171,1890],[-101,1890],[-372,1879],[-508,1659],[-574,1395],[-714,1180],[-985,1170],[-1244,1220],[-1336,1472],[-1402,1736],[-1614,1871],[-1885,1841],[-2155,1808],[-2319,1610],[-2412,1354],[-2505,1098],[-2588,840],[-2489,591],[-2356,354],[-2224,116],[-1995,0],[-1723,0]],"shortcuts":[{"from":[1221,-34],"to":[2068,601],"via":[[1650,-230],[2010,-235],[2225,-60],[2125,295]]}],"elevation":[{"from":0.66064,"to":0.76709,"level":-1},{"from":0.46456,"to":0.59293,"level":1},{"from":0.23117,"to":0.32577,"level":-1}],"barricades":[0.20651,0.42653,0.8332],"setting":"vegas","jumps":[],"gaps":[],"loops":[{"at":0.11914,"r":200,"side":"right"}]}]/*LIB*/;
+/* every setting (the world around a track), with what can hang over a sunken stretch in each (kept in step with the
+   game's setting files by its build script) */
+const SETTINGS_META = /*SET*/[{"id":"space","name":"Deep space","words":{"scenery":"asteroids"},"alias":{},"overhead":[{"key":"gas","label":"gas clouds"},{"key":"ice","label":"ice asteroids"}]},{"id":"dunes","name":"Dune world","words":{"scenery":"desert rocks"},"alias":{"gas":"storm","ice":"storm"},"overhead":[{"key":"storm","label":"sandstorms"}]},{"id":"arctic","name":"Arctic","words":{"scenery":"snowy rocks"},"alias":{"gas":"blizzard","ice":"blizzard","storm":"blizzard"},"overhead":[{"key":"blizzard","label":"blizzards"}]},{"id":"forest","name":"Forest","words":{"scenery":"trees"},"alias":{"ice":"none","leaves":"none","gas":"none","storm":"none","blizzard":"none","mist":"none","smoke":"none"},"overhead":[{"key":"branches","label":"overhanging branches"}]},{"id":"volcano","name":"Volcano","words":{"scenery":"mining machinery"},"alias":{"gas":"smoke","ice":"smoke","storm":"smoke","blizzard":"smoke","mist":"smoke"},"overhead":[{"key":"smoke","label":"smoke"}]},{"id":"gale","name":"Gale world","words":{"scenery":"sky jellies"},"alias":{"gas":"cloud","ice":"cloud","storm":"cloud","blizzard":"cloud","mist":"cloud","smoke":"cloud"},"overhead":[{"key":"cloud","label":"wind-torn cloud"}]}]/*SET*/;
+const settingMeta = () => SETTINGS_META.find((m) => m.id === doc.setting) || SETTINGS_META.find((m) => m.id === 'space') || { id: 'space', name: 'Deep space', words: {}, alias: {}, overhead: [] };
+/* an overhead name as this setting shows it (a name it lacks is mapped by its alias, or to its first overhead type) */
+function overheadLabel(key) {
+  if (!settingMeta().overhead.some((q) => q.key === key) && settingMeta().alias[key] === 'none') return 'nothing';   // (this world turns it off)
+  const m = settingMeta(), o = m.overhead.find((q) => q.key === key) || m.overhead.find((q) => q.key === m.alias[key]) || m.overhead[0];
+  return o ? o.label : key;
+}
+const EXAMPLE = {"format":"gatebreaker-track","version":1,"name":"Kessler Loop","points":[[300,0],[560,0],[715,-25],[790,-110],[808,-240],[868,-338],[1025,-338],[1092,-240],[1100,-110],[1170,-10],[1310,30],[1580,10],[1860,80],[2080,340],[2020,570],[1730,715],[1450,715],[1290,712],[1205,790],[1182,900],[1112,1032],[968,1032],[898,900],[875,790],[790,712],[660,706],[420,712],[160,724],[-90,724],[-203,677],[-250,564],[-250,420],[-250,300],[-250,135],[-284,54],[-365,20],[-446,54],[-480,135],[-446,216],[-365,250],[-250,250],[-170,250],[-85,215],[-50,130],[-50,100],[-21,29],[50,0],[150,0]],"shortcuts":[{"from":[560,0],"to":[1340,30],"via":[[653,113],[747,209],[842,274],[939,300],[1037,282],[1137,224],[1238,135]]},{"from":[1384,711],"to":[660,706],"via":[[1294,620],[1204,544],[1114,492],[1024,474],[933,491],[842,541],[751,617]]}],"elevation":[{"from":0.07142857142857142,"to":0.16777408637873753,"level":1,"rocks":true},{"from":0.48172757475083056,"to":0.584717607973422,"level":-1,"canopy":"ice"},{"from":0.8538205980066446,"to":0.9534883720930233,"level":1,"rocks":true}],"barricades":[0.2840531561461794,0.7059800664451827],"setting":"space","jumps":[],"gaps":[],"loops":[]};
+function blankDoc() {
+  const pts = [];
+  for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU - Math.PI / 2; pts.push([Math.round(Math.cos(a) * 1150), Math.round(Math.sin(a) * 620)]); }
+  // start on the top straight, racing clockwise
+  return { name: 'New track', setting: 'space', points: pts, shortcuts: [], elevation: [], barricades: [], jumps: [], gaps: [], loops: [] };
+}
+let doc = null, G = null;
+function rebuild() { G = buildGeom(doc.points); computeHeights(); runChecks(); refreshCode(); refreshSel(); save(); draw(); const st = document.getElementById('setting'); if (st && doc.setting && st.value !== doc.setting) st.value = doc.setting; }
+
+/* elevation profile, exactly as the game builds it */
+function stretchSamples(e) {
+  const N = G.N, s0 = anchorIdx(G, e.a), e0 = anchorIdx(G, e.b), span = cyc(e0 - s0, N);
+  return { s0, span };
+}
+function computeHeights() {
+  const N = G.N, rS = Math.max(4, Math.round(RAMP / G.step));
+  G.h.fill(0);
+  for (const e of doc.elevation) {
+    const { s0, span } = stretchSamples(e), r = Math.min(rS, Math.floor(span / 3)), a = s0 + r, len = span - 2 * r, lv = e.level > 0 ? 1 : -1;
+    for (let i = 0; i < N; i++) {
+      const rel = cyc(i - a, N);
+      let d = 0;
+      if (rel <= len) d = 1;
+      else { const m = Math.min(rel - len, N - rel); if (m < r) { const t = 1 - m / r; d = t * t * (3 - 2 * t); } }
+      if (d > 0) G.h[i] += lv * d;
+    }
+  }
+  G.gap = new Uint8Array(N);
+  for (const g of doc.gaps) { const { s0, span } = stretchSamples(g); for (let q = 0; q < span; q++) G.gap[cyc(s0 + q, N)] = 1; }
+}
+/* a gap: its samples, and how fast a racer must be going to clear it (the game works this out the same way) */
+function gapInfo(g) {
+  const N = G.N, { s0, span } = stretchSamples(g), pre = cyc(s0 - 1, N), post = cyc(s0 + span, N), hN = G.h[pre], hF = G.h[post];
+  let jb = -1, best = 1e9;
+  doc.jumps.forEach((j, k) => { const d = cyc(s0 - anchorIdx(G, j.a), N); if (d >= 1 && d <= 60 && d < best) { best = d; jb = k; } });
+  let need = Infinity, why = '';
+  if (jb >= 0) {
+    const ji = anchorIdx(G, doc.jumps[jb].a), top = G.h[ji] + AIR.H;
+    if (top <= hF + 0.02) why = 'the far side is higher than a jump reaches';
+    else need = (cyc(post - ji, N) * G.step + 8) / (AIR.H / AIR.RISE + AIR.HOLD + Math.sqrt((2 * (top - hF)) / AIR.G));
+  } else if (hN <= hF + 0.05) why = 'nothing launches racers over it';
+  else need = ((span + 0.5) * G.step + 8) / Math.sqrt((2 * (hN - hF)) / AIR.G);
+  return { s0, span, n: span, a: s0, b: cyc(s0 + span - 1, N), jump: jb, need, why, drop: jb < 0 && hN > hF + 0.05 };
+}
+/* the deck under a point (any part of the lane, not over a gap) at or below height hMax: its sample, or -1 */
+function floorUnder(x, y, hMax) {
+  const N = G.N, D = new Float64Array(N);
+  for (let i = 0; i < N; i++) D[i] = (G.x[i] - x) ** 2 + (G.y[i] - y) ** 2;
+  let best = -1e9, bi = -1;
+  for (let i = 0; i < N; i++) {
+    const d = D[i];
+    if (d >= HW * HW || d > D[cyc(i - 1, N)] || d > D[cyc(i + 1, N)] || G.gap[i] || G.h[i] > hMax || G.h[i] <= best) continue;
+    best = G.h[i]; bi = i;
+  }
+  return bi;
+}
+/* how long a jump keeps a racer up, coming down to the height it left from */
+const flightTime = () => AIR.H / AIR.RISE + AIR.HOLD + Math.sqrt((2 * AIR.H) / AIR.G);
+/* a shortcut always runs forwards, from the earlier end to the later one */
+/* corridor centre line: straight, or a smooth curve through the bend points (same as the game) */
+function corridorPoints(A, via, B) {
+  if (!via || !via.length) return [A, B];
+  const P = [A].concat(via, [B]), n = P.length, out = [];
+  const at = (i) => (i < 0 ? [2 * P[0][0] - P[1][0], 2 * P[0][1] - P[1][1]] : i >= n ? [2 * P[n - 1][0] - P[n - 2][0], 2 * P[n - 1][1] - P[n - 2][1]] : P[i]);
+  for (let i = 0; i < n - 1; i++) for (let k = 0; k < 16; k++) out.push(catmull(at(i - 1), at(i), at(i + 1), at(i + 2), k / 16));
+  out.push(B);
+  return out;
+}
+function polyOf(pts) {
+  const n = pts.length, P = { x: new Float64Array(n), y: new Float64Array(n), s: new Float64Array(n), len: 0 };
+  for (let i = 0; i < n; i++) { P.x[i] = pts[i][0]; P.y[i] = pts[i][1]; if (i) P.s[i] = P.s[i - 1] + Math.hypot(P.x[i] - P.x[i - 1], P.y[i] - P.y[i - 1]); }
+  P.len = P.s[n - 1];
+  return P;
+}
+function polyAt(P, s) {
+  const n = P.x.length;
+  s = clamp(s, 0, P.len);
+  let i = 1;
+  while (i < n - 1 && P.s[i] < s) i++;
+  const l = P.s[i] - P.s[i - 1] || 1, f = (s - P.s[i - 1]) / l;
+  return [P.x[i - 1] + (P.x[i] - P.x[i - 1]) * f, P.y[i - 1] + (P.y[i] - P.y[i - 1]) * f, (P.x[i] - P.x[i - 1]) / l, (P.y[i] - P.y[i - 1]) / l];
+}
+function polyDist(P, x, y) {
+  let best = 1e18, bs = 0;
+  for (let i = 1; i < P.x.length; i++) {
+    const ax = P.x[i - 1], ay = P.y[i - 1], dx = P.x[i] - ax, dy = P.y[i] - ay, l2 = dx * dx + dy * dy || 1;
+    const t = clamp(((x - ax) * dx + (y - ay) * dy) / l2, 0, 1), px = ax + dx * t - x, py = ay + dy * t - y, d = px * px + py * py;
+    if (d < best) { best = d; bs = P.s[i - 1] + (P.s[i] - P.s[i - 1]) * t; }
+  }
+  return { d: Math.sqrt(best), s: bs };
+}
+/* a shortcut always runs forwards, from the earlier end to the later one; its bend points are kept in that order */
+function chordInfo(c) {
+  const N = G.N;
+  let a = anchorIdx(G, c.a), b = anchorIdx(G, c.b), swapped = false;
+  if (cyc(b - a, N) > N / 2) { [a, b] = [b, a]; swapped = true; }
+  const via = swapped ? c.via.slice().reverse() : c.via.slice();
+  const ax = G.x[a], ay = G.y[a], bx = G.x[b], by = G.y[b];
+  const P = polyOf(corridorPoints([ax, ay], via, [bx, by]));
+  const door = (from, fromEnd) => {
+    for (let t = 0.1; t < 0.6; t += 0.01) {
+      const p = polyAt(P, fromEnd ? P.len * (1 - t) : P.len * t);
+      if (nearestSample(G, p[0], p[1], from, 30).d > HW + CHW + 6) return t * P.len;
+    }
+    return -1;
+  };
+  const doorS = door(a, false), doorSB = door(b, true);
+  const e = polyAt(P, Math.max(0, doorS)), st = polyAt(P, 0);
+  // its heights, as the game works them out: the lane's at each end, with a ramp between its door and its exit gate
+  // where they differ (the ramp up to 1.5 x RAMP long, centred in the room there)
+  const h0 = Math.round(G.h[a] * 1000) / 1000, h1 = Math.round(G.h[b] * 1000) / 1000;
+  const exitS = Math.max(P.len - Math.max(0, doorSB), Math.min(P.len - 30, Math.max(0, doorS) + 90));
+  const rr0 = Math.max(0, doorS) + 20, rr1 = exitS - 20, rmid = (rr0 + rr1) / 2, rhalf = Math.min((rr1 - rr0) / 2, RAMP * 0.75);
+  const r0 = rmid - Math.max(10, rhalf), r1 = rmid + Math.max(10, rhalf);
+  const hAt = (sv) => { if (h0 === h1) return h0; let t = clamp((sv - r0) / (r1 - r0), 0, 1); t = t * t * (3 - 2 * t); return h0 + (h1 - h0) * t; };
+  // its target: placed by the designer, or by default just before the entrance on the side the corridor leaves from
+  let ti, lat;
+  if (c.target) { ti = anchorIdx(G, c.target.anchor); lat = clamp(c.target.lat, -(HW - 13), HW - 13); }
+  else { ti = cyc(a - 16, N); lat = (G.nx[ti] * st[2] + G.ny[ti] * st[3] >= 0 ? 1 : -1) * (HW - 13); }
+  return {
+    a, b, ax, ay, bx, by, P, len: P.len, arc: cyc(b - a, N) * G.step, doorS, doorSB, dx: e[2], dy: e[3], via, swapped,
+    h0, h1, hAt, room: rr1 - rr0, rampLen: r1 - r0,
+    ti, lat, tx: G.x[ti] + G.nx[ti] * lat, ty: G.y[ti] + G.ny[ti] * lat, custom: !!c.target
+  };
+}
+
+/* ================= checks ================= */
+let issues = [], stats = {};
+function issue(level, text, at) { issues.push({ level, text, at: at || [] }); }
+function runChecks() {
+  issues = [];
+  const N = G.N, h = G.h;
+  const far = (i, j) => Math.min(Math.abs(i - j), N - Math.abs(i - j));
+  if (doc.points.length < 4) issue('bad', 'A track needs at least 4 points.');
+  // bends
+  const tight = [];
+  for (let i = 0; i < N; i++) {
+    const a = cyc(i - 6, N), b = cyc(i + 6, N);
+    const ax = G.x[i] - G.x[a], ay = G.y[i] - G.y[a], bx = G.x[b] - G.x[i], by = G.y[b] - G.y[i];
+    const cr = Math.abs(ax * by - ay * bx), la = Math.hypot(ax, ay), lb = Math.hypot(bx, by), lc = Math.hypot(G.x[b] - G.x[a], G.y[b] - G.y[a]);
+    const R = (la * lb * lc) / (2 * cr + 1e-9);
+    if (R < MIN_R) tight.push(i);
+  }
+  for (const g of groups(tight, N)) issue('bad', 'Bend too tight for the lane. Spread the points out or move them further apart.', g);
+  // lanes touching: allowed only where one side is raised or sunken a whole level relative to the other
+  const clash = [], cross = [];
+  const lim = (2 * HW + 16) ** 2;
+  for (let i = 0; i < N; i += 2) for (let j = i + 2; j < N; j += 2) {
+    if (far(i, j) <= 40) continue;
+    const dx = G.x[i] - G.x[j], dy = G.y[i] - G.y[j];
+    if (dx * dx + dy * dy >= lim) continue;
+    if (Math.abs(h[i] - h[j]) < 0.9) clash.push([i, j]); else cross.push([i, j]);
+  }
+  for (const g of pairGroups(clash, N)) issue('bad', 'The lane runs into another part of the track. Move them apart, or raise one stretch over the other to make an overpass.', g);
+  const xg = pairGroups(cross, N);
+  stats.crossings = xg.length;
+  stats.crossAt = [].concat(...xg);
+  // lap length
+  if (G.L < 3000) issue('warn', 'Very short lap (' + (G.L / 1000).toFixed(1) + ' km). The shortest track in the game is 7.2 km.', [0]);
+  if (G.L > 18000) issue('warn', 'Very long lap (' + (G.L / 1000).toFixed(1) + ' km). The longest tracks in the game are about 15 km.', [0]);
+  // start line
+  let startBad = false;
+  for (let q = -16; q <= 6; q++) if (Math.abs(h[cyc(q, N)]) > 0.001) startBad = true;
+  let startAir = false;
+  for (let q = -24; q <= 12; q++) if (G.gap[cyc(q, N)]) startAir = true;
+  for (const j of doc.jumps) { const i = anchorIdx(G, j.a); if (Math.min(i, N - i) < 20) startAir = true; }
+  if (startAir) issue('bad', 'Keep gaps and jump pads away from the start line and the grid behind it.', [0]);
+  if (startBad) issue('bad', 'The start line and the grid behind it must be on the ground.', [0]);
+  else if (stats.crossAt.some((i) => Math.min(i, N - i) < 18)) issue('bad', 'The start line is on a crossing. Move it to open track.', [0]);
+  else {
+    let straight = true;
+    for (const q of [-10, -4, 0]) { const a = cyc(q - 6, N), b = cyc(q + 6, N), i = cyc(q, N); if (G.tx[a] * G.tx[b] + G.ty[a] * G.ty[b] < 0.96) straight = false; void i; }
+    if (!straight) issue('warn', 'The start line is on a bend. Racers line up better on a straight.', [0]);
+  }
+  // elevation stretches
+  const spans = doc.elevation.map((e) => stretchSamples(e));
+  spans.forEach((sp, k) => {
+    const mid = cyc(sp.s0 + (sp.span >> 1), N);
+    if (sp.span < 30) issue('bad', (doc.elevation[k].level > 0 ? 'Raised' : 'Sunken') + ' stretch is too short for its ramps. Make it at least 360 m long.', [mid]);
+    else if (sp.span < 40) issue('warn', 'Short ' + (doc.elevation[k].level > 0 ? 'raised' : 'sunken') + ' stretch: the ramps will be steep.', [mid]);
+    for (let j = k + 1; j < spans.length; j++) {
+      const o = spans[j];
+      const inside = (i, s) => cyc(i - s.s0, N) <= s.span + 4 || cyc(s.s0 - i, N) <= 4;
+      if (inside(sp.s0, o) || inside(o.s0, sp) ) issue('bad', 'Two raised or sunken stretches overlap or touch. Leave flat ground between them.', [sp.s0, o.s0]);
+    }
+  });
+  // shortcuts
+  const infos = doc.shortcuts.map(chordInfo);
+  infos.forEach((c, k) => {
+    const mid = cyc(c.a + (cyc(c.b - c.a, N) >> 1), N);
+    // its ends may be on any level (the ground, or the flat top or floor of a raised or sunken stretch), not on a ramp
+    let level = true;
+    for (let q = -22; q <= 4; q++) if (Math.abs(h[cyc(c.a + q, N)] - h[c.a]) > 0.001) level = false;
+    for (let q = -4; q <= 4; q++) if (Math.abs(h[cyc(c.b + q, N)] - h[c.b]) > 0.001) level = false;
+    if (!level) issue('bad', 'Shortcut ' + (k + 1) + ': both ends (and the lane just before its entry) must be on level track: on the ground, or on the flat top or floor of a raised or sunken stretch, clear of its ramps.', [c.a, c.b]);
+    if (c.doorS < 0 || c.doorSB < 0) { issue('bad', 'Shortcut ' + (k + 1) + ' never leaves the lane. Pick ends further apart, or bend it away from the lane.', [c.a, c.b]); return; }
+    if (c.arc / c.len < 1.3) issue('warn', 'Shortcut ' + (k + 1) + ' barely saves any distance.', [c.a, c.b]);
+    // joining two levels: a ramp between its door and its exit gate, which needs the room
+    if (level && c.h0 !== c.h1) {
+      const dl = Math.abs(c.h1 - c.h0), word = (v) => (v > 0.5 ? 'raised' : v < -0.5 ? 'sunken' : 'ground');
+      const mid = nearestSample(G, ...polyAt(c.P, (c.doorS + c.len - c.doorSB) / 2).slice(0, 2), -1, 0).i;
+      if (c.room < RAMP * 0.75) issue('bad', 'Shortcut ' + (k + 1) + ' joins ' + word(c.h0) + ' track to ' + word(c.h1) + ' track but has no room for its ramp. Make it longer (at least ' + Math.round(RAMP * 0.75 + 40) + ' m between its door and where it rejoins).', [mid]);
+      else if (c.rampLen < RAMP * dl * 0.99) issue('warn', 'Shortcut ' + (k + 1) + "'s ramp (" + Math.round(c.rampLen) + ' m for ' + (dl > 1.5 ? 'two levels' : 'one level') + ') is steep. A longer corridor gives it more room.', [mid]);
+      else issue('info', 'Shortcut ' + (k + 1) + ' ' + (c.h1 > c.h0 ? 'climbs' : 'drops') + ' from ' + word(c.h0) + ' track to ' + word(c.h1) + ' track, on a ' + Math.round(c.rampLen) + ' m ramp in its middle.', [mid]);
+    }
+    // between its doors the corridor must stay clear of every other part of the lane
+    let hit = -1;
+    // (all along it, mouths included: only the lane right at its own two ends may be close)
+    for (let sa = 0; sa <= c.len && hit < 0; sa += 10) {
+      const p = polyAt(c.P, sa), mouth = sa < c.doorS || sa > c.len - c.doorSB;
+      for (let i = 0; i < N; i++) {
+        if (far(i, c.a) < (mouth ? 30 : 18) || far(i, c.b) < (mouth ? 30 : 18)) continue;
+        if (Math.hypot(G.x[i] - p[0], G.y[i] - p[1]) < HW + CHW + 26) { hit = i; break; }
+      }
+    }
+    if (hit >= 0) issue('bad', 'Shortcut ' + (k + 1) + ' cuts through or runs too close to another part of the track.', [hit]);
+    // bends in the corridor itself
+    const pts = [];
+    for (let sa = 0; sa <= c.len; sa += 12) pts.push(polyAt(c.P, sa));
+    let sharp = -1, folds = false;
+    for (let i = 3; i < pts.length - 3; i++) {
+      const A = pts[i - 3], B = pts[i], C = pts[i + 3];
+      const cr = Math.abs((B[0] - A[0]) * (C[1] - B[1]) - (B[1] - A[1]) * (C[0] - B[0]));
+      const R = (Math.hypot(B[0] - A[0], B[1] - A[1]) * Math.hypot(C[0] - B[0], C[1] - B[1]) * Math.hypot(C[0] - A[0], C[1] - A[1])) / (2 * cr + 1e-9);
+      if (R < CHW + 20) { sharp = i; break; }
+    }
+    for (let i = 0; i < pts.length && !folds; i++) for (let j = i + 14; j < pts.length; j++) if (Math.hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1]) < CHW * 2 + 10) { folds = true; break; }
+    if (sharp >= 0) issue('bad', 'Shortcut ' + (k + 1) + ' bends too sharply for its corridor. Move its bend points apart.', [nearestSample(G, pts[sharp][0], pts[sharp][1], -1, 0).i]);
+    if (folds) issue('bad', 'Shortcut ' + (k + 1) + ' folds back over itself.', [c.a]);
+    for (const e of [c.a, c.b]) for (let i = 0; i < N; i += 2) if (far(i, e) > 40 && Math.hypot(G.x[i] - G.x[e], G.y[i] - G.y[e]) < 2 * HW + 10) { issue('warn', 'Shortcut ' + (k + 1) + ' ends where two lanes cross; the game may attach it to the wrong one.', [e]); break; }
+    // its target
+    let tLevel = true;
+    for (let q = -2; q <= 2; q++) if (Math.abs(h[cyc(c.ti + q, N)] - h[c.ti]) > 0.001) tLevel = false;
+    if (!tLevel) issue('bad', 'Shortcut ' + (k + 1) + "'s target must be on level track, clear of ramps.", [c.ti]);
+    const lead = cyc(c.a - c.ti, N);
+    if (lead === 0 || lead > N / 2) issue('warn', 'Shortcut ' + (k + 1) + "'s target is past its entrance, so racers would have to come back for it.", [c.ti]);
+    else if (lead > 140) issue('warn', 'Shortcut ' + (k + 1) + "'s target is a long way before its entrance; the pass only lasts 6 seconds.", [c.ti]);
+    for (let j = k + 1; j < infos.length; j++) {
+      const o = infos[j];
+      // corridors running into or alongside each other
+      let close = false;
+      for (let sa = c.doorS; sa <= c.len - c.doorSB && !close; sa += 15) { const p = polyAt(c.P, sa); if (polyDist(o.P, p[0], p[1]).d < CHW * 2 + 20) close = true; }
+      if (close) issue('bad', 'Shortcuts ' + (k + 1) + ' and ' + (j + 1) + ' run into each other.', [mid]);
+      let x = false;
+      for (let p = 1; p < c.P.x.length && !x; p++) for (let q = 1; q < o.P.x.length; q++) if (segsCross(c.P.x[p - 1], c.P.y[p - 1], c.P.x[p], c.P.y[p], o.P.x[q - 1], o.P.y[q - 1], o.P.x[q], o.P.y[q])) { x = true; break; }
+      if (x) issue('bad', 'Shortcuts ' + (k + 1) + ' and ' + (j + 1) + ' cross each other.', [mid]);
+    }
+  });
+  // barricades
+  const bars = doc.barricades.map((b) => anchorIdx(G, b));
+  bars.forEach((g, k) => {
+    let ok = true;
+    for (let q = -26; q <= 8; q++) if (Math.abs(h[cyc(g + q, N)] - h[g]) > 0.001) ok = false;
+    if (!ok) issue('bad', 'Barricade ' + (k + 1) + ' and its target must be on level track (the ground, or the flat top or floor of a raised or sunken stretch), clear of ramps.', [g]);
+    if (far(g, 0) < 30) issue('warn', 'Barricade ' + (k + 1) + ' is right at the start line.', [g]);
+    for (const c of infos) {
+      if (far(g, c.a) < 26 || far(g, c.b) < 12) issue('warn', 'Barricade ' + (k + 1) + ' sits on a shortcut entrance.', [g]);
+      // its wall reaches a little past the lane edge, which must not block a corridor
+      let near = false;
+      for (const s2 of [-1, 1]) for (let l = -HW * 1.25; l <= HW * 1.25; l += 10) { const px = G.x[g] + G.nx[g] * l, py = G.y[g] + G.ny[g] * l; if (polyDist(c.P, px, py).d < CHW + 8) near = true; void s2; }
+      if (near) issue('bad', 'Barricade ' + (k + 1) + ' blocks a shortcut corridor.', [g]);
+    }
+    for (let j = k + 1; j < bars.length; j++) if (far(g, bars[j]) < 40) issue('warn', 'Barricades ' + (k + 1) + ' and ' + (j + 1) + ' are very close together.', [g]);
+  });
+  if (doc.barricades.length > 10) issue('bad', 'The game supports up to 10 barricades.');
+  // jumps and gaps
+  const member = new Int16Array(N).fill(-1);
+  spans.forEach((sp, k) => { for (let q = 0; q <= sp.span; q++) member[cyc(sp.s0 + q, N)] = k; });
+  const jIdx = doc.jumps.map((j) => anchorIdx(G, j.a));
+  const gaps = doc.gaps.map(gapInfo);
+  gaps.forEach((g, k) => {
+    const name = 'Gap ' + (k + 1), mid = cyc(g.s0 + (g.span >> 1), N), m0 = member[g.a];
+    if (g.span < 3) issue('warn', name + ' is very narrow (' + Math.round(g.span * G.step) + ' m); racers will hardly notice it.', [mid]);
+    if (g.span > 60) issue('bad', name + ' is too long. Keep gaps under 720 m.', [mid]);
+    let mixed = false;
+    for (let q = -2; q < g.span + 2; q++) if (member[cyc(g.a + q, N)] !== m0) mixed = true;
+    if (mixed) issue('bad', name + ' must sit wholly on flat ground or wholly inside one raised or sunken stretch (clear of its ends).', [mid]);
+    if (!isFinite(g.need)) issue('bad', name + " can't be cleared: " + g.why + '. Put a jump pad before it (within 720 m), or drop off a higher stretch onto lower track.', [mid]);
+    else if (g.need > SPD.boost) issue('bad', name + ' needs ' + Math.round(g.need) + ' m/s, faster than a boost. Shorten it' + (g.jump >= 0 ? ' or move the jump closer.' : '.'), [mid]);
+    else if (g.need > SPD.full) issue('warn', name + ' needs ' + Math.round(g.need) + ' m/s: only a boosting racer clears it.', [mid]);
+    else if (g.need > SPD.cruise) issue('warn', name + ' needs ' + Math.round(g.need) + ' m/s: racers must be near full speed.', [mid]);
+    if (g.jump >= 0 && doc.jumps[g.jump].side) issue('warn', name + "'s jump pad only covers the " + doc.jumps[g.jump].side + ' half of the lane; racers on the other side will fall.', [jIdx[g.jump]]);
+    for (let j = k + 1; j < gaps.length; j++) {
+      const o = gaps[j];
+      if (cyc(o.a - g.a, N) < g.span + 4 || cyc(g.a - o.a, N) < o.span + 4) issue('bad', 'Gaps ' + (k + 1) + ' and ' + (j + 1) + ' overlap or touch.', [mid]);
+    }
+    // another part of the lane running under it
+    let under = -1;
+    for (let q = 0; q < g.span && under < 0; q++) { const i = cyc(g.a + q, N); for (let j = 0; j < N; j += 2) if (far(i, j) > 40 && h[j] < h[i] - 0.5 && Math.hypot(G.x[i] - G.x[j], G.y[i] - G.y[j]) < HW) { under = i; break; } }
+    if (under >= 0) issue('warn', 'Another part of the track runs under ' + name.toLowerCase() + '. Racers who fall in land on it, or are put back if that is far along the lap.', [under]);
+    const inGap = (i, pad) => cyc(i - g.a, N) < g.span + pad || cyc(g.a - i, N) <= pad;
+    for (const c of infos) if (inGap(c.a, 10) || inGap(c.b, 10) || inGap(c.ti, 6)) issue('bad', name + ' is on a shortcut entrance, exit or target.', [mid]);
+    bars.forEach((b, j) => { if (inGap(b, 8) || inGap(cyc(b - 18, N), 6)) issue('bad', 'Barricade ' + (j + 1) + ' (or its target) is on ' + name.toLowerCase() + '.', [b]); });
+  });
+  jIdx.forEach((ji, k) => {
+    if (G.gap[ji]) issue('bad', 'Jump ' + (k + 1) + ' is over a gap.', [ji]);
+    // an overpass just ahead would be in the way of the climb
+    let over = -1;
+    for (let q = 2; q <= 30 && over < 0; q++) { const i = cyc(ji + q, N); for (let j = 0; j < N; j += 2) if (far(i, j) > 40 && h[j] > h[ji] + 0.4 && h[j] < h[ji] + AIR.H + 0.3 && Math.hypot(G.x[i] - G.x[j], G.y[i] - G.y[j]) < HW + 10) { over = i; break; } }
+    if (over >= 0) issue('warn', 'Jump ' + (k + 1) + ' launches racers up into the overpass just ahead.', [over]);
+    // flown straight ahead, does it reach a later part of the lap? (a jump shortcut)
+    const ft = flightTime(), hits = [];
+    for (let v = SPD.slow; v <= SPD.boost; v += 20) {
+      const D = v * ft, f = floorUnder(G.x[ji] + G.tx[ji] * D, G.y[ji] + G.ty[ji] * D, h[ji] + 0.01);
+      if (f < 0) continue;
+      const sk = cyc(f - ji, N);
+      if (sk > 40 && sk < N / 2 && sk * G.step > D * 1.3) hits.push([v, sk, sk * G.step - D]);
+    }
+    if (hits.length) {
+      const far2 = hits.filter((q) => q[1] > N * 0.2);
+      if (far2.length === hits.length) issue('warn', 'Jump ' + (k + 1) + ' can be flown straight across to a part of the lap too far ahead; racers who land there are put back.', [ji]);
+      else { const ok = hits.filter((q) => q[1] <= N * 0.2); issue('info', 'Jump ' + (k + 1) + ' is a jump shortcut: flown straight at ' + ok[0][0] + (ok.length > 1 ? '–' + ok[ok.length - 1][0] : '') + ' m/s it lands further along the lap, saving about ' + Math.round(ok[0][2] / 10) * 10 + ' m.', [ji]); }
+    }
+  });
+  // loops: a flat, straight, clear run-up, footprint and way out
+  const lIdx = doc.loops.map((q) => anchorIdx(G, q.a));
+  lIdx.forEach((li, k) => {
+    const q = doc.loops[k], name = 'Loop ' + (k + 1), reach = Math.ceil(q.r / G.step) + LOOP.EASE, back = reach + 20, fwd = reach + 5;
+    let flat = true, straight = true, busy = false, clash = -1;
+    for (let d = -back; d <= fwd; d++) {
+      const i = cyc(li + d, N);
+      if (Math.abs(h[i]) > 0.001) flat = false;
+      if (Math.abs(d) <= reach && G.tx[li] * G.tx[i] + G.ty[li] * G.ty[i] < 0.95) straight = false;
+      if (G.gap[i] || Math.min(i, N - i) < 20) busy = true;
+    }
+    const inSpan = (e, pad) => cyc(e - li + back + pad, N) <= back + fwd + 2 * pad;
+    for (const j of jIdx) if (inSpan(j, 0)) busy = true;
+    for (const b of bars) if (inSpan(b, 0) || inSpan(cyc(b - 18, N), 0)) busy = true;
+    for (const c of infos) for (const e of [c.a, c.b, c.ti]) if (inSpan(e, 0)) busy = true;
+    lIdx.forEach((o, j) => { if (j !== k && inSpan(o, back)) busy = true; });
+    // the ring's footprint must stay clear of every other part of the lane
+    for (let s2 = 0; s2 < 48 && clash < 0; s2++) {
+      const p = loopFoot(li, q, (s2 / 48) * TAU, 0);
+      for (let i = 0; i < N; i += 2) if (far(i, li) > back + 10 && Math.hypot(G.x[i] - p[0], G.y[i] - p[1]) < 2 * HW + 16) { clash = i; break; }
+    }
+    if (!flat) issue('bad', name + ' needs flat ground for its run-up, its footprint and the way out.', [li]);
+    if (!straight) issue('bad', name + ' needs the lane to run straight for ' + Math.round(reach * G.step) + ' m either side of it.', [li]);
+    if (busy) issue('bad', name + ' needs its run-up and way out clear of the start, gaps, jumps, barricades, shortcuts and other loops.', [li]);
+    if (clash >= 0) issue('bad', name + ' stands on another part of the track.', [clash]);
+    issue('info', name + ' (radius ' + Math.round(q.r) + ' m, ' + Math.round(TAU * q.r) + ' m of track, comes out to the ' + (q.side === 'left' ? 'left' : 'right') + '): racers need about ' + Math.round(loopNeed(q.r)) + ' m/s going in, and a clean line round it to come out fast.', [li]);
+  });
+  stats.lIdx = lIdx;
+  stats.gaps = gaps; stats.jIdx = jIdx;
+  stats.L = G.L; stats.infos = infos;
+}
+/* bunch close pairs of samples (one on each lane) into separate crossings; returns the samples of each */
+function pairGroups(pairs, N) {
+  const near = (a, b) => Math.min(Math.abs(a - b), N - Math.abs(a - b)) < 20, out = [];
+  for (const [i, j] of pairs) {
+    const g = out.find((q) => q.ps.some(([a, b]) => (near(a, i) && near(b, j)) || (near(a, j) && near(b, i))));
+    if (g) { g.ps.push([i, j]); g.at.push(i); } else out.push({ ps: [[i, j]], at: [i, j] });
+  }
+  return out.map((g) => g.at);
+}
+/* bunch nearby sample indices into separate problem spots */
+function groups(list, N) {
+  const s = Array.from(new Set(list)).sort((a, b) => a - b), out = [];
+  for (const i of s) {
+    const g = out.find((q) => q.some((j) => Math.min(Math.abs(i - j), N - Math.abs(i - j)) < 16));
+    if (g) g.push(i); else out.push([i]);
+  }
+  return out;
+}
+function segsCross(ax, ay, bx, by, cx, cy, dx, dy) {
+  const o = (px, py, qx, qy, rx, ry) => Math.sign((qx - px) * (ry - py) - (qy - py) * (rx - px));
+  return o(ax, ay, bx, by, cx, cy) !== o(ax, ay, bx, by, dx, dy) && o(cx, cy, dx, dy, ax, ay) !== o(cx, cy, dx, dy, bx, by);
+}
+
+/* ================= import / export ================= */
+const r5 = (v) => Math.round(v * 1e5) / 1e5;
+function exportDoc() {
+  const out = {
+    format: 'gatebreaker-track', version: 1, name: doc.name.trim() || 'Untitled track', setting: doc.setting || 'space',
+    points: doc.points.map((p) => [Math.round(p[0]), Math.round(p[1])]),
+    shortcuts: stats.infos.map((c) => {
+      const o = { from: [Math.round(c.ax), Math.round(c.ay)], to: [Math.round(c.bx), Math.round(c.by)] };
+      if (c.via.length) o.via = c.via.map((p) => [Math.round(p[0]), Math.round(p[1])]);
+      if (c.custom) o.target = [r5(c.ti / G.N), Math.round(c.lat)];
+      return o;
+    }),
+    elevation: doc.elevation.map((e) => {
+      const o = { from: r5(anchorFrac(G, e.a)), to: r5(anchorFrac(G, e.b)), level: e.level > 0 ? 1 : -1 };
+      if (e.level > 0 && e.rocks) o.rocks = true;
+      if (e.level < 0 && e.canopy) o.canopy = e.canopy;
+      return o;
+    }),
+    barricades: doc.barricades.map((b) => r5(anchorFrac(G, b))),
+    jumps: doc.jumps.map((j) => (j.side ? { at: r5(anchorFrac(G, j.a)), side: j.side } : { at: r5(anchorFrac(G, j.a)) })),
+    gaps: doc.gaps.map((g) => ({ from: r5(anchorFrac(G, g.a)), to: r5(anchorFrac(G, g.b)) })),
+    loops: doc.loops.map((q) => ({ at: r5(anchorFrac(G, q.a)), r: Math.round(q.r), side: q.side === 'left' ? 'left' : 'right' }))
+  };
+  if (!out.loops.length) delete out.loops;
+  return JSON.stringify(out);
+}
+function importCode(text) {
+  let d;
+  try { d = JSON.parse(text); } catch (e) { throw new Error('That is not track code: it could not be read as JSON.'); }
+  if (!d || !Array.isArray(d.points) || d.points.length < 4) throw new Error('Track code needs a "points" list with at least 4 points.');
+  const pts = d.points.map((p) => [Number(p[0]), Number(p[1])]);
+  if (pts.some((p) => !isFinite(p[0]) || !isFinite(p[1]))) throw new Error('Some points are not numbers.');
+  const g = buildGeom(pts), atXY = (p) => { const a = nearestAnchor(g, p[0], p[1]); return { k: a.k, u: a.u }; };
+  return {
+    name: String(d.name || 'Imported track').slice(0, 40), setting: typeof d.setting === 'string' && d.setting ? d.setting : 'space', points: pts,
+    shortcuts: (d.shortcuts || []).map((c) => ({
+      a: atXY(c.from), b: atXY(c.to), via: (c.via || []).map((p) => [Number(p[0]), Number(p[1])]),
+      target: c.target ? { anchor: fracToAnchor(g, +c.target[0]), lat: +c.target[1] || 0 } : null
+    })),
+    elevation: (d.elevation || []).map((e) => ({ a: fracToAnchor(g, +e.from), b: fracToAnchor(g, +e.to), level: e.level > 0 ? 1 : -1, rocks: !!e.rocks, canopy: typeof e.canopy === 'string' && e.canopy ? e.canopy : null })),
+    barricades: (d.barricades || []).map((f) => fracToAnchor(g, +f)),
+    jumps: (d.jumps || []).map((j) => ({ a: fracToAnchor(g, +(typeof j === 'number' ? j : j.at)), side: j.side === 'left' || j.side === 'right' ? j.side : null })),
+    gaps: (d.gaps || []).map((q) => ({ a: fracToAnchor(g, +q.from), b: fracToAnchor(g, +q.to) })),
+    loops: (d.loops || []).map((q) => ({ a: fracToAnchor(g, +(typeof q === 'number' ? q : q.at)), r: clamp(+q.r || LOOP.R, LOOP.MIN_R, LOOP.MAX_R), side: q.side === 'left' ? 'left' : 'right' }))
+  };
+}
+function refreshCode() { $('code').value = exportDoc(); }
+
+/* ================= edits (all go through history) ================= */
+const undoStack = [], redoStack = [];
+function snapshot() { return JSON.stringify(doc); }
+function remember() { undoStack.push(snapshot()); if (undoStack.length > 120) undoStack.shift(); redoStack.length = 0; syncUndo(); }
+function undo() { if (!undoStack.length) return; redoStack.push(snapshot()); doc = JSON.parse(undoStack.pop()); sel = null; pending = null; rebuild(); syncUndo(); }
+function redo() { if (!redoStack.length) return; undoStack.push(snapshot()); doc = JSON.parse(redoStack.pop()); sel = null; pending = null; rebuild(); syncUndo(); }
+function syncUndo() { $('undo').disabled = !undoStack.length; $('redo').disabled = !redoStack.length; }
+function allAnchors() {
+  const out = [];
+  for (const c of doc.shortcuts) { out.push(c.a, c.b); if (c.target) out.push(c.target.anchor); }
+  for (const e of doc.elevation) out.push(e.a, e.b);
+  for (const b of doc.barricades) out.push(b);
+  for (const j of doc.jumps) out.push(j.a);
+  for (const g of doc.gaps) out.push(g.a, g.b);
+  for (const q of doc.loops) out.push(q.a);
+  return out;
+}
+/* put a new control point on the curve at a, keeping every feature on the same stretch of curve */
+function insertPoint(a) {
+  const n = doc.points.length, k = a.k, u0 = clamp(a.u, 0.02, 0.98);
+  const p = segPoint(doc.points, k, u0);
+  doc.points.splice(k + 1, 0, [Math.round(p[0]), Math.round(p[1])]);
+  for (const q of allAnchors()) {
+    if (q.k > k) q.k++;
+    else if (q.k === k) { if (q.u < u0) q.u = q.u / u0; else { q.k = k + 1; q.u = (q.u - u0) / (1 - u0); } }
+  }
+  void n;
+  return k + 1;
+}
+function deletePoint(i) {
+  const n = doc.points.length;
+  if (i === 0) { toast('That point is the start line. Move the start elsewhere first.'); return false; }
+  if (n <= 4) { toast('A track needs at least 4 points'); return false; }
+  doc.points.splice(i, 1);
+  const prev = cyc(i - 1, n);
+  for (const q of allAnchors()) {
+    if (q.k === prev) q.u = q.u * 0.5;
+    else if (q.k === i) { q.k = prev; q.u = 0.5 + q.u * 0.5; }
+    if (q.k > i) q.k--;
+    q.k = cyc(q.k, n - 1);
+  }
+  return true;
+}
+/* an existing control point within reach of this spot on the curve, if any (avoids stacking points into kinks) */
+function pointNear(a, reach) {
+  const p = segPoint(doc.points, a.k, a.u);
+  let best = -1, bd = reach;
+  doc.points.forEach((q, i) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+function setStart(a) {
+  const near = pointNear(a, 60);
+  const s = near >= 0 ? near : insertPoint(a);
+  const n = doc.points.length;
+  doc.points = doc.points.slice(s).concat(doc.points.slice(0, s));
+  for (const q of allAnchors()) q.k = cyc(q.k - s, n);
+}
+function reverseDir() {
+  const n = doc.points.length;
+  doc.points = [doc.points[0]].concat(doc.points.slice(1).reverse());
+  for (const q of allAnchors()) { q.k = n - 1 - q.k; q.u = 1 - q.u; if (q.u >= 1) { q.u = 0; q.k = cyc(q.k + 1, n); } }
+  for (const e of doc.elevation) [e.a, e.b] = [e.b, e.a];
+  for (const g of doc.gaps) [g.a, g.b] = [g.b, g.a];
+  for (const j of doc.jumps) if (j.side) j.side = j.side === 'left' ? 'right' : 'left';
+}
+
+/* ================= view ================= */
+const $ = (id) => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const view = { x: 800, y: 350, z: 0.3 };
+let W = 0, H = 0, DPR = 1;
+const toScreen = (x, y) => [(x - view.x) * view.z + W / 2, (y - view.y) * view.z + H / 2];
+const toWorld = (sx, sy) => [(sx - W / 2) / view.z + view.x, (sy - H / 2) / view.z + view.y];
+function resize() {
+  const r = cv.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = r.width; H = r.height;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  draw();
+}
+function fit() {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (let i = 0; i < G.N; i++) { x0 = Math.min(x0, G.x[i]); x1 = Math.max(x1, G.x[i]); y0 = Math.min(y0, G.y[i]); y1 = Math.max(y1, G.y[i]); }
+  x0 -= HW + 60; y0 -= HW + 60; x1 += HW + 60; y1 += HW + 60;
+  view.x = (x0 + x1) / 2; view.y = (y0 + y1) / 2;
+  view.z = clamp(Math.min(W / (x1 - x0), H / (y1 - y0)), 0.04, 3);
+  draw();
+}
+function zoomAt(sx, sy, f) {
+  const [wx, wy] = toWorld(sx, sy);
+  view.z = clamp(view.z * f, 0.04, 3);
+  view.x = wx - (sx - W / 2) / view.z; view.y = wy - (sy - H / 2) / view.z;
+  draw();
+}
+
+/* ================= drawing ================= */
+const LV = {
+  ground: { rim: '#4fd1c5', fill: '#1d2550' },
+  high: { rim: '#ffc478', fill: '#4a3524' },
+  low: { rim: '#6f7dff', fill: '#161a52' }
+};
+function mix(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const c = (s) => Math.round(((pa >> s) & 255) * (1 - t) + ((pb >> s) & 255) * t);
+  return 'rgb(' + c(16) + ',' + c(8) + ',' + c(0) + ')';
+}
+function draw() {
+  if (!G) return;
+  const z = view.z, N = G.N;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#0a0918'; ctx.fillRect(0, 0, W, H);
+  // grid: fine lines every 100 m, strong every 500 m
+  const [gx0, gy0] = toWorld(0, 0), [gx1, gy1] = toWorld(W, H);
+  for (const [stepW, col] of [[100, 'rgba(160,170,255,0.06)'], [500, 'rgba(160,170,255,0.13)']]) {
+    if (stepW * z < 8) continue;
+    ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = Math.floor(gx0 / stepW) * stepW; x <= gx1; x += stepW) { const s = toScreen(x, 0)[0]; ctx.moveTo(Math.round(s) + 0.5, 0); ctx.lineTo(Math.round(s) + 0.5, H); }
+    for (let y = Math.floor(gy0 / stepW) * stepW; y <= gy1; y += stepW) { const s = toScreen(0, y)[1]; ctx.moveTo(0, Math.round(s) + 0.5); ctx.lineTo(W, Math.round(s) + 0.5); }
+    ctx.stroke();
+  }
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  // shortcut corridors under the lane
+  stats.infos.forEach((c, k) => {
+    const on = sel && (sel.type === 'shortcut' || sel.type === 'via' || sel.type === 'target') && sel.i === k;
+    ctx.beginPath();
+    for (let i = 0; i < c.P.x.length; i++) { const P = toScreen(c.P.x[i], c.P.y[i]); if (i) ctx.lineTo(P[0], P[1]); else ctx.moveTo(P[0], P[1]); }
+    ctx.strokeStyle = on ? 'rgba(255,200,120,0.9)' : 'rgba(255,176,74,0.55)'; ctx.lineWidth = (CHW * 2 + 4) * z; ctx.stroke();
+    ctx.strokeStyle = '#1c1830'; ctx.lineWidth = Math.max(1, CHW * 2 * z - 4); ctx.stroke();
+    // (off the ground: its deck in the level's colour, as the lane's is, blending along its ramp)
+    if (c.h0 !== 0 || c.h1 !== 0) {
+      ctx.lineCap = 'butt'; ctx.lineWidth = Math.max(1, CHW * 2 * z - 4);
+      for (let i = 1; i < c.P.x.length; i++) {
+        const hm = c.hAt((c.P.s[i - 1] + c.P.s[i]) / 2);
+        if (Math.abs(hm) < 0.002) continue;
+        const A = toScreen(c.P.x[i - 1], c.P.y[i - 1]), B = toScreen(c.P.x[i], c.P.y[i]);
+        ctx.strokeStyle = colourAt(hm, 'fill'); ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+      }
+      ctx.lineCap = 'round';
+    }
+    if (c.doorS > 0) {
+      const d = polyAt(c.P, c.doorS), nx = -d[3] * CHW, ny = d[2] * CHW;
+      const p = toScreen(d[0] + nx, d[1] + ny), q = toScreen(d[0] - nx, d[1] - ny);
+      ctx.strokeStyle = '#ffb04a'; ctx.lineWidth = Math.max(2, 6 * z); ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
+    }
+  });
+  // the lane, lowest level first so raised stretches sit on top at crossings
+  const segs = [];
+  for (let i = 0; i < N; i++) segs.push(i);
+  segs.sort((a, b) => (G.h[a] + G.h[(a + 1) % N]) - (G.h[b] + G.h[(b + 1) % N]));
+  // each short piece gets its rim and then its fill, so a higher piece fully covers a lower one where they cross
+  for (const i of segs) {
+    const hm = (G.h[i] + G.h[(i + 1) % N]) / 2, j = (i + 1) % N, A = toScreen(G.x[i], G.y[i]), B = toScreen(G.x[j], G.y[j]);
+    ctx.lineWidth = (HW * 2 + 8) * z; ctx.strokeStyle = colourAt(hm, 'rim');
+    ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+  }
+  for (const i of segs) {
+    const hm = (G.h[i] + G.h[(i + 1) % N]) / 2, j = (i + 1) % N, A = toScreen(G.x[i], G.y[i]), B = toScreen(G.x[j], G.y[j]);
+    ctx.lineWidth = HW * 2 * z; ctx.strokeStyle = colourAt(hm, 'fill');
+    ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+  }
+  // a raised stretch re-draws its rim over whatever it crosses, so the crossing reads clearly
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N, hm = (G.h[i] + G.h[j]) / 2;
+    if (hm < 0.5) continue;
+    for (const s of [1, -1]) {
+      const A = toScreen(G.x[i] + G.nx[i] * HW * s, G.y[i] + G.ny[i] * HW * s), B = toScreen(G.x[j] + G.nx[j] * HW * s, G.y[j] + G.ny[j] * HW * s);
+      ctx.strokeStyle = '#ffc478'; ctx.lineWidth = Math.max(1.5, 4 * z); ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+    }
+  }
+  // selected stretch
+  if (sel && sel.type === 'stretch') {
+    const sp = stretchSamples(doc.elevation[sel.i]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = Math.max(2, 10 * z); ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    for (let q = 0; q <= sp.span; q++) { const i = cyc(sp.s0 + q, N), P = toScreen(G.x[i], G.y[i]); if (q) ctx.lineTo(P[0], P[1]); else ctx.moveTo(P[0], P[1]); }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  // centre line and direction arrows
+  ctx.strokeStyle = 'rgba(239,233,247,0.22)'; ctx.lineWidth = 1; ctx.setLineDash([6, 8]); ctx.beginPath();
+  for (let i = 0; i <= N; i++) { const P = toScreen(G.x[i % N], G.y[i % N]); if (i) ctx.lineTo(P[0], P[1]); else ctx.moveTo(P[0], P[1]); }
+  ctx.stroke(); ctx.setLineDash([]);
+  const every = Math.max(8, Math.round(260 / (G.step * Math.max(z, 0.05) * 10)));
+  ctx.fillStyle = 'rgba(239,233,247,0.55)';
+  for (let i = every >> 1; i < N; i += every) {
+    const P = toScreen(G.x[i], G.y[i]), s = Math.max(4, 14 * z), tx = G.tx[i], ty = G.ty[i];
+    ctx.beginPath(); ctx.moveTo(P[0] + tx * s, P[1] + ty * s); ctx.lineTo(P[0] - tx * s * 0.6 - ty * s * 0.7, P[1] - ty * s * 0.6 + tx * s * 0.7); ctx.lineTo(P[0] - tx * s * 0.6 + ty * s * 0.7, P[1] - ty * s * 0.6 - tx * s * 0.7); ctx.closePath(); ctx.fill();
+  }
+  // start line
+  {
+    const i = 0, n = 10;
+    for (let k = 0; k < n; k++) for (let r = 0; r < 2; r++) {
+      const l0 = -HW + (k / n) * 2 * HW, l1 = l0 + (2 * HW) / n, f0 = -8 + r * 8, f1 = f0 + 8;
+      const c = (l, f) => toScreen(G.x[i] + G.nx[i] * l + G.tx[i] * f, G.y[i] + G.ny[i] * l + G.ty[i] * f);
+      const a = c(l0, f0), b = c(l1, f0), cc = c(l1, f1), d = c(l0, f1);
+      ctx.fillStyle = (k + r) & 1 ? '#f4efe6' : '#241a3a';
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(cc[0], cc[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); ctx.fill();
+    }
+    const P = toScreen(G.x[0] + G.nx[0] * (HW + 34), G.y[0] + G.ny[0] * (HW + 34));
+    label('START', P[0], P[1], '#f4efe6');
+  }
+  // shortcut targets (amber, before the entry)
+  stats.infos.forEach((c, k) => {
+    if (c.doorS > 0) {
+      const d = polyAt(c.P, c.doorS), A = toScreen(c.tx, c.ty), B = toScreen(d[0], d[1]);
+      ctx.strokeStyle = 'rgba(255,176,74,0.45)'; ctx.lineWidth = 1; ctx.setLineDash([3, 5]); ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const hot = tool === 'shortcut' && ((sel && sel.type === 'target' && sel.i === k) || (hover && hover.type === 'target' && hover.i === k));
+    diamond(c.tx, c.ty, hot ? '#ffffff' : '#ffb04a');
+    if (tool === 'shortcut') {
+      c.via.forEach((p, j) => {
+        const P = toScreen(p[0], p[1]), isSel = sel && sel.type === 'via' && sel.i === k && sel.j === (c.swapped ? c.via.length - 1 - j : j);
+        ctx.fillStyle = isSel ? '#ffb04a' : '#0a0918'; ctx.strokeStyle = '#ffb04a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.rect(P[0] - 5, P[1] - 5, 10, 10); ctx.fill(); ctx.stroke();
+      });
+    }
+  });
+  // barricades: a wall covering most of the lane from one side, and its target before it
+  doc.barricades.forEach((b, k) => {
+    const g = anchorIdx(G, b), ts = k % 2 ? -1 : 1, on = sel && sel.type === 'barricade' && sel.i === k;
+    const half = HW, cover = HW * 1.24, nx = G.nx[g], ny = G.ny[g];
+    const A = toScreen(G.x[g] + nx * half, G.y[g] + ny * half), B = toScreen(G.x[g] + nx * (half - cover), G.y[g] + ny * (half - cover));
+    ctx.strokeStyle = on ? '#ffffff' : '#8ff3ff'; ctx.lineWidth = Math.max(3, 8 * z); ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); ctx.lineCap = 'round';
+    const ti = cyc(g - 18, N);
+    diamond(G.x[ti] + G.nx[ti] * ts * (HW - 13), G.y[ti] + G.ny[ti] * ts * (HW - 13), '#8ff3ff', true);
+  });
+  // gaps: open space with lit edges
+  stats.gaps.forEach((g, k) => {
+    const on = sel && sel.type === 'gap' && sel.i === k, pts = [];
+    const mid = (i, j) => [(G.x[i] + G.x[j]) / 2, (G.y[i] + G.y[j]) / 2];
+    pts.push(mid(cyc(g.a - 1, N), g.a));
+    for (let q = 0; q < g.span; q++) { const i = cyc(g.a + q, N); pts.push([G.x[i], G.y[i]]); }
+    pts.push(mid(g.b, cyc(g.b + 1, N)));
+    ctx.lineCap = 'butt'; ctx.beginPath();
+    pts.forEach((p, q) => { const P = toScreen(p[0], p[1]); if (q) ctx.lineTo(P[0], P[1]); else ctx.moveTo(P[0], P[1]); });
+    ctx.strokeStyle = on ? '#ffffff' : '#0a0918'; ctx.lineWidth = (HW * 2 + 12) * z; ctx.stroke();
+    if (on) { ctx.strokeStyle = '#0a0918'; ctx.lineWidth = (HW * 2 + 4) * z; ctx.stroke(); }
+    ctx.lineCap = 'round';
+    for (const [p, i] of [[pts[0], g.a], [pts[pts.length - 1], g.b]]) {
+      const A = toScreen(p[0] + G.nx[i] * HW, p[1] + G.ny[i] * HW), B = toScreen(p[0] - G.nx[i] * HW, p[1] - G.ny[i] * HW);
+      ctx.strokeStyle = '#ffc24a'; ctx.lineWidth = Math.max(2, 7 * z); ctx.setLineDash([Math.max(3, 10 * z), Math.max(3, 10 * z)]);
+      ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const i = cyc(g.a + (g.span >> 1), N), P = toScreen(G.x[i] - G.nx[i] * (HW + 40), G.y[i] - G.ny[i] * (HW + 40));
+    label('GAP · ' + (isFinite(g.need) ? Math.round(g.need) + ' M/S' : 'NO WAY OVER'), P[0], P[1], !isFinite(g.need) || g.need > SPD.boost ? '#ff6b81' : g.need > SPD.cruise ? '#ffd166' : '#ffc24a');
+  });
+  // jump pads, and where racers come down off them
+  const ft = flightTime();
+  stats.jIdx.forEach((ji, k) => {
+    const j = doc.jumps[k], on = sel && sel.type === 'jump' && sel.i === k, lo = j.side === 'right' ? 0 : -HW, hi = j.side === 'left' ? 0 : HW;
+    if (tool === 'jump' || on) {
+      const q0 = Math.round((SPD.slow * ft) / G.step), q1 = Math.round((SPD.boost * ft) / G.step);
+      ctx.beginPath();
+      for (let q = q0; q <= q1; q++) { const i = cyc(ji + q, N), P = toScreen(G.x[i], G.y[i]); if (q > q0) ctx.lineTo(P[0], P[1]); else ctx.moveTo(P[0], P[1]); }
+      ctx.strokeStyle = on ? 'rgba(182,255,106,0.55)' : 'rgba(182,255,106,0.3)'; ctx.lineWidth = Math.max(3, HW * z * 0.7); ctx.stroke();
+      const A = toScreen(G.x[ji], G.y[ji]), B = toScreen(G.x[ji] + G.tx[ji] * SPD.boost * ft, G.y[ji] + G.ty[ji] * SPD.boost * ft);
+      ctx.strokeStyle = 'rgba(182,255,106,0.6)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const c = (l, f) => toScreen(G.x[ji] + G.nx[ji] * l + G.tx[ji] * f, G.y[ji] + G.ny[ji] * l + G.ty[ji] * f);
+    const pts = [c(lo + 4, -15), c(hi - 4, -15), c(hi - 4, 15), c(lo + 4, 15)];
+    ctx.fillStyle = on ? '#ffffff' : '#b6ff6a'; ctx.beginPath(); pts.forEach((P, q) => (q ? ctx.lineTo(P[0], P[1]) : ctx.moveTo(P[0], P[1]))); ctx.closePath(); ctx.fill();
+    const m = (lo + hi) / 2, w = (hi - lo) / 2 - 10, ch = [c(m - w, -8), c(m, 8), c(m + w, -8)];
+    ctx.strokeStyle = '#16402a'; ctx.lineWidth = Math.max(1.5, 4 * z); ctx.beginPath(); ch.forEach((P, q) => (q ? ctx.lineTo(P[0], P[1]) : ctx.moveTo(P[0], P[1]))); ctx.stroke();
+  });
+  // loops: the ring's footprint on the map (a curl of lane), drawn over the line it is spliced into
+  stats.lIdx.forEach((li, k) => {
+    const q = doc.loops[k], n = 96, edge = (l) => { const P = []; for (let s2 = 0; s2 <= n; s2++) P.push(toScreen(...loopFoot(li, q, (s2 / n) * TAU, l))); return P; };
+    const L0 = edge(-HW), L1 = edge(HW), M = edge(0);
+    for (let s2 = 0; s2 < n; s2++) {
+      const tt = (s2 + 0.5) / n, up = Math.sin(Math.PI * tt);
+      ctx.fillStyle = mix('#1d2550', '#20476a', up); ctx.beginPath();
+      ctx.moveTo(L0[s2][0], L0[s2][1]); ctx.lineTo(L0[s2 + 1][0], L0[s2 + 1][1]); ctx.lineTo(L1[s2 + 1][0], L1[s2 + 1][1]); ctx.lineTo(L1[s2][0], L1[s2][1]); ctx.closePath(); ctx.fill();
+    }
+    const on = sel && sel.type === 'loop' && sel.i === k, hot = !on && tool === 'loop' && hover && hover.type === 'loop' && hover.i === k;
+    for (const P of [L0, L1]) { ctx.strokeStyle = on ? '#ffffff' : hot ? '#b9fff6' : '#62d6cc'; ctx.lineWidth = Math.max(1.5, 4 * z); ctx.beginPath(); P.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(239,233,247,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([6, 8]); ctx.beginPath(); M.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.stroke(); ctx.setLineDash([]);
+    const T0 = loopFoot(li, q, Math.PI / 2, 0), P = toScreen(T0[0] + G.tx[li] * 120, T0[1] + G.ty[li] * 120);
+    label('LOOP · ' + Math.round(loopNeed(q.r)) + '+ M/S', P[0], P[1], '#62d6cc');
+  });
+  // elevation labels
+  doc.elevation.forEach((e) => {
+    const sp = stretchSamples(e), i = cyc(sp.s0 + (sp.span >> 1), N), P = toScreen(G.x[i] + G.nx[i] * (HW + 40), G.y[i] + G.ny[i] * (HW + 40));
+    label(e.level > 0 ? (e.rocks ? 'RAISED · OVER ' + (settingMeta().words.scenery || 'asteroids').toUpperCase() : 'RAISED') : e.canopy ? 'SUNKEN · UNDER ' + overheadLabel(e.canopy).toUpperCase() : 'SUNKEN', P[0], P[1], e.level > 0 ? '#ffc478' : '#9aa5ff');
+  });
+  // control polygon and handles
+  ctx.strokeStyle = 'rgba(239,233,247,0.14)'; ctx.lineWidth = 1; ctx.beginPath();
+  doc.points.forEach((p, i) => { const P = toScreen(p[0], p[1]); if (i) ctx.lineTo(P[0], P[1]); else ctx.moveTo(P[0], P[1]); });
+  ctx.closePath(); ctx.stroke();
+  const showHandles = tool === 'shape';
+  doc.points.forEach((p, i) => {
+    const P = toScreen(p[0], p[1]), isSel = sel && sel.type === 'point' && sel.i === i, isHov = hover && hover.type === 'point' && hover.i === i;
+    const r = i === 0 ? 8 : 6;
+    ctx.globalAlpha = showHandles ? 1 : 0.35;
+    ctx.fillStyle = isSel ? '#ffb04a' : i === 0 ? '#f4efe6' : '#0a0918';
+    ctx.strokeStyle = isSel || isHov ? '#ffb04a' : '#efe9f7'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(P[0], P[1], r + (isHov ? 2 : 0), 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+  // problems
+  for (const is of issues) {
+    if (is.level === 'ok') continue;
+    const col = is.level === 'bad' ? '#ff6b81' : is.level === 'info' ? '#b6ff6a' : '#ffd166';
+    const pts = is.at.length > 6 ? [is.at[0], is.at[is.at.length >> 1], is.at[is.at.length - 1]] : is.at;
+    for (const i of pts) {
+      const P = toScreen(G.x[i], G.y[i]);
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.arc(P[0], P[1], Math.max(14, (HW + 16) * z), 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+  if (focusAt !== null) {
+    const P = toScreen(G.x[focusAt], G.y[focusAt]);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(P[0], P[1], Math.max(20, (HW + 30) * z), 0, TAU); ctx.stroke();
+  }
+  // a tool waiting for its second click
+  if (pending) {
+    const p0 = segPoint(doc.points, pending.k, pending.u), A = toScreen(p0[0], p0[1]);
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(A[0], A[1], 6, 0, TAU); ctx.fill();
+    if (hover && hover.type === 'lane') {
+      const p1 = segPoint(doc.points, hover.a.k, hover.a.u), B = toScreen(p1[0], p1[1]);
+      if (tool === 'shortcut') {
+        ctx.strokeStyle = 'rgba(255,176,74,0.6)'; ctx.lineWidth = CHW * 2 * z; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+      } else {
+        let s0 = anchorIdx(G, pending), e0 = anchorIdx(G, hover.a), span = cyc(e0 - s0, N);
+        if (tool === 'gap' && span > N / 2) { span = cyc(s0 - e0, N); s0 = e0; }
+        ctx.strokeStyle = tool === 'raise' ? 'rgba(255,196,120,0.7)' : tool === 'gap' ? 'rgba(255,194,74,0.6)' : 'rgba(111,125,255,0.75)'; ctx.lineWidth = HW * 2 * z * 0.5;
+        ctx.beginPath();
+        for (let q = 0; q <= span; q++) { const i = cyc(s0 + q, N), P = toScreen(G.x[i], G.y[i]); if (q) ctx.lineTo(P[0], P[1]); else ctx.moveTo(P[0], P[1]); }
+        ctx.stroke();
+      }
+    }
+  } else if (hover && hover.type === 'lane' && tool !== 'shape') {
+    const p1 = segPoint(doc.points, hover.a.k, hover.a.u), B = toScreen(p1[0], p1[1]);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(B[0], B[1], 6, 0, TAU); ctx.stroke();
+  } else if (hover && hover.type === 'lane' && tool === 'shape') {
+    const p1 = segPoint(doc.points, hover.a.k, hover.a.u), B = toScreen(p1[0], p1[1]);
+    ctx.strokeStyle = 'rgba(255,176,74,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(B[0], B[1], 5, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(B[0] - 3, B[1]); ctx.lineTo(B[0] + 3, B[1]); ctx.moveTo(B[0], B[1] - 3); ctx.lineTo(B[0], B[1] + 3); ctx.stroke();
+  }
+  // scale bar
+  const m = [50, 100, 200, 500, 1000, 2000].find((v) => v * z > 70) || 2000, len = m * z;
+  ctx.strokeStyle = 'rgba(239,233,247,0.6)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(16, H - 22); ctx.lineTo(16 + len, H - 22); ctx.moveTo(16, H - 27); ctx.lineTo(16, H - 17); ctx.moveTo(16 + len, H - 27); ctx.lineTo(16 + len, H - 17); ctx.stroke();
+  ctx.fillStyle = 'rgba(239,233,247,0.75)'; ctx.font = '600 12px "Barlow Semi Condensed", sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(m + ' m  ·  lane ' + HW * 2 + ' m wide', 16, H - 32);
+}
+function colourAt(h, part) {
+  const a = Math.abs(h);
+  if (a < 0.002) return LV.ground[part];
+  return mix(LV.ground[part], h > 0 ? LV.high[part] : LV.low[part], clamp(a, 0, 1));
+}
+function diamond(x, y, col, oct) {
+  const P = toScreen(x, y), s = Math.max(5, 11 * view.z);
+  ctx.fillStyle = '#150f2a'; ctx.strokeStyle = col; ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (oct) for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU + TAU / 16; ctx.lineTo(P[0] + Math.cos(a) * s, P[1] + Math.sin(a) * s); }
+  else { ctx.moveTo(P[0], P[1] - s); ctx.lineTo(P[0] + s * 0.8, P[1]); ctx.lineTo(P[0], P[1] + s); ctx.lineTo(P[0] - s * 0.8, P[1]); }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+}
+function label(t, x, y, col) {
+  ctx.font = '700 12px "Pixelify Sans", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const w = ctx.measureText(t).width + 10;
+  ctx.fillStyle = 'rgba(10,9,24,0.85)'; ctx.fillRect(x - w / 2, y - 9, w, 18);
+  ctx.fillStyle = col; ctx.fillText(t, x, y + 1);
+  ctx.textBaseline = 'alphabetic';
+}
+
+/* ================= tools and input ================= */
+const HINTS = {
+  shape: 'Drag a point to move it. Click the lane to add a point there. Select a point and press Delete to remove it. Drag empty space to pan, scroll to zoom.',
+  shortcut: 'Click the lane where the shortcut starts, then where it rejoins. Either end can be on the ground or on the flat part of a raised or sunken stretch: a shortcut joining two levels ramps between them in its middle. Click a corridor to select it, click it again to add a bend point, and drag the square bend points to curve it. Drag its amber target anywhere on the lane.',
+  raise: 'Click the lane where the raised stretch starts, then where it ends (in the racing direction). Ramps take the first and last 144 m. Raise a stretch over another lane to make an overpass. Select a raised stretch to let it fly over an asteroid field.',
+  sink: 'Click the lane where the sunken stretch starts, then where it ends (in the racing direction). Ramps take the first and last 144 m. Another lane can pass over it. Select a sunken stretch to hang gas clouds or ice asteroids over it.',
+  barricade: 'Click the lane to place a sliding barricade (on the ground, or on the flat part of a raised or sunken stretch); its cyan target goes 216 m before it. Click a barricade to select it.',
+  start: 'Click the lane to move the start line there. Use Reverse direction to race the other way.',
+  jump: 'Click the lane to place a jump pad. Racers who cross it fly up over the walls for about 1.7 s, then come down. The lime band shows where they land (slow to boosting); the thin line is a straight-ahead flight, for jumping across to another part of the track. Click a pad to select it: it can cover the whole lane or one half.',
+  loop: 'Click the lane to put a loop-de-loop there: racers climb a full ring and come out beside where they went in. It needs a flat, fairly straight run-up and way out, clear of other features (Checks says what is wrong). Click a loop to select it: change its size, or which side it comes out on.',
+  gap: 'Click where a gap starts, then where it ends: on the ground, or inside a raised or sunken stretch. Clear it with a jump pad before it, or let racers drop across it onto lower track (over the ramp at the end of a raised stretch, say). Racers who fall in are put back just past it.'
+};
+let tool = 'shape', sel = null, hover = null, pending = null, drag = null, focusAt = null;
+function setTool(t) {
+  tool = t; pending = null;
+  document.querySelectorAll('.tool').forEach((b) => b.setAttribute('aria-pressed', b.dataset.tool === t ? 'true' : 'false'));
+  $('hint').textContent = HINTS[t];
+  draw();
+}
+function pick(sx, sy) {
+  // control points (shape tool only)
+  if (tool === 'shape') {
+    for (let i = doc.points.length - 1; i >= 0; i--) { const P = toScreen(doc.points[i][0], doc.points[i][1]); if (Math.hypot(P[0] - sx, P[1] - sy) < 10) return { type: 'point', i }; }
+  }
+  const [wx, wy] = toWorld(sx, sy);
+  if (tool === 'barricade') {
+    for (let k = 0; k < doc.barricades.length; k++) { const g = anchorIdx(G, doc.barricades[k]); if (Math.hypot(G.x[g] - wx, G.y[g] - wy) < HW) return { type: 'barricade', i: k }; }
+  }
+  if (tool === 'jump') {
+    for (let k = 0; k < doc.jumps.length; k++) { const i = anchorIdx(G, doc.jumps[k].a); if (Math.hypot(G.x[i] - wx, G.y[i] - wy) < HW * 0.6) return { type: 'jump', i: k }; }
+  }
+  if (tool === 'loop') {
+    for (let k = 0; k < doc.loops.length; k++) {
+      const li = stats.lIdx[k], q = doc.loops[k];
+      for (let s2 = 0; s2 <= 48; s2++) { const p = loopFoot(li, q, (s2 / 48) * TAU, 0); if (Math.hypot(p[0] - wx, p[1] - wy) < HW) return { type: 'loop', i: k }; }
+    }
+  }
+  const a = nearestAnchor(G, wx, wy);
+  const onLane = a.dist < HW + 4;
+  if (tool === 'gap' && !pending && onLane) {
+    const i = anchorIdx(G, a);
+    for (let k = 0; k < doc.gaps.length; k++) { const sp = stretchSamples(doc.gaps[k]); if (cyc(i - sp.s0, G.N) <= sp.span) return { type: 'gap', i: k }; }
+  }
+  if (tool === 'shortcut' && !pending) {
+    for (let k = 0; k < stats.infos.length; k++) {
+      const c = stats.infos[k];
+      for (let j = 0; j < c.via.length; j++) {
+        const P = toScreen(c.via[j][0], c.via[j][1]);
+        if (Math.hypot(P[0] - sx, P[1] - sy) < 9) return { type: 'via', i: k, j: c.swapped ? c.via.length - 1 - j : j };
+      }
+      const T2 = toScreen(c.tx, c.ty);
+      if (Math.hypot(T2[0] - sx, T2[1] - sy) < Math.max(10, 13 * view.z)) return { type: 'target', i: k };
+    }
+    for (let k = 0; k < stats.infos.length; k++) {
+      const c = stats.infos[k], q = polyDist(c.P, wx, wy), t = q.s / c.len;
+      if (q.d < CHW + 4 && (!onLane || (t > 0.15 && t < 0.85))) return { type: 'shortcut', i: k, s: q.s };
+    }
+  }
+  if ((tool === 'raise' || tool === 'sink') && !pending && onLane) {
+    const i = anchorIdx(G, a);
+    for (let k = 0; k < doc.elevation.length; k++) { const sp = stretchSamples(doc.elevation[k]); if (cyc(i - sp.s0, G.N) <= sp.span) return { type: 'stretch', i: k }; }
+  }
+  if (onLane) return { type: 'lane', a: { k: a.k, u: a.u } };
+  return null;
+}
+function evPos(e) { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+cv.addEventListener('pointerdown', (e) => {
+  const [sx, sy] = evPos(e);
+  cv.setPointerCapture(e.pointerId);
+  focusAt = null;
+  if (e.button === 1 || e.button === 2) { drag = { kind: 'pan', sx, sy, vx: view.x, vy: view.y }; cv.classList.add('grab'); return; }
+  const h = pick(sx, sy);
+  if (tool === 'shape') {
+    if (h && h.type === 'point') { remember(); sel = { type: 'point', i: h.i }; drag = { kind: 'point', i: h.i, moved: false }; rebuild(); return; }
+    if (h && h.type === 'lane') {
+      const near = pointNear(h.a, 40);
+      if (near >= 0) { remember(); sel = { type: 'point', i: near }; drag = { kind: 'point', i: near, moved: false }; rebuild(); return; }
+      remember(); const i = insertPoint(h.a); sel = { type: 'point', i }; drag = { kind: 'point', i, moved: true }; rebuild(); return;
+    }
+  } else if (h) {
+    if (h.type === 'via') { remember(); sel = h; drag = { kind: 'via', i: h.i, j: h.j, moved: false }; refreshSel(); draw(); return; }
+    if (h.type === 'target') { remember(); sel = h; drag = { kind: 'target', i: h.i, moved: false }; refreshSel(); draw(); return; }
+    if (h.type === 'shortcut' && sel && sel.type === 'shortcut' && sel.i === h.i) {
+      // clicking a selected corridor adds a bend point there, ready to drag
+      remember();
+      const j = addBend(h.i, h.s, toWorld(sx, sy));
+      sel = { type: 'via', i: h.i, j }; drag = { kind: 'via', i: h.i, j, moved: true }; rebuild(); return;
+    }
+    if (h.type === 'shortcut' || h.type === 'stretch' || h.type === 'barricade' || h.type === 'jump' || h.type === 'gap' || h.type === 'loop') { sel = { type: h.type, i: h.i }; pending = null; refreshSel(); draw(); return; }
+    if (h.type === 'lane') { laneClick(h.a); return; }
+  }
+  sel = null; refreshSel();
+  drag = { kind: 'pan', sx, sy, vx: view.x, vy: view.y }; cv.classList.add('grab');
+});
+function laneClick(a) {
+  if (tool === 'start') { remember(); setStart(a); sel = null; rebuild(); toast('Start line moved'); return; }
+  if (tool === 'barricade') { remember(); doc.barricades.push(a); sel = { type: 'barricade', i: doc.barricades.length - 1 }; rebuild(); return; }
+  if (tool === 'jump') { remember(); doc.jumps.push({ a, side: null }); sel = { type: 'jump', i: doc.jumps.length - 1 }; rebuild(); return; }
+  if (tool === 'loop') { remember(); doc.loops.push({ a, r: LOOP.R, side: 'right' }); sel = { type: 'loop', i: doc.loops.length - 1 }; rebuild(); return; }
+  if (!pending) { pending = a; sel = null; refreshSel(); draw(); return; }
+  const s0 = anchorIdx(G, pending), e0 = anchorIdx(G, a);
+  if (Math.min(cyc(e0 - s0, G.N), cyc(s0 - e0, G.N)) < (tool === 'gap' ? 2 : 6)) { toast('Pick a second spot further along the lane'); return; }
+  remember();
+  if (tool === 'shortcut') { doc.shortcuts.push({ a: pending, b: a, via: [], target: null }); sel = { type: 'shortcut', i: doc.shortcuts.length - 1 }; }
+  else if (tool === 'gap') {
+    // a gap runs forwards, from the earlier spot to the later one
+    let A = pending, B = a;
+    if (cyc(e0 - s0, G.N) > G.N / 2) [A, B] = [B, A];
+    doc.gaps.push({ a: A, b: B }); sel = { type: 'gap', i: doc.gaps.length - 1 };
+  }
+  else { doc.elevation.push({ a: pending, b: a, level: tool === 'raise' ? 1 : -1 }); sel = { type: 'stretch', i: doc.elevation.length - 1 }; }
+  pending = null;
+  rebuild();
+}
+cv.addEventListener('pointermove', (e) => {
+  const [sx, sy] = evPos(e);
+  if (drag && drag.kind === 'pan') { view.x = drag.vx - (sx - drag.sx) / view.z; view.y = drag.vy - (sy - drag.sy) / view.z; draw(); return; }
+  if (drag && drag.kind === 'via') {
+    const [wx, wy] = toWorld(sx, sy);
+    doc.shortcuts[drag.i].via[drag.j] = [Math.round(wx / 5) * 5, Math.round(wy / 5) * 5];
+    drag.moved = true; rebuild(); return;
+  }
+  if (drag && drag.kind === 'target') {
+    const [wx, wy] = toWorld(sx, sy), a = nearestAnchor(G, wx, wy), i = anchorIdx(G, a);
+    const lat = clamp((wx - G.x[i]) * G.nx[i] + (wy - G.y[i]) * G.ny[i], -(HW - 13), HW - 13);
+    doc.shortcuts[drag.i].target = { anchor: { k: a.k, u: a.u }, lat: Math.round(lat) };
+    drag.moved = true; rebuild(); return;
+  }
+  if (drag && drag.kind === 'point') {
+    const [wx, wy] = toWorld(sx, sy);
+    doc.points[drag.i] = [Math.round(wx / 5) * 5, Math.round(wy / 5) * 5];
+    drag.moved = true;
+    rebuild(); return;
+  }
+  const h = pick(sx, sy);
+  hover = h;
+  draw();
+});
+const endDrag = () => {
+  if (drag && (drag.kind === 'point' || drag.kind === 'via' || drag.kind === 'target') && !drag.moved) undoStack.pop(), syncUndo();
+  drag = null; cv.classList.remove('grab');
+};
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
+cv.addEventListener('pointerleave', () => { if (!drag) { hover = null; draw(); } });
+cv.addEventListener('contextmenu', (e) => e.preventDefault());
+cv.addEventListener('wheel', (e) => { e.preventDefault(); const [sx, sy] = evPos(e); zoomAt(sx, sy, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+
+/* new bend point on shortcut k at distance s along it (in racing order), stored in the shortcut's own order */
+function addBend(k, s, w) {
+  const info = stats.infos[k], c = doc.shortcuts[k];
+  // where each existing bend point sits along the corridor: the curve passes through them every 16 steps
+  let before = 0;
+  info.via.forEach((p, j) => { const si = info.P.s[(j + 1) * 16]; if (si < s) before = j + 1; });
+  const at = info.swapped ? c.via.length - before : before;
+  c.via.splice(at, 0, [Math.round(w[0] / 5) * 5, Math.round(w[1] / 5) * 5]);
+  return at;
+}
+function deleteSel() {
+  if (!sel) return;
+  remember();
+  if (sel.type === 'point') { if (!deletePoint(sel.i)) { undoStack.pop(); syncUndo(); return; } }
+  else if (sel.type === 'shortcut') doc.shortcuts.splice(sel.i, 1);
+  else if (sel.type === 'via') { doc.shortcuts[sel.i].via.splice(sel.j, 1); sel = { type: 'shortcut', i: sel.i }; rebuild(); return; }
+  else if (sel.type === 'target') { doc.shortcuts[sel.i].target = null; sel = { type: 'shortcut', i: sel.i }; rebuild(); return; }
+  else if (sel.type === 'stretch') doc.elevation.splice(sel.i, 1);
+  else if (sel.type === 'barricade') doc.barricades.splice(sel.i, 1);
+  else if (sel.type === 'jump') doc.jumps.splice(sel.i, 1);
+  else if (sel.type === 'gap') doc.gaps.splice(sel.i, 1);
+  else if (sel.type === 'loop') doc.loops.splice(sel.i, 1);
+  sel = null; rebuild();
+}
+function refreshSel() {
+  const box = $('sel'), t = $('selText'), b = $('selBtns');
+  b.textContent = '';
+  if (!sel || !G) { box.hidden = true; return; }
+  const add = (txt, fn, cls) => { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn' + (cls ? ' ' + cls : ''); x.textContent = txt; x.addEventListener('click', fn); b.appendChild(x); };
+  if (sel.type === 'point') {
+    const p = doc.points[sel.i];
+    t.textContent = (sel.i === 0 ? 'Start point' : 'Point ' + (sel.i + 1)) + ' at ' + p[0] + ', ' + p[1];
+  } else if (sel.type === 'shortcut' || sel.type === 'via' || sel.type === 'target') {
+    const c = stats.infos[sel.i], sc = doc.shortcuts[sel.i];
+    t.textContent = 'Shortcut ' + (sel.i + 1) + ': ' + Math.round(c.len) + ' m corridor instead of ' + Math.round(c.arc) + ' m of lane' + (c.h0 !== c.h1 ? ', ' + (c.h1 > c.h0 ? 'climbing' : 'dropping') + ' ' + (Math.abs(c.h1 - c.h0) > 1.5 ? 'two levels' : 'a level') : '') +
+      (sel.type === 'via' ? '. Bend point selected.' : sel.type === 'target' ? '. Target selected.' : '. Click the corridor again to add a bend point; drag the amber target to move it.');
+    if (sel.type === 'via') add('Remove bend point', deleteSel);
+    if (sc.via.length) add('Straighten', () => { remember(); sc.via = []; sel = { type: 'shortcut', i: sel.i }; rebuild(); });
+    if (sc.target) add('Reset target', () => { remember(); sc.target = null; sel = { type: 'shortcut', i: sel.i }; rebuild(); });
+    if (sel.type !== 'shortcut') { add('Delete shortcut', () => { sel = { type: 'shortcut', i: sel.i }; deleteSel(); }, 'danger'); box.hidden = false; return; }
+  } else if (sel.type === 'stretch') {
+    const e = doc.elevation[sel.i], sp = stretchSamples(e);
+    t.textContent = (e.level > 0 ? 'Raised' : 'Sunken') + ' stretch, ' + Math.round(sp.span * G.step) + ' m long' + (e.level > 0 ? (e.rocks ? ', flying over ' + (settingMeta().words.scenery || 'asteroids') + '.' : ', open below.') : (e.canopy ? ', under ' + overheadLabel(e.canopy) + '.' : ', open above.'));
+    add(e.level > 0 ? 'Make sunken' : 'Make raised', () => { remember(); e.level = -e.level; rebuild(); });
+    const w = settingMeta().words.scenery || 'asteroids';
+    if (e.level > 0) add(e.rocks ? 'Clear ' + w + ' below' : 'Fly over ' + w, () => { remember(); e.rocks = !e.rocks; rebuild(); });
+    else {
+      // cycle through nothing and this setting's overhead types
+      const keys = [null].concat(settingMeta().overhead.map((o) => o.key));
+      const at = Math.max(0, keys.indexOf(e.canopy || null));
+      add('Overhead: ' + (e.canopy ? overheadLabel(e.canopy) : 'nothing') + ' (change)', () => { remember(); e.canopy = keys[(at + 1) % keys.length]; rebuild(); });
+    }
+  } else if (sel.type === 'barricade') {
+    t.textContent = 'Barricade ' + (sel.i + 1) + ' (its target is on the ' + (sel.i % 2 ? 'right' : 'left') + ')';
+  } else if (sel.type === 'jump') {
+    const j = doc.jumps[sel.i], ft = flightTime();
+    t.textContent = 'Jump ' + (sel.i + 1) + ', across ' + (j.side ? 'the ' + j.side + ' half of the lane' : 'the whole lane') + '. Racers come down ' + Math.round(SPD.slow * ft) + '–' + Math.round(SPD.boost * ft) + ' m on, depending on speed.';
+    const next = { none: 'left', left: 'right', right: 'none' };
+    add('Covers: ' + (j.side ? j.side + ' half' : 'whole lane') + ' (change)', () => { remember(); const n = next[j.side || 'none']; j.side = n === 'none' ? null : n; rebuild(); });
+  } else if (sel.type === 'gap') {
+    const g = stats.gaps[sel.i];
+    t.textContent = 'Gap ' + (sel.i + 1) + ', ' + Math.round(g.span * G.step) + ' m. ' + (!isFinite(g.need) ? "Can't be cleared: " + g.why + '.' :
+      (g.jump >= 0 ? 'Cleared off jump ' + (g.jump + 1) : 'Cleared by dropping onto the lower track beyond') + ' at ' + Math.round(g.need) + ' m/s or more.');
+  } else if (sel.type === 'loop') {
+    const q = doc.loops[sel.i];
+    t.textContent = 'Loop ' + (sel.i + 1) + ': radius ' + Math.round(q.r) + ' m (' + Math.round(TAU * q.r) + ' m round), comes out to the ' + q.side + '. Racers need ' + Math.round(loopNeed(q.r)) + '+ m/s going in.';
+    const size = (d) => () => { const r = clamp(q.r + d, LOOP.MIN_R, LOOP.MAX_R); if (r === q.r) return; remember(); q.r = r; rebuild(); };
+    add('Smaller', size(-20)); add('Larger', size(20));
+    add('Comes out: ' + q.side + ' (change)', () => { remember(); q.side = q.side === 'left' ? 'right' : 'left'; rebuild(); });
+  }
+  add('Delete', deleteSel, 'danger');
+  box.hidden = false;
+}
+
+/* checks panel */
+function runPanel() {
+  const st = $('stats'), list = $('checks');
+  const lapS = G.L / 300;
+  const rows = [
+    ['Lap', ((G.L + doc.loops.reduce((t, q) => t + TAU * q.r, 0)) / 1000).toFixed(2) + ' km  (about ' + Math.round(lapS) + ' s)'],
+    ['Points', String(doc.points.length)],
+    ['Shortcuts', String(doc.shortcuts.length)],
+    ['Raised / sunken', doc.elevation.filter((e) => e.level > 0).length + ' / ' + doc.elevation.filter((e) => e.level < 0).length],
+    ['Overpasses', String(stats.crossings)],
+    ['Barricades', String(doc.barricades.length)],
+    ['Jumps / gaps', doc.jumps.length + ' / ' + doc.gaps.length],
+    ['Loops', String(doc.loops.length)]
+  ];
+  st.textContent = '';
+  for (const [k, v] of rows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; st.append(dt, dd); }
+  const bad = issues.filter((i) => i.level === 'bad').length, warn = issues.filter((i) => i.level === 'warn').length;
+  const v = $('verdict');
+  v.className = 'verdict ' + (bad ? 'poor' : 'good');
+  v.textContent = bad ? bad + (bad > 1 ? ' problems need fixing' : ' problem needs fixing') + ' before this can race' : (warn ? 'Raceable, with ' + warn + (warn > 1 ? ' things' : ' thing') + ' to look at' : 'Ready to race');
+  list.textContent = '';
+  const rank = { bad: 0, warn: 1, info: 2 }, sorted = issues.slice().sort((a, b) => rank[a.level] - rank[b.level]);
+  for (const is of sorted) {
+    const li = document.createElement('li'), btn = document.createElement('button');
+    btn.type = 'button'; btn.className = is.level;
+    const dot = document.createElement('i'), sp = document.createElement('span');
+    sp.textContent = is.text; btn.append(dot, sp);
+    btn.addEventListener('click', () => {
+      if (!is.at.length) return;
+      const i = is.at[is.at.length >> 1];
+      focusAt = i; view.x = G.x[i]; view.y = G.y[i]; view.z = Math.max(view.z, 0.45); draw();
+    });
+    li.appendChild(btn); list.appendChild(li);
+  }
+}
+const _runChecks = runChecks;
+runChecks = function () { _runChecks(); runPanel(); };
+
+/* ================= persistence, buttons, keys ================= */
+const SAVE_KEY = 'gatebreaker.editor.v1';
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(doc)); } catch (e) { /* storage unavailable: nothing is kept between visits */ } }
+function restore() {
+  try {
+    const s = localStorage.getItem(SAVE_KEY), d = s ? JSON.parse(s) : null;
+    if (d && d.shortcuts) for (const c of d.shortcuts) { c.via = c.via || []; c.target = c.target || null; }
+    if (d) { d.jumps = d.jumps || []; d.gaps = d.gaps || []; d.loops = d.loops || []; d.setting = d.setting || 'space'; }
+    return d;
+  } catch (e) { return null; }
+}
+let toastT = 0;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 1800); }
+document.querySelectorAll('.tool').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.tool)));
+$('undo').addEventListener('click', undo);
+$('redo').addEventListener('click', redo);
+$('reverse').addEventListener('click', () => { remember(); reverseDir(); sel = null; rebuild(); toast('Racing direction reversed'); });
+let confirmAction = null;
+function askReplace(text, fn) { confirmAction = fn; $('confirmText').textContent = text; $('confirmRow').hidden = false; $('confirmYes').focus(); }
+$('confirmYes').addEventListener('click', () => { $('confirmRow').hidden = true; if (confirmAction) confirmAction(); confirmAction = null; });
+$('confirmNo').addEventListener('click', () => { $('confirmRow').hidden = true; confirmAction = null; });
+function replaceDoc(d) { remember(); doc = d; sel = null; pending = null; $('name').value = doc.name; $('setting').value = doc.setting || 'space'; rebuild(); fit(); }
+$('newTrack').addEventListener('click', () => askReplace('Start a new track? You can undo this.', () => replaceDoc(blankDoc())));
+$('example').addEventListener('click', () => askReplace('Load Kessler Loop over this design? You can undo this.', () => replaceDoc(importCode(JSON.stringify(EXAMPLE)))));
+$('name').addEventListener('input', () => { doc.name = $('name').value; refreshCode(); save(); });
+SETTINGS_META.forEach((m) => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; $('setting').appendChild(o); });
+$('setting').addEventListener('change', () => { remember(); doc.setting = $('setting').value; rebuild(); });
+$('copy').addEventListener('click', () => {
+  const text = $('code').value;
+  const fallback = () => { $('code').focus(); $('code').select(); toast('Code selected: press Ctrl+C to copy'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast('Track code copied'), fallback);
+  else fallback();
+});
+$('load').addEventListener('click', () => {
+  try { const d = importCode($('loadCode').value); replaceDoc(d); $('loadMsg').textContent = 'Loaded "' + d.name + '".'; $('loadCode').value = ''; }
+  catch (err) { $('loadMsg').textContent = err.message; }
+});
+LIBRARY.forEach((t, i) => { const o = document.createElement('option'); o.value = i; o.textContent = t.name + '  (' + t.km + ' km)'; $('lib').appendChild(o); });
+$('libLoad').addEventListener('click', () => {
+  const t = LIBRARY[+$('lib').value];
+  if (t) askReplace('Load ' + t.name + ' over this design? You can undo this.', () => { replaceDoc(importCode(JSON.stringify(t))); $('loadMsg').textContent = 'Loaded "' + t.name + '". Send its new code to Claude to update it in the game.'; });
+});
+$('fit').addEventListener('click', fit);
+$('zin').addEventListener('click', () => zoomAt(W / 2, H / 2, 1.25));
+$('zout').addEventListener('click', () => zoomAt(W / 2, H / 2, 0.8));
+window.addEventListener('keydown', (e) => {
+  if (e.target.closest('input, textarea')) return;
+  const k = e.key;
+  if ((e.ctrlKey || e.metaKey) && (k === 'z' || k === 'Z')) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && (k === 'y' || k === 'Y')) { e.preventDefault(); redo(); return; }
+  if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); deleteSel(); return; }
+  if (k === 'Escape') { pending = null; sel = null; focusAt = null; refreshSel(); draw(); return; }
+  if (k === 'f' || k === 'F') { fit(); return; }
+  const tools = ['shape', 'shortcut', 'raise', 'sink', 'barricade', 'start', 'jump', 'gap', 'loop'];
+  if (k >= '1' && k <= '9') setTool(tools[+k - 1]);
+});
+window.addEventListener('resize', resize);
+
+/* start: the saved draft if there is one, otherwise the game's own track as a worked example */
+doc = restore();
+try { if (!doc || !Array.isArray(doc.points) || doc.points.length < 4) doc = importCode(JSON.stringify(EXAMPLE)); }
+catch (e) { doc = importCode(JSON.stringify(EXAMPLE)); }
+$('name').value = doc.name;
+$('setting').value = doc.setting || 'space';
+setTool('shape');
+syncUndo();
+G = buildGeom(doc.points); computeHeights(); runChecks();
+resize();
+rebuild();
+fit();
+</script>
+
+</body></html>

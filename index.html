@@ -869,12 +869,14 @@ function segDist(px, py, ax, ay, bx, by) {
 /* ---------- the circuits ----------
    A track is plain data, in the same format the map editor exports:
      points      closed loop of control points; the first one is the start line, the order is the racing direction
-     shortcuts   corridors between two points on the lane (door and amber target are placed automatically)
+     shortcuts   corridors between two points on the lane (door and amber target are placed automatically). Either
+                 end may be on a raised or sunken stretch (on its flat part); a corridor joining two levels ramps
+                 between them in its middle, between its door and its exit gate (see chordH)
      elevation   stretches that leave the ground, as fractions of the lap; level 1 = raised, -1 = sunken;
                  rocks: true lets the scenery asteroids fill the ground under a raised stretch;
                  canopy: 'gas' or 'ice' hangs drifting gas clouds or ice asteroids over a sunken one.
                  The ramps (RAMP metres) sit inside the stretch. A raised stretch over another lane is an overpass.
-     barricades  sliding blockades, as fractions of the lap
+     barricades  sliding blockades, as fractions of the lap (on the ground, or the flat part of a raised or sunken stretch)
      jumps       launch pads, {at: fraction, side?: 'left' | 'right'}; without a side they cover the whole lane.
                  A ship that crosses one flies AIR.H levels up for a moment (over walls too), then comes down.
      gaps        stretches with no deck, {from, to}. Cross one with a jump, or drop off it onto lower track beyond;
@@ -1090,8 +1092,33 @@ function buildTrack(def) {
     c.exitS = Math.max(te * c.len, Math.min(c.len - 30, c.doorS + 90));
     const ep = chordAt(c, c.exitS);
     c.exitX = ep[0]; c.exitY = ep[1]; c.ex = ep[2]; c.ey = ep[3];
+    // its height: the lane's where it leaves and where it rejoins (an end may be on a raised or sunken stretch), with a
+    // ramp between its door and its exit gate where the two differ (see chordH). 'lift': not all on the ground.
+    c.h0 = Math.round(T.h[a] * 1000) / 1000; c.h1 = Math.round(T.h[b] * 1000) / 1000;
+    c.lift = Math.abs(c.h0) > 0.01 || Math.abs(c.h1) > 0.01;
+    {
+      let r0 = c.doorS + 20, r1 = c.exitS - 20;
+      const mid = (r0 + r1) / 2, half = Math.min((r1 - r0) / 2, RAMP * 0.75);
+      c.r0 = mid - Math.max(10, half); c.r1 = mid + Math.max(10, half);
+    }
     T.chords.push(c);
   }
+}
+/* a corridor's height at distance s along it */
+function chordH(c, s) {
+  if (c.h0 === c.h1) return c.h0;
+  let t = clamp((s - c.r0) / (c.r1 - c.r0), 0, 1); t = t * t * (3 - 2 * t);
+  return c.h0 + (c.h1 - c.h0) * t;
+}
+/* the corridor (one off the ground) a point is in, or null; _cs is left at how far along it */
+function liftedChordAt(x, y) {
+  for (const c of T.chords) {
+    if (!c.lift) continue;
+    const b = c.box;
+    if (x < b[0] || y < b[1] || x > b[2] || y > b[3]) continue;
+    if (chordDist(c, x, y) < c.hw + 4) return c;
+  }
+  return null;
 }
 
 /* ---------- loop geometry ----------
@@ -1857,7 +1884,7 @@ function newWorld(laps, solo) {
 /* height of the surface at a point: the lane's, or ground level off the lane (shortcut corridors are on the ground) */
 function groundH(x, y, i) {
   const dx = x - T.x[i], dy = y - T.y[i];
-  if (dx * dx + dy * dy > T.hw * T.hw) return 0;
+  if (dx * dx + dy * dy > T.hw * T.hw) { const c = liftedChordAt(x, y); return c ? chordH(c, _cs) : 0; }   // (off the lane: a corridor's height, or the ground)
   // between samples, the deck's height runs smoothly from one to the next (a ramp has no steps)
   const a = (dx * T.tx[i] + dy * T.ty[i]) / T.step, j = wrapIdx(i + (a >= 0 ? 1 : -1));
   return T.h[i] + (T.h[j] - T.h[i]) * clamp(Math.abs(a), 0, 1);
@@ -2016,7 +2043,7 @@ function stepAir(s, dt) {
   // (and a ramp rising to meet it counts too: coming down onto an up-ramp, the deck can climb past the ship between
   // two steps, so a deck a little above it still catches it)
   let fl = floorAt(s.x, s.y, Math.max(h0, s.h) + (s.air === 3 && !s.edgeFall ? 0.15 : 0.02)), fi = _fi;
-  if (s.inCorr && chordDist(s.inCorr, s.x, s.y) < s.inCorr.hw && 0 <= s.h + 0.02 && fl < 0) { fl = 0; fi = s.idx; }
+  if (s.inCorr && chordDist(s.inCorr, s.x, s.y) < s.inCorr.hw) { const ch = chordH(s.inCorr, _cs); if (ch <= s.h + 0.02 && fl < ch) { fl = ch; fi = s.idx; } }
   s.floorH = fl > -1e8 ? fl : null;
   if (fl > -1e8 && laneOpen(s.x, s.y, fi)) { fl = -1e9; s.floorH = null; }   // (open water: no deck there)
   if (s.air === 3 && fl > -1e8 && s.h <= fl + 0.001) { land(s, fi, fl); s.doomed = false; return; }
@@ -2441,7 +2468,8 @@ function stepBullets(dt) {
         if (sd(b.x, b.y, b.idx) > 0) {
           const idx = _sdIdx;
           // (nor inside a shortcut corridor: a shot fired down one flies on to its exit gate)
-          inCorr = T.chords.some((c) => chordDist(c, b.x, b.y) < c.hw + 8 && _cs > c.doorS && Math.abs(T.h[c.a] - b.h) <= CFG.levelTol);
+          // (a shot down one off the ground keeps to it, up or down its ramp)
+          inCorr = T.chords.some((c) => { if (!(chordDist(c, b.x, b.y) < c.hw + 8 && _cs > c.doorS)) return false; const ch = chordH(c, _cs); if (Math.abs(ch - b.h) > CFG.levelTol) return false; if (c.lift) b.h = ch; return true; });
           if (!inCorr && !W.gates.some((g) => g.kind === 'door' && Math.abs(g.h - b.h) <= CFG.levelTol && Math.hypot(b.x - g.chord.doorX, b.y - g.chord.doorY) < 400)) { dead = true; burst(b.x, b.y, 3, 70, '#bff8ff', 0.2, true); break; }
           b.idx = idx;
         } else b.idx = _sdIdx;
@@ -6593,6 +6621,30 @@ function buildTrenchEdges() {
     for (let q = r.n; q >= -1; q--) { const i = (r.s + q + N) % N; P.push([T.x[i] - T.nx[i] * (T.hw + TLIP[0][i]), T.y[i] - T.ny[i] * (T.hw + TLIP[0][i])]); }
     TRENCH_POLYS.push(P);
   }
+  // a shortcut corridor's sunken part: its own opening (joining the trench's where it leaves it), its edge ragged and
+  // wider the deeper it is, as a trench's is
+  for (const c of T.chords) {
+    if (!c.lift) continue;
+    const Q = chordPts(c);
+    let a = -1;
+    for (let k = 0; k <= Q.length; k++) {
+      const down = k < Q.length && Q[k].h < -0.005;
+      if (down && a < 0) a = k;
+      if (down || a < 0) continue;
+      const lo = a, hi = k - 1, P = [];   // (just where it is sunken: its walls and deck end there, and so does its opening)
+      if (hi <= lo) { a = -1; continue; }
+      for (let q = lo; q <= hi; q++) { const p = Q[q], w = c.hw + chordLip(c, p, 1); P.push([p.x + p.nx * w, p.y + p.ny * w]); }
+      for (let q = hi; q >= lo; q--) { const p = Q[q], w = c.hw + chordLip(c, p, -1); P.push([p.x - p.nx * w, p.y - p.ny * w]); }
+      TRENCH_POLYS.push(P);
+      a = -1;
+    }
+  }
+}
+/* how far past a sunken corridor's deck its opening reaches, on side sd: as a trench's (see TLIP), from its depth */
+function chordLip(c, p, sd) {
+  const base = (SET.ground && SET.ground.lip) || 10, d = clamp(-p.h, 0, 1), k = Math.round(p.s / 8);
+  const wob = 0.5 + 0.3 * Math.sin(k * 0.19 + sd * 1.7) + 0.2 * Math.sin(k * 0.47 + sd * 0.9);
+  return base + d * (10 + 26 * wob);
 }
 function resizeRender(cssW, cssH, dpr) {
   // the output canvas matches the screen pixels it is shown on, so the browser never resamples it
@@ -6788,6 +6840,7 @@ function paintTrack(l, e) {
   // shortcut corridors sit underneath the main lane
   CHORD_PATHS.forEach((p, k) => {
     const c = T.chords[k];
+    if (c.lift) return;   // (a corridor off the ground is drawn live, at its heights: see corridorItems)
     strokeP(l, p, c.hw * 2 + 6, COL.side, 9);
     const cu = !!c.catchup;
     strokeP(l, p, c.hw * 2 + 4, cu ? COL.catchRim : COL.corrRim);
@@ -6825,8 +6878,19 @@ function paintTrack(l, e) {
   if (CHORD_PATHS.length) {
     const tmp = mkCanvas(BAKE.w, BAKE.h), t = tmp.getContext('2d');
     t.translate(-BAKE.x, -BAKE.y); t.lineJoin = 'round'; t.lineCap = 'butt';
-    CHORD_PATHS.forEach((p, k) => {
+    CHORD_PATHS.forEach((p0, k) => {
       const c = T.chords[k], cu = !!c.catchup;
+      // (a corridor off the ground: only its mouths that are on the ground, near its ends; a raised or sunken mouth is
+      //  opened live, see corridorMouth)
+      let p = p0;
+      if (c.lift) {
+        p = new Path2D();
+        for (const [h, x, y] of [[c.h0, c.ax, c.ay], [c.h1, c.bx, c.by]]) {
+          if (Math.abs(h) > 0.01) continue;
+          let pen = false;
+          for (let i = 0; i < c.px.length; i++) { const near = Math.hypot(c.px[i] - x, c.py[i] - y) < hw + c.hw + 40; if (!near) { pen = false; continue; } if (pen) p.lineTo(c.px[i], c.py[i]); else { p.moveTo(c.px[i], c.py[i]); pen = true; } }
+        }
+      }
       strokeP(t, p, c.hw * 2 + 4, cu ? COL.catchRim : COL.corrRim);
       strokeP(t, p, c.hw * 2, cu ? COL.catchCorr : COL.corr);
     });
@@ -6878,7 +6942,15 @@ function groundClear() {
     if (!rad) continue;
     const k = Math.floor(T.x[i] / C) + ',' + Math.floor(T.y[i] / C);
     if (!cells.has(k)) cells.set(k, []);
-    cells.get(k).push(i, rad);
+    cells.get(k).push(T.x[i], T.y[i], rad);
+  }
+  // (and a shortcut corridor's raised or sunken parts)
+  for (const c of T.chords) if (c.lift) for (const p of chordPts(c)) {
+    const rad = p.h > 0.01 ? c.hw + 6 + slope * p.h + 8 : p.h < -0.01 ? c.hw + chordLip(c, p, 1) + 6 : 0;
+    if (!rad) continue;
+    const k = Math.floor(p.x / C) + ',' + Math.floor(p.y / C);
+    if (!cells.has(k)) cells.set(k, []);
+    cells.get(k).push(p.x, p.y, rad);
   }
   const HH = HILL.H && HILL.nx ? HILL : null;
   const raised = (x, y, r) => {   // (any ground raised under it: a hill or a dune)
@@ -6895,7 +6967,7 @@ function groundClear() {
     for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) {
       const L = cells.get((cx + a) + ',' + (cy + b));
       if (!L) continue;
-      for (let k = 0; k < L.length; k += 2) { const i = L[k], d = L[k + 1] + r * 0.7 + 10; if ((T.x[i] - x) ** 2 + (T.y[i] - y) ** 2 < d * d) return false; }
+      for (let k = 0; k < L.length; k += 3) { const d = L[k + 2] + r * 0.7 + 10; if ((L[k] - x) ** 2 + (L[k + 1] - y) ** 2 < d * d) return false; }
     }
     return true;
   };
@@ -7037,12 +7109,15 @@ function runPoly(ctx, v0, v1, w, dyA, dyB, style) {
 }
 function runEdges(ctx, v0, v1, w, style, width, alpha) {
   ctx.strokeStyle = style; ctx.lineWidth = width; ctx.globalAlpha = alpha;
+  const M = railMouths();
   for (let side = -1; side <= 1; side += 2) {
     ctx.beginPath();
+    let pen = false;
     for (let q = v0; q <= v1; q++) {
       const i = RI[q], f = RF[q];
+      if (M[side > 0 ? 1 : 0][i]) { pen = false; continue; }   // (open where a shortcut leaves)
       const x = RX[q] + T.nx[i] * w * f * side, y = RY[q] + T.ny[i] * w * f * side;
-      if (q === v0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      if (!pen) { ctx.moveTo(x, y); pen = true; } else ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
@@ -7491,7 +7566,7 @@ function buildHills() {
   // a ramp it climbs with the ramp), blended smoothly with any other bit nearly as near, so where two bits of road at
   // different heights meet in the middle the ground runs between them without a step.
   const SW = new Float32Array(NX * NY), SV = new Float32Array(NX * NY), BLEND = 28;
-  for (const pass of [0, 1]) T.runs.forEach((r, ri) => {
+  for (const pass of [0, 1]) { T.runs.forEach((r, ri) => {
     if (r.lv <= 0) return;
     for (let q = -1; q < r.n; q++) {
       const i = (r.s + q + N) % N, j = (i + 1) % N;
@@ -7517,6 +7592,32 @@ function buildHills() {
       }
     }
   });
+  // and a shortcut corridor's raised part raises the ground round it the same way (its embankment)
+  T.chords.forEach((c, ci) => {
+    if (!c.lift) return;
+    const P = chordPts(c), ce = c.hw + 6;
+    for (let q = 0; q + 1 < P.length; q++) {
+      const A = P[q], Bp = P[q + 1];
+      if (A.h < 0.01 && Bp.h < 0.01) continue;
+      const hm = Math.max(A.h, Bp.h), R = ce + slope * hm + (pass ? BLEND * 3 : 0);
+      const ax = A.x, ay = A.y, dx = Bp.x - ax, dy = Bp.y - ay, L2 = dx * dx + dy * dy || 1;
+      const gx0 = Math.max(0, Math.floor((Math.min(ax, Bp.x) - R - HILL.x0) / C)), gx1 = Math.min(NX - 1, Math.ceil((Math.max(ax, Bp.x) + R - HILL.x0) / C));
+      const gy0 = Math.max(0, Math.floor((Math.min(ay, Bp.y) - R - HILL.y0) / C)), gy1 = Math.min(NY - 1, Math.ceil((Math.max(ay, Bp.y) + R - HILL.y0) / C));
+      for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) {
+        const px = HILL.x0 + gx * C, py = HILL.y0 + gy * C;
+        const t = clamp(((px - ax) * dx + (py - ay) * dy) / L2, 0, 1), cx = ax + dx * t, cy = ay + dy * t;
+        const d = Math.hypot(px - cx, py - cy), h = A.h + (Bp.h - A.h) * t;
+        if (h <= 0) continue;
+        const k = gy * NX + gx;
+        if (!pass) { if (d < D[k]) { D[k] = d; OWN[k] = T.runs.length; NI[k] = -1; } continue; }   // (grouped with the open ground's own hills)
+        const bl = 0.5 + BLEND * clamp((D[k] - ce) / 70, 0, 1);
+        if (D[k] > 1e8 || d - D[k] > bl * 4) continue;
+        const w = Math.exp(-(d - D[k]) / bl), v = d <= ce ? h : h * prof(clamp(1 - (d - ce) / (slope * h), 0, 1));
+        SW[k] += w; SV[k] += w * v;
+      }
+    }
+  });
+  }
   for (let k = 0; k < NX * NY; k++) { H[k] = SW[k] > 0 ? SV[k] / SW[k] : 0; if (H[k] <= 0.002) OWN[k] = -1; }
   // dunes for decoration, out in the open away from the track (the setting says how many and what shape)
   const DEC = T.runs.length;
@@ -7577,7 +7678,7 @@ function buildHills() {
   // (every bit of lane, raised ones too: no hill may rise over a road beside it, a ramp's included; a road's own hill is
   // never above it, so this leaves it alone)
   for (let j = 0; j < N; j++) { const k = (j + 1) % N; if (T.loopOf[j] < 0 && T.loopOf[k] < 0) hold(T.x[j], T.y[j], T.x[k], T.y[k], T.hw + 18, Math.max(0, Math.min(T.h[j], T.h[k])), j); }
-  for (const c of T.chords) for (let k = 0; k + 1 < c.px.length; k++) hold(c.px[k], c.py[k], c.px[k + 1], c.py[k + 1], c.hw + 18, 0, -1);
+  for (const c of T.chords) for (let k = 0; k + 1 < c.px.length; k++) hold(c.px[k], c.py[k], c.px[k + 1], c.py[k + 1], c.hw + 18, c.lift ? Math.max(0, Math.min(chordH(c, c.ps[k]), chordH(c, c.ps[k + 1]))) : 0, -1);   // (to its own height, where it is raised)
   // no hill on the water: held down beside rivers and lakes, rising gently from their banks
   if (RIVER.paths.length || RIVER.lakes.length) {
     const bank = (G.river.bank || 14) + 6;
@@ -8067,12 +8168,11 @@ function railCols() {
 }
 /* the flat lane's two edges, in short pieces (each with its box, to draw only those in view), broken at the gaps
    and where the lane leaves the ground (a raised or sunken stretch, or a loop, draws its own) */
-function railChunks() {
-  const key = TRACK.id + ':' + T.N + ':' + SET.id;
-  if (RAIL.key === key) return RAIL.chunks;
-  const N = T.N, w = T.hw + 1, out = [], flat = (i) => T.runOf[i] < 0 && T.loopOf[i] < 0 && !T.gap[i];
-  // (no rail where a shortcut corridor meets the lane's edge: its mouth stays open, as it is to racers)
-  const mouth = [new Uint8Array(N), new Uint8Array(N)];
+/* where a shortcut corridor meets the lane's edge, for each side of the lane: [left, right], 1 at a sample in a mouth */
+function railMouths() {
+  const key = TRACK.id + ':' + T.N;
+  if (RAIL.mouthKey === key) return RAIL.mouths;
+  const N = T.N, w = T.hw + 1, mouth = [new Uint8Array(N), new Uint8Array(N)];
   for (const c of T.chords) for (let k = 0; k < c.px.length; k++) {
     const x = c.px[k], y = c.py[k], r = c.hw + 6;
     for (let i = 0; i < N; i++) {
@@ -8081,6 +8181,15 @@ function railChunks() {
       for (let si = 0; si < 2; si++) { const sd = si ? 1 : -1, ex = T.x[i] + T.nx[i] * w * sd - x, ey = T.y[i] + T.ny[i] * w * sd - y; if (ex * ex + ey * ey < r * r) mouth[si][i] = 1; }
     }
   }
+  RAIL.mouthKey = key; RAIL.mouths = mouth;
+  return mouth;
+}
+function railChunks() {
+  const key = TRACK.id + ':' + T.N + ':' + SET.id;
+  if (RAIL.key === key) return RAIL.chunks;
+  const N = T.N, w = T.hw + 1, out = [], flat = (i) => T.runOf[i] < 0 && T.loopOf[i] < 0 && !T.gap[i];
+  // (no rail where a shortcut corridor meets the lane's edge: its mouth stays open, as it is to racers)
+  const mouth = railMouths();
   for (const sd of [1, -1]) {
     const ok = (i) => flat(i) && !mouth[sd > 0 ? 1 : 0][i];
     // (runs of railed samples, started where the rail is broken, so none runs over the lap's seam)
@@ -8123,12 +8232,15 @@ function drawRails() {
 /* a raised (or, without 3D, sunken) stretch's edges as the same wall: slices from its deck up (see drawRun) */
 function runRail(ctx, v0, v1, w, hh, style, width, alpha) {
   ctx.strokeStyle = style; ctx.lineWidth = width; ctx.globalAlpha = alpha;
+  const M = railMouths();
   for (let side = -1; side <= 1; side += 2) {
     ctx.beginPath();
+    let pen = false;
     for (let q = v0; q <= v1; q++) {
       const i = RI[q], f = fscale(RH[q] + hh);
+      if (M[side > 0 ? 1 : 0][i]) { pen = false; continue; }   // (open where a shortcut leaves)
       const x = CX + (T.x[i] + T.nx[i] * w * side - CX) * f, y = CY + (T.y[i] + T.ny[i] * w * side - CY) * f;
-      if (q === v0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      if (!pen) { ctx.moveTo(x, y); pen = true; } else ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
@@ -9180,6 +9292,11 @@ const LKEY = (h, idx, c) => {
 };
 /* a ship in the air: high flyers go over everything; one falling through a gap goes under the deck it fell through */
 function shipKey(s) {
+  // (in a shortcut corridor off the ground: drawn with that corridor's part at its height, see corridorItems)
+  if (s.inCorr && s.inCorr.lift && !s.loop) {
+    const dx = s.x - T.x[s.idx], dy = s.y - T.y[s.idx];
+    if (dx * dx + dy * dy > T.hw * T.hw) return (s.h > 0.05 ? 0.81 : s.h < -0.05 ? -0.79 : 0.25) + s.id * 0.0001;
+  }
   if (!s.air) return LKEY(s.h, s.idx, 4);
   if (s.h > 1.02) return 0.86 + s.id * 0.001;
   if (s.doomed || s.h < s.airBase - 0.15) {
@@ -9239,6 +9356,7 @@ function renderFrame(time) {
   // (every ship at the scale of its own height, the same as the deck at that height)
   for (const s of W.ships) { if (s.loop) continue; items.push({ k: shipKey(s), y: s.y, fn: () => atPos(s.h, s.x, s.y, (f) => drawShip(s, time, f)) }); }
   ghostItem(items, time);   // (a time trial's ghost)
+  if (T.chords.some((c) => c.lift)) corridorItems(items);   // (shortcut corridors off the ground)
   const bb9 = [[], [], [], [], [], [], [], [], []], pp9 = [[], [], [], [], [], [], [], [], []];
   for (const b of W.bullets) bb9[clamp(Math.round(b.h * 4) + 4, 0, 8)].push(b);
   for (const p of W.parts) pp9[clamp(Math.round(p.h * 4) + 4, 0, 8)].push(p);
@@ -9364,6 +9482,128 @@ function drawMinimap(cv, ctx2) {
 }
 
 'use strict';
+/* ================= shortcut corridors off the ground =================
+   A corridor whose ends are on a raised or sunken stretch climbs or drops between them (see chordH), so it cannot be
+   painted once into the flat track picture with the rest. It is drawn live instead, in pieces by level, each at the
+   place in the draw order of the lane at that level: on the ground under the flat lane, raised over it, sunken under
+   it (on a world with ground, a sunken piece is a trench: see the 3D trenches). Every point is scaled about the middle
+   of the screen by its height, as the lane is, and a racer in it is drawn with the piece it is on (shipKey). Where it
+   opens off a raised or sunken stretch, the lane's edge is cut away and the corridor's deck runs through (corridorMouth). */
+function chordPts(c) {
+  if (c.pts) return c.pts;
+  const P = [], n = Math.max(2, Math.ceil(c.len / 8));
+  for (let k = 0; k <= n; k++) {
+    const sv = (k / n) * c.len, q = chordAt(c, sv);
+    P.push({ s: sv, x: q[0], y: q[1], nx: -q[3], ny: q[2], h: chordH(c, sv) });
+  }
+  // (which points lie over the lane, at its ends: the lane hides the corridor there)
+  for (const p of P) { nearestIdx(p.x, p.y, -1, 0, 0); p.inLane = _bd < T.hw + 1; }
+  return (c.pts = P);
+}
+// (its level at a point: 1 raised, 0 on the ground, -1 sunken)
+const lvOf = (h) => (h > 0.02 ? 1 : h < -0.02 ? -1 : 0);
+/* a strip along points P[a..b] of a corridor, w each side of its centre line, each point at its own height's scale,
+   shifted dy down the screen (a deck's side) */
+function chordStrip(ctx, P, a, b, w, dy) {
+  ctx.beginPath();
+  for (let k = a; k <= b; k++) { const p = P[k], f = fscale(p.h); ctx.lineTo(CX + (p.x + p.nx * w - CX) * f, CY + (p.y + p.ny * w - CY) * f + dy); }
+  for (let k = b; k >= a; k--) { const p = P[k], f = fscale(p.h); ctx.lineTo(CX + (p.x - p.nx * w - CX) * f, CY + (p.y - p.ny * w - CY) * f + dy); }
+  ctx.closePath(); ctx.fill();
+}
+function chordLine(ctx, P, a, b, w, every) {
+  ctx.beginPath();
+  for (let k = a; k < b; k++) {
+    if (every && k % 2) continue;
+    const p = P[k], q = P[k + 1], fp = fscale(p.h), fq = fscale(q.h);
+    for (const sd of w ? [1, -1] : [0]) {
+      ctx.moveTo(CX + (p.x + p.nx * w * sd - CX) * fp, CY + (p.y + p.ny * w * sd - CY) * fp);
+      ctx.lineTo(CX + (q.x + q.nx * w * sd - CX) * fq, CY + (q.y + q.ny * w * sd - CY) * fq);
+    }
+  }
+  ctx.stroke();
+}
+/* one piece of a corridor, drawn as the baked ones are: its side (off the ground, with nothing under it), rims, deck, dashes */
+function drawChordPiece(c, a, b) {
+  const P = chordPts(c), cu = !!c.catchup, GR = !!SET.ground, lv = lvOf(P[(a + b) >> 1].h);
+  // (a piece reaching over the lane at an end is painted on its own layer, the lane's deck cut out of it there: the lane
+  //  hides it, as the flat lane hides a corridor painted under it)
+  const ends = [0, 1].filter((e) => P.slice(a, b + 1).some((p) => p.inLane && (e ? p.s > c.len / 2 : p.s < c.len / 2)));
+  const L = ends.length ? rc : lc;
+  if (ends.length) { rc.setTransform(1, 0, 0, 1, 0, 0); rc.clearRect(0, 0, VW, VH); rc.setTransform(1, 0, 0, 1, VW / 2 - CX, VH / 2 - CY); }
+  else setScale(1);
+  L.lineJoin = 'round'; L.lineCap = 'butt';
+  if (!GR || lv === 0) { L.fillStyle = COL.side; chordStrip(L, P, a, b, c.hw + 3, lv === 0 ? 9 : 9 + 8 * HK * Math.max(0, P[(a + b) >> 1].h)); }
+  L.fillStyle = cu ? COL.catchRim : COL.corrRim; chordStrip(L, P, a, b, c.hw + 2, 0);
+  L.fillStyle = cu ? COL.catchCorr : COL.corr; chordStrip(L, P, a, b, c.hw, 0);
+  L.strokeStyle = cu ? '#c9b6ff' : '#e8b36a'; L.lineWidth = 2; L.globalAlpha = 0.35; chordLine(L, P, a, b, 0, true); L.globalAlpha = 1;
+  if (ends.length) {
+    L.globalCompositeOperation = 'destination-out'; L.strokeStyle = '#000'; L.lineJoin = 'round'; L.lineCap = 'round';
+    for (const e of ends) {
+      const i0 = e ? c.b : c.a, f = fscale(e ? c.h1 : c.h0), lane = new Path2D();
+      for (let q = -40; q <= 40; q++) { const i = wrapIdx(i0 + q), x = CX + (T.x[i] - CX) * f, y = CY + (T.y[i] - CY) * f; if (q === -40) lane.moveTo(x, y); else lane.lineTo(x, y); }
+      L.lineWidth = (T.hw + 2) * 2 * f; L.stroke(lane);
+    }
+    L.globalCompositeOperation = 'source-over';
+    lc.setTransform(1, 0, 0, 1, 0, 0); lc.drawImage(runCv, 0, 0); setScale(1);
+  }
+  // its edges' glow (not over the lane)
+  ec.strokeStyle = cu ? COL.catchRim : COL.corrRim; ec.lineWidth = 2; ec.globalAlpha = 0.35;
+  let k0 = a; while (k0 < b && P[k0].inLane) k0++;
+  let k1 = b; while (k1 > k0 && P[k1].inLane) k1--;
+  if (k1 > k0) chordLine(ec, P, k0, k1, c.hw + 1, false);
+  ec.globalAlpha = 1;
+}
+/* where a corridor leaves or rejoins a raised or sunken stretch: the lane's edge there (its rim, rails and side) covered
+   by the corridor's deck, just in a band along the lane's edge, so the way in reads as open */
+function corridorMouth(c, end) {
+  const h = end ? c.h1 : c.h0, i0 = end ? c.b : c.a, f = fscale(h), P = chordPts(c), N = T.N, hw = T.hw, cu = !!c.catchup;
+  const ex = end ? c.bx : c.ax, ey = end ? c.by : c.ay;
+  if (offscreen(ex, ey, f, hw * 3)) return;
+  const R = rc;
+  R.setTransform(1, 0, 0, 1, 0, 0); R.clearRect(0, 0, VW, VH); R.setTransform(1, 0, 0, 1, VW / 2 - CX, VH / 2 - CY);
+  // the corridor's deck near this end
+  let a = 0, b = P.length - 1;
+  while (a < P.length - 1 && Math.hypot(P[a].x - ex, P[a].y - ey) > hw + c.hw + 40) a++;
+  while (b > 0 && Math.hypot(P[b].x - ex, P[b].y - ey) > hw + c.hw + 40) b--;
+  if (end) { a = b; while (a > 0 && Math.hypot(P[a - 1].x - ex, P[a - 1].y - ey) <= hw + c.hw + 40) a--; }
+  else { b = a; while (b < P.length - 1 && Math.hypot(P[b + 1].x - ex, P[b + 1].y - ey) <= hw + c.hw + 40) b++; }
+  if (b <= a) return;
+  R.fillStyle = cu ? COL.catchRim : COL.corrRim; chordStrip(R, P, a, b, c.hw + 2, 0);
+  R.fillStyle = cu ? COL.catchCorr : COL.corr; chordStrip(R, P, a, b, c.hw, 0);
+  // only the band along the lane's edge here: inside its outer reach, outside its deck
+  const lane = new Path2D();
+  for (let q = -30; q <= 30; q++) { const i = wrapIdx(i0 + q), x = CX + (T.x[i] - CX) * f, y = CY + (T.y[i] - CY) * f; if (q === -30) lane.moveTo(x, y); else lane.lineTo(x, y); }
+  R.lineJoin = 'round'; R.lineCap = 'round';
+  R.globalCompositeOperation = 'destination-in'; R.lineWidth = (hw + 30) * 2 * f; R.strokeStyle = '#000'; R.stroke(lane);
+  R.globalCompositeOperation = 'destination-out'; R.lineCap = 'butt'; R.lineWidth = (hw - 1) * 2 * f; R.stroke(lane);
+  R.globalCompositeOperation = 'source-over';
+  lc.setTransform(1, 0, 0, 1, 0, 0); lc.drawImage(runCv, 0, 0); setScale(1);
+}
+/* everything corridors off the ground add to the frame: pieces by level, and their mouths on raised or sunken stretches */
+function corridorItems(items) {
+  const GR = !!SET.ground;
+  for (const c of T.chords) {
+    if (!c.lift) continue;
+    const b = c.box, m = 60;   // (in view, at any of its heights)
+    if (b[2] < CX - VW / 2 / 0.7 - m || b[0] > CX + VW / 2 / 0.7 + m || b[3] < CY - VH / 2 / 0.7 - m || b[1] > CY + VH / 2 / 0.7 + m) continue;
+    const P = chordPts(c);
+    let a = 0;
+    for (let k = 1; k <= P.length - 1; k++) {
+      const lv = lvOf(P[a].h);
+      if (k < P.length - 1 && lvOf(P[k].h) === lv) continue;
+      const a0 = a, b0 = k;
+      // (a sunken piece on a world with ground is a trench, drawn with the 3D trenches)
+      if (!(GR && lv < 0)) items.push({ k: lv > 0 ? 0.795 : lv < 0 ? -0.81 : -0.05, y: 0, fn: () => drawChordPiece(c, a0, b0) });
+      a = k;
+    }
+    for (const end of [0, 1]) {
+      const h = end ? c.h1 : c.h0;
+      if (Math.abs(h) < 0.01 || (GR && h < 0)) continue;
+      items.push({ k: h > 0 ? 0.805 : -0.795, y: 0, fn: () => corridorMouth(c, end) });
+    }
+  }
+}
+
 /* ================= loop-de-loops: drawing the ring =================
    A loop is drawn as track: the full-width deck with its rims, dotted surface, centre dashes and chevrons, climbing
    up the screen off the lane (the camera looks down at it at an angle), over the top, where the dark underside shows,
@@ -10096,7 +10336,7 @@ uniform int ground;   // 1 a trench in the ground, 0 a deck over the void
 uniform int pass;     // 0 colour, 1 the walls alone in white (a mask)
 uniform float hw; uniform float D; uniform float time; uniform vec2 dOff; uniform float VHp;
 uniform sampler2D grain;
-uniform vec3 shoulder, rim, road, roadHi, line, rockLo, rockHi, band, bankLo, bankHi, side, railSide;
+uniform vec3 shoulder, rim, road, roadHi, line, rockLo, rockHi, band, bankLo, bankHi, side, railSide, corr, corrRim, corrLine;
 const float B8[64] = float[64](${B8.join(', ')});
 out vec4 o;
 float seg(vec2 p, vec2 a, vec2 b) { vec2 ab = b - a; float t = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0); return length(p - a - ab * t); }
@@ -10104,10 +10344,15 @@ void main() {
   if (pass == 1) { if (v.z < 0.5 || v.z > 1.5) discard; o = vec4(1.0); return; }
   vec3 c;
   float hz = 0.38 * clamp(-h, 0.0, 1.0);
-  if (v.z < 0.5) {
+  if (v.z > 4.5) {   // a shortcut corridor's deck, down in its own trench (v.w: its half width): rims, deck, centre dashes
+    float u = abs(v.x);
+    c = u > v.w ? corrRim : corr;
+    if (u < 1.0 && mod(v.y, 20.0) < 8.0) c = mix(c, corrLine, 0.35);
+  } else if (v.z < 0.5) {
     float u = abs(v.x), al = v.y;
     if (ground == 1) {   // the road, as paintRoad lays it: kerb, lit edge, road, worn middle, grit over the road
       c = u > hw + 2.0 ? shoulder : u > hw ? rim : u > hw - 15.0 ? road : roadHi;
+      if (v.w > 0.5 && u > hw - 1.0) c = corr;   // (where a shortcut leaves: its deck, no edge across its mouth)
       if (u <= hw) { vec4 g = texture(grain, wp / 32.0); c = mix(c, g.rgb, g.a); }
       if (u < 1.0 && mod(al, 26.0) < 10.0) c = mix(c, line, 0.35);
     } else {             // the dotted deck: thicker dots the lower it is (coverOf), the void between them
@@ -10140,7 +10385,7 @@ void main() {
     gl.bindAttribLocation(p, 0, 'a'); gl.bindAttribLocation(p, 1, 'b'); gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     TR3.prog = p;
-    for (const n of ['cam', 'halfV', 'A', 'ground', 'pass', 'hw', 'D', 'time', 'dOff', 'VHp', 'grain', 'shoulder', 'rim', 'road', 'roadHi', 'line', 'rockLo', 'rockHi', 'band', 'bankLo', 'bankHi', 'side', 'railSide']) TR3.loc[n] = gl.getUniformLocation(p, n);
+    for (const n of ['cam', 'halfV', 'A', 'ground', 'pass', 'hw', 'D', 'time', 'dOff', 'VHp', 'grain', 'shoulder', 'rim', 'road', 'roadHi', 'line', 'rockLo', 'rockHi', 'band', 'bankLo', 'bankHi', 'side', 'railSide', 'corr', 'corrRim', 'corrLine']) TR3.loc[n] = gl.getUniformLocation(p, n);
   } catch (e) { console.warn('3D trenches unavailable:', e.message); TR3.failed = true; return false; }
   return true;
 }
@@ -10151,13 +10396,27 @@ function tr3Build() {
   let len = 0; for (let i = 0; i < N; i++) { const j = (i + 1) % N; len += Math.hypot(T.x[j] - T.x[i], T.y[j] - T.y[i]); }
   const D = len / N;
   const vert = (x, y, z, l, b0, b1, kind, sl) => { V.push(x, y, z, l, b0, b1, kind, sl); return V.length / 8 - 1; };
-  const strip = (I, L) => { for (let k = 0; k < L.length - 1; k++) { const A = L[k], B = L[k + 1]; if (T.gap[A[2]] || T.gap[B[2]]) continue; I.push(A[0], A[1], B[1], A[0], B[1], B[0]); } };   // (nothing across a gap: what is below shows)
+  const strip = (I, L, skip) => { for (let k = 0; k < L.length - 1; k++) { const A = L[k], B = L[k + 1]; if (T.gap[A[2]] || T.gap[B[2]] || (skip && (skip[A[2]] || skip[B[2]]))) continue; I.push(A[0], A[1], B[1], A[0], B[1], B[0]); } };   // (nothing across a gap: what is below shows)
+  // where a shortcut leaves the trench: no rail there, and on the ground no wall where the corridor's own opening is
+  const M = railMouths(), CUT = [new Uint8Array(N), new Uint8Array(N)], low = T.chords.filter((c) => c.lift && (c.h0 < 0 || c.h1 < 0));
+  if (GR && low.length) for (let i = 0; i < N; i++) {
+    if (T.h[i] > -0.01) continue;
+    for (let si = 0; si < 2; si++) {
+      const sd = si ? 1 : -1, tp = hw + TLIP[si][i] + 2.5;
+      for (const c of low) {
+        const mx = T.x[i] + T.nx[i] * (hw + tp) / 2 * sd, my = T.y[i] + T.ny[i] * (hw + tp) / 2 * sd;
+        if (chordDist(c, mx, my) < c.hw + 14) { CUT[si][i] = 1; break; }
+      }
+    }
+  }
   for (const r of T.runs) {
     if (r.lv >= 0) continue;
-    const fl = [], wl = [[], []], sk = [], rs = [[], []], rt = [[], []], FW = GR ? hw + 3 : hw + 2;
+    const fl = [[], []], wl = [[], []], sk = [], rs = [[], []], rt = [[], []], FW = GR ? hw + 3 : hw + 2;
     for (let q = -1; q <= r.n; q++) {
       const i = (r.s + q + N) % N, x = T.x[i], y = T.y[i], nx = T.nx[i], ny = T.ny[i], z = Math.min(0, T.h[i]), al = (r.s + q) * D;
-      fl.push([vert(x - nx * FW, y - ny * FW, z, 0, -FW, al, 0, 0), vert(x + nx * FW, y + ny * FW, z, 0, FW, al, 0, 0), i]);
+      // (each half of the road on its own, so a shortcut's mouth on one side can show there: see the floor's shader)
+      fl[0].push([vert(x - nx * FW, y - ny * FW, z, 0, -FW, al, 0, M[0][i]), vert(x, y, z, 0, 0, al, 0, M[0][i]), i]);
+      fl[1].push([vert(x, y, z, 0, 0, al, 0, M[1][i]), vert(x + nx * FW, y + ny * FW, z, 0, FW, al, 0, M[1][i]), i]);
       // the rails standing on the road's edges: a side (at the edge, from the floor up) and a lit top
       for (let si = 0; si < 2; si++) {
         const sd = si ? 1 : -1, ex = x + nx * (hw + 1) * sd, ey = y + ny * (hw + 1) * sd, zt = z + RAIL.h;
@@ -10172,9 +10431,29 @@ function tr3Build() {
         sk.push([vert(x - nx * W2, y - ny * W2 + dy, z, 0, 0, al, 2, 0), vert(x + nx * W2, y + ny * W2 + dy, z, 0, 0, al, 2, 0), i]);
       }
     }
-    strip(top, fl);
-    if (GR) { strip(rest, wl[0]); strip(rest, wl[1]); } else strip(rest, sk);
-    for (const L of rs.concat(rt)) strip(rails, L);
+    strip(top, fl[0]); strip(top, fl[1]);
+    if (GR) { strip(rest, wl[0], CUT[0]); strip(rest, wl[1], CUT[1]); } else strip(rest, sk);
+    rs.forEach((L, si) => strip(rails, L, M[si])); rt.forEach((L, si) => strip(rails, L, M[si]));
+  }
+  // on the ground, a shortcut corridor's sunken part is a trench of its own: its deck, a hair under the lane's where the
+  // two meet (so the lane's shows), and its walls up to its opening
+  if (GR) for (const c of low) {
+    const Q = chordPts(c), fl = [], wl = [[], []];
+    for (const p of Q) {
+      if (p.h > -0.002) { fl.push(null); wl[0].push(null); wl[1].push(null); continue; }
+      const z = p.h - 0.004, W = c.hw + 3;
+      fl.push([vert(p.x - p.nx * W, p.y - p.ny * W, z, 0, -W, p.s, 5, c.hw), vert(p.x + p.nx * W, p.y + p.ny * W, z, 0, W, p.s, 5, c.hw)]);
+      for (let si = 0; si < 2; si++) {
+        const sd = si ? 1 : -1;
+        // (no wall where its foot is down on the lane's own deck, at the mouth: the lane's trench is open there)
+        nearestIdx(p.x + p.nx * W * sd, p.y + p.ny * W * sd, -1, 0, 0);
+        if (_bd < hw + 2) { wl[si].push(null); continue; }
+        const tp = c.hw + chordLip(c, p, sd) + 2.5, lit = clamp(0.5 + 0.6 * (sd * p.nx * 0.6 + sd * p.ny * 0.8), 0, 1);
+        wl[si].push([vert(p.x + p.nx * W * sd, p.y + p.ny * W * sd, p.h, lit, 0, p.s, 1, 0.24), vert(p.x + p.nx * tp * sd, p.y + p.ny * tp * sd, 0, lit, 1, p.s, 1, 0.24)]);
+      }
+    }
+    const qs = (I, L) => { for (let k = 0; k < L.length - 1; k++) { const A = L[k], B = L[k + 1]; if (A && B) I.push(A[0], A[1], B[1], A[0], B[1], B[0]); } };
+    qs(top, fl); qs(rest, wl[0]); qs(rest, wl[1]);
   }
   if (TR3.vao) gl.deleteVertexArray(TR3.vao);
   TR3.vao = gl.createVertexArray(); gl.bindVertexArray(TR3.vao);
@@ -10218,10 +10497,12 @@ function drawTrenches3D(time) {
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, TR3.grain); gl.uniform1i(L.grain, 0);
   const C3 = TR3.colsFor === SET.id ? TR3.cols : (TR3.colsFor = SET.id, TR3.cols = GR ? {
     shoulder: rgb(G.road.shoulder), rim: rgb(COL.rim), road: rgb(G.road.base), roadHi: rgb(G.road.hi), line: rgb(G.road.line),
-    rockLo: rgb(G.wall.lo), rockHi: rgb(G.wall.hi), band: rgb(G.wall.band), bankLo: rgb(G.bank.lo), bankHi: rgb(G.bank.hi), side: rgb(COL.side), railSide: hexRgb(COL.rim).map((v, k) => (v + (hexRgb(COL.side)[k] - v) * 0.55) / 255)
+    rockLo: rgb(G.wall.lo), rockHi: rgb(G.wall.hi), band: rgb(G.wall.band), bankLo: rgb(G.bank.lo), bankHi: rgb(G.bank.hi), side: rgb(COL.side), railSide: hexRgb(COL.rim).map((v, k) => (v + (hexRgb(COL.side)[k] - v) * 0.55) / 255),
+    corr: rgb(COL.corr), corrRim: rgb(COL.corrRim), corrLine: rgb('#e8b36a')
   } : {
     shoulder: rgb(COL.side), rim: rgb(COL.rim), road: rgb(COL.dot), roadHi: rgb(COL.dotHi), line: rgb('#8fa6ff'),
-    rockLo: rgb(COL.side), rockHi: rgb(COL.side), band: rgb(COL.side), bankLo: rgb(COL.side), bankHi: rgb(COL.side), side: rgb(COL.side), railSide: hexRgb(COL.rim).map((v, k) => (v + (hexRgb(COL.side)[k] - v) * 0.55) / 255)
+    rockLo: rgb(COL.side), rockHi: rgb(COL.side), band: rgb(COL.side), bankLo: rgb(COL.side), bankHi: rgb(COL.side), side: rgb(COL.side), railSide: hexRgb(COL.rim).map((v, k) => (v + (hexRgb(COL.side)[k] - v) * 0.55) / 255),
+    corr: rgb(COL.corr), corrRim: rgb(COL.corrRim), corrLine: rgb('#e8b36a')
   });
   for (const k in C3) gl.uniform3f(L[k], C3[k][0], C3[k][1], C3[k][2]);
   gl.bindVertexArray(TR3.vao);
