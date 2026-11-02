@@ -1390,6 +1390,16 @@ TRACKS.push(
     gaps: [{from: 0.43889, to: 0.45145}, {from: 0.70544, to: 0.71297}]
   },
   {
+    // Lagrange Knot again, its sunken stretches drawn as real 3D (see drawTrenches3D) rather than painted in 2D
+    id: 'lagrange-knot-alt', name: 'Lagrange Knot Alt', setting: 'forest', seed: 38, trench3d: true,
+    points: [[405, 85], [265, 345], [100, 585], [-100, 800], [-325, 985], [-640, 960], [-855, 1220], [-1145, 1230], [-1265, 1100], [-1215, 880], [-1410, 740], [-1705, 775], [-1790, 565], [-1620, 235], [-1325, 95], [-970, 45], [-850, -240], [-575, -345], [-290, -405], [0, -425], [290, -405], [575, -345], [850, -240], [1100, -90], [1320, 100], [1490, 335], [1760, 295], [1905, 470], [1565, 900], [1390, 1130], [1135, 1410], [810, 1260], [555, 1125], [305, 975], [80, 790], [-110, 570], [-275, 330], [-410, 70], [-515, -200], [-590, -485], [-540, -780], [-620, -1065], [-565, -1355], [-455, -1620], [-265, -1840], [5, -1930], [275, -1830], [460, -1605], [570, -1335], [620, -1050], [625, -967], [530, -745], [585, -465], [510, -185]],
+    shortcuts: [{from: [-560, -1370], to: [602, -918], via: [[-393, -1446], [-251, -1548], [-97, -1616], [65, -1634], [218, -1583], [337, -1479], [419, -1344], [465, -1199]]}],   // (smoothed and balanced: tools/shortcuts.js)
+    elevation: [{from: 0.36058, to: 0.4148, level: -1, canopy: 'ice'}, {from: 0.62938, to: 0.6836, level: -1, canopy: 'gas'}, {from: 0.70394, to: 0.76023, level: -1, canopy: 'ice'}, {from: 0.07408, to: 0.23187, level: -1, canopy: 'gas'}, {from: 0.46155, to: 0.61111, level: 1, rocks: true}, {from: 0.29709, to: 0.33366, level: 1}],
+    barricades: [0.26619, 0.78],
+    jumps: [{at: 0.43135}],
+    gaps: [{from: 0.43889, to: 0.45145}, {from: 0.70544, to: 0.71297}]
+  },
+  {
     id: 'rime-belt', name: 'Rime Belt', setting: 'arctic', seed: 45,
     points: [[1030, -1645], [745, -1590], [680, -1335], [380, -1215], [60, -1085], [-75, -830], [-135, -550], [-115, -260], [0, 0], [210, 200], [475, 305], [765, 315], [1035, 215], [1170, -30], [1015, -255], [740, -345], [455, -320], [190, -200], [-5, 10], [-120, 275], [-140, 560], [-85, 845], [145, 1020], [235, 1320], [535, 1345], [735, 1600], [1020, 1655], [1305, 1650], [1590, 1600], [2005, 1195], [1905, 820], [1665, 805], [1335, 820], [1155, 575], [1380, 265], [1685, 345], [1780, 645], [1675, 890], [1765, 1115], [2095, 1280], [2365, 1215], [2580, 1025], [2770, 805], [2420, 275], [2850, -30], [2990, -165], [3045, -370], [2815, -545], [2780, -810], [2425, -895], [2380, -1225], [2140, -1385], [1895, -1395], [1783, -1396], [1485, -1425], [1320, -1650]],
     shortcuts: [{from: [2420, 274], to: [1505, -1416], via: [[2245, -165], [2350, -525], [2065, -945], [1680, -1120]]}],
@@ -6927,7 +6937,12 @@ function blit(src, ctx, cx, cy) {
 const PAR = { K: 0.3 };   // scale change per level, relative to the player's own level (raised 1.3x, sunken 0.7x)
 const HK = PAR.K / 0.15;   // how much deeper shadows and side walls are drawn than at the old, gentler 0.15
 let CX = 0, CY = 0;
-const fscale = (h) => 1 + PAR.K * (h - CAM.h);
+// (on a track with 3D trenches, anything below the camera is scaled by true perspective instead: 1 / (1 + A x depth),
+//  with A chosen so a floor one level down still shows at 0.7x. A straight line in the world then stays straight on
+//  screen, which the 3D trench's walls and floor need to meet the ships and sprites drawn on them)
+const PERSP_A = 1 / (1 - PAR.K) - 1;
+let PERSP = false;
+const fscale = (h) => (PERSP && h < CAM.h ? 1 / (1 + PERSP_A * (CAM.h - h)) : 1 + PAR.K * (h - CAM.h));
 function setScale(f) {
   const tx = VW / 2 - f * CX, ty = VH / 2 - f * CY;
   lc.setTransform(f, 0, 0, f, tx, ty); ec.setTransform(f, 0, 0, f, tx, ty);
@@ -9058,7 +9073,9 @@ function renderFrame(time) {
   if (SET.scenery.live && !GR) items.push({ k: 0.003, y: 0, fn: () => drawLiveScenery(time) });
   if (SET.scenery.emit && !GR) items.push({ k: 0.005, y: 0, fn: () => drawEmits(time) });
   items.push({ k: 0.01, y: 0, fn: () => drawChevrons(time) });
-  for (const r of T.runs) items.push({ k: r.key, y: 0, fn: () => drawRun(r, time) });
+  const t3 = GR && TRACK.trench3d && tr3Init();
+  for (const r of T.runs) if (!(t3 && r.lv < 0)) items.push({ k: r.key, y: 0, fn: () => drawRun(r, time) });
+  if (t3 && T.runs.some((r) => r.lv < 0)) items.push({ k: -0.8, y: 0, fn: () => drawTrenches3D(time) });   // (the sunken stretches' own key: under the ships in them)
   // (the low layer hangs below the ground, so the ground and everything on it is drawn over it)
   for (const cp of CANOPY) { items.push({ k: GR ? -0.05 : -0.5, y: 0, fn: () => drawCanopy(cp, time, false) }); items.push({ k: -0.65, y: 0, fn: () => drawCanopy(cp, time, true) }); }
   if (MID_ROCKS.length) items.push({ k: 0.5, y: 0, fn: drawMidRocks });
@@ -9706,6 +9723,127 @@ function g3BakeShadows(NX, NY) {
   gl.bindVertexArray(null); gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb);
   G3.shO = [HILL.x0, HILL.y0]; G3.shN = [nx, ny]; G3.shStep = step;
+}
+
+/* ================= sunken stretches in real 3D (WebGL), on a track that asks for it (trench3d) =================
+   The trench's floor and both walls are one mesh in the world (x, y, height), drawn on the graphics card with a
+   depth test and a true perspective camera looking straight down (see PERSP: the same scale everything else on a
+   sunken stretch is drawn at). The floor is the road down there; each wall runs from the floor's edge up to the
+   ragged edge of the opening at ground level. Round a bend, the depth test hides whatever of the floor lies behind
+   a wall. The ground (drawn later, with the openings cut out of it) covers what is under its overhang, as before. */
+const TR3 = { prog: null, loc: {}, vao: null, nIdx: 0, key: null, out: null };
+function tr3Init() {
+  if (TR3.prog) return true;
+  if (TR3.failed || !g3Init()) return false;
+  const gl = G3.gl;
+  const vs = `#version 300 es
+in vec4 a;   // world x, y, height, light (on a wall)
+in vec4 b;   // floor: across (from the centre line), along (in samples); wall: up (0 at its foot, 1 at its top). z: 0 floor, 1 wall. w: slumped sand
+uniform vec3 cam; uniform vec2 halfV; uniform float A;
+out float h; out float lt; out vec4 v;
+void main() {
+  float w = 1.0 + A * (cam.z - a.z);   // (true perspective: further down, smaller)
+  vec2 d = a.xy - cam.xy;
+  gl_Position = vec4(d.x / halfV.x, -d.y / halfV.y, (0.5 - a.z * 0.2) * w, w);
+  h = a.z; lt = a.w; v = b;
+}`;
+  const fs = `#version 300 es
+precision highp float;
+in float h; in float lt; in vec4 v;
+uniform float hw;
+uniform vec3 road, roadHi, shoulder, rim, dash, rockLo, rockHi, band, bankLo, bankHi;
+out vec4 o;
+void main() {
+  vec3 c;
+  if (v.z < 0.5) {   // the road on the floor: shoulder, lit edge, road, its paler middle, the centre dashes
+    float u = abs(v.x);
+    c = u > hw + 1.0 ? shoulder : u > hw - 1.0 ? rim : u > hw - 15.0 ? road : roadHi;
+    if (u < 1.0 && mod(v.y, 2.0) < 0.8) c = mix(c, dash, 0.22);
+  } else {           // a wall: rock lit by which way it faces, a paler band partway up, sand at its top and slumped at its foot
+    float t = v.x;
+    c = mix(rockLo, rockHi, lt);
+    if (abs(t - 0.55) < 0.03) c = mix(c, band, 0.3);
+    if (t > 0.86) c = mix(bankLo, bankHi, 0.3 + 0.6 * lt);
+    else if (t < v.w) c = mix(bankLo, bankHi, 0.2 + 0.6 * lt);
+  }
+  // (darker the deeper, as the 2D trench is)
+  c = mix(c, vec3(4.0, 3.0, 16.0) / 255.0, 0.38 * clamp(-h, 0.0, 1.0) * (v.z < 0.5 ? 1.0 : 0.6));
+  o = vec4(c, 1.0);
+}`;
+  try {
+    const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+    const p = gl.createProgram();
+    gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+    gl.bindAttribLocation(p, 0, 'a'); gl.bindAttribLocation(p, 1, 'b'); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    TR3.prog = p;
+    for (const n of ['cam', 'halfV', 'A', 'hw', 'road', 'roadHi', 'shoulder', 'rim', 'dash', 'rockLo', 'rockHi', 'band', 'bankLo', 'bankHi']) TR3.loc[n] = gl.getUniformLocation(p, n);
+  } catch (e) { console.warn('3D trenches unavailable:', e.message); TR3.failed = true; return false; }
+  TR3.out = mkCanvas(VW, VH);
+  return true;
+}
+/* the mesh of every sunken stretch on this track, built once per track */
+function tr3Build() {
+  const gl = G3.gl, N = T.N, hw = T.hw, FW = hw + 3, V = [], I = [];
+  const vert = (x, y, z, l, b0, b1, kind, sl) => { V.push(x, y, z, l, b0, b1, kind, sl); return V.length / 8 - 1; };
+  for (const r of T.runs) {
+    if (r.lv >= 0) continue;
+    const fl = [], wl = [[], []];
+    for (let q = -1; q <= r.n; q++) {
+      const i = (r.s + q + N) % N, x = T.x[i], y = T.y[i], nx = T.nx[i], ny = T.ny[i], z = Math.min(0, T.h[i]);
+      // the floor, across the road (shoulder to shoulder)
+      fl.push([vert(x - nx * FW, y - ny * FW, z, 0, -FW, q, 0, 0), vert(x + nx * FW, y + ny * FW, z, 0, FW, q, 0, 0), i]);
+      // each wall: from the floor's edge up to the opening's edge on the ground
+      for (let si = 0; si < 2; si++) {
+        const sd = si ? 1 : -1, top = hw + TLIP[si][i] + 2.5, lit = WLIT[si][i], tal = WTAL[si][i];
+        wl[si].push([vert(x + nx * FW * sd, y + ny * FW * sd, z, lit, 0, q, 1, tal), vert(x + nx * top * sd, y + ny * top * sd, 0, lit, 1, q, 1, tal), i]);
+      }
+    }
+    // (no floor or wall across a gap in the road: the chasm or the river shows through)
+    const open = (a, b) => !(T.gap[a[2]] || T.gap[b[2]]);
+    for (let k = 0; k < fl.length - 1; k++) if (open(fl[k], fl[k + 1])) { const A = fl[k], B = fl[k + 1]; I.push(A[0], A[1], B[1], A[0], B[1], B[0]); }
+    for (const W of wl) for (let k = 0; k < W.length - 1; k++) if (open(W[k], W[k + 1])) { const A = W[k], B = W[k + 1]; I.push(A[0], A[1], B[1], A[0], B[1], B[0]); }
+  }
+  if (TR3.vao) gl.deleteVertexArray(TR3.vao);
+  TR3.vao = gl.createVertexArray(); gl.bindVertexArray(TR3.vao);
+  const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(V), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 32, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 16);
+  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(I), gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  TR3.nIdx = I.length; TR3.key = T;
+}
+/* every trench this frame, onto the scene */
+function drawTrenches3D(time) {
+  if (TR3.key !== T) tr3Build();
+  if (!TR3.nIdx) return;
+  const gl = G3.gl, L = TR3.loc, G = SET.ground, rgb = (c) => hexRgb(c).map((v) => v / 255);
+  g3Fit(VW, VH);
+  gl.viewport(0, 0, VW, VH);
+  gl.clearColor(0, 0, 0, 0); gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+  gl.useProgram(TR3.prog);
+  gl.uniform3f(L.cam, CX, CY, CAM.h); gl.uniform2f(L.halfV, VW / 2, VH / 2); gl.uniform1f(L.A, PERSP_A); gl.uniform1f(L.hw, T.hw);
+  const C3 = TR3.cols && TR3.colsFor === SET.id ? TR3.cols : (TR3.colsFor = SET.id, TR3.cols = {
+    road: rgb(G.road.base), roadHi: rgb(G.road.hi), shoulder: rgb(G.road.shoulder), rim: rgb(COL.rim), dash: rgb('#8fa6ff'),
+    rockLo: rgb(G.wall.lo), rockHi: rgb(G.wall.hi), band: rgb(G.wall.band), bankLo: rgb(G.bank.lo), bankHi: rgb(G.bank.hi)
+  });
+  for (const k in C3) gl.uniform3f(L[k], C3[k][0], C3[k][1], C3[k][2]);
+  gl.bindVertexArray(TR3.vao); gl.drawElements(gl.TRIANGLES, TR3.nIdx, gl.UNSIGNED_INT, 0); gl.bindVertexArray(null);
+  const o = TR3.out.getContext('2d');
+  o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'copy'; o.drawImage(G3.cv, 0, G3.cv.height - VH, VW, VH, 0, 0, VW, VH); o.globalCompositeOperation = 'source-over';
+  lc.setTransform(1, 0, 0, 1, 0, 0); lc.drawImage(TR3.out, 0, 0);
+  // the edges of the deck where a gap crosses a trench (its hazard bands and warning lights), still drawn in 2D
+  lc.setTransform(1, 0, 0, 1, VW / 2 - CX, VH / 2 - CY);
+  for (const g of T.gaps) {
+    const N = T.N, a = g.a, b = (g.a + g.n - 1 + N) % N;
+    if (T.h[a] > -0.05) continue;
+    for (const [i, j, dir] of [[(a - 1 + N) % N, a, 1], [(b + 1) % N, b, -1]]) {
+      const f = fscale(T.h[i]), mx = (T.x[i] + T.x[j]) / 2, my = (T.y[i] + T.y[j]) / 2;
+      drawLip(lc, ec, CX + (mx - CX) * f, CY + (my - CY) * f, T.nx[i], T.ny[i], T.tx[i] * dir, T.ty[i] * dir, (T.hw + 2) * f, 9, time);
+    }
+  }
+  setScale(1);
 }
 
 'use strict';
@@ -11701,7 +11839,7 @@ let cupSel = 0;
 const cupFeature = [];   // (each cup's feature track, drawn when the cup screen opens)
 const trackOf = (id) => TRACKS.findIndex((t) => t.id === id);
 function drawFeature(c) {
-  const C = CUPS[c], pool = TRACKS.slice(0, BUILTIN_N).map((t, i) => i).filter((i) => !C.tracks.includes(TRACKS[i].id));
+  const C = CUPS[c], pool = TRACKS.slice(0, BUILTIN_N).map((t, i) => i).filter((i) => !C.tracks.includes(TRACKS[i].id) && !TRACKS[i].trench3d);   // (the 3D-trench test track stays out of the cups)
   cupFeature[c] = pool[Math.floor(Math.random() * pool.length)];
 }
 function cupRaces(c) { return CUPS[c].tracks.map(trackOf).filter((i) => i >= 0).concat([cupFeature[c]]); }
@@ -12455,6 +12593,7 @@ const SCENERY_OF = {}, TRACK_INFO = [];
 function setTrack(ix) {
   trackIx = ix;
   const d = TRACKS[ix];
+  PERSP = !!d.trench3d;
   buildTrack(d);
   SCENERY = SCENERY_OF[d.id] || (SCENERY_OF[d.id] = buildRocks(d.seed || 11));
 }
