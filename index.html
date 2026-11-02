@@ -5038,9 +5038,10 @@ defineSetting({
       { name: 'log', share: 0.03, stack: logStack, height: [0.02, 0.025], fixed: true },
       { name: 'toadstools', share: 0.03, clump: 2, stack: toadstoolStack, height: [0.012, 0.02], fixed: true }
     ],
-    // a forest's worth over the open ground, with clearings
-    fill: { per: 2200, r: [11, 24], gap: 0.6 },
-    patchy: { scale: 420, keep: [0.4, 1] }
+    // a forest's worth over the open ground, with clearings (about half what it once was: the trees, bushes, logs
+    // and toadstools made the forest tracks the heaviest to draw)
+    fill: { per: 500, r: [11, 24], gap: 0.6 },
+    patchy: { scale: 420, keep: [0.3, 1] }
   },
   // thorn bushes: tangled balls of bramble blowing onto the lane, to be shot apart. Curling stems, dark on the shaded
   // side, thorns sticking out of them, a few leaves and red berries, and a soft shadow under it all
