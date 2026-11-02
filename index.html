@@ -9537,8 +9537,9 @@ void main() {
   vec3 c;
   if (kind <= 1) {
     float u = abs(v.x);
-    // the dots: half the deck low down, as on the lane; overhead (both faces), more see-through, the same holes in each
-    float k = floor((over > 0.5 ? 0.36 : 0.5) * 64.0 + 0.5);
+    // the dots: at the feet as on the lane (half the deck), filling in to solid as it climbs (v.w: 0 at the feet, 1 up
+    // the ring); overhead, both faces a little see-through (the same holes in each), so a racer riding upside down shows
+    float k = floor((over > 0.5 ? 0.6 : mix(0.5, 1.0, v.w)) * 64.0 + 0.5);
     if (u <= hw && (kind == 0 || over > 0.5) && bay >= k) discard;
     if (kind == 0) {
       c = u > hw ? rim : u > hw - 15.0 ? (over > 0.5 ? odeck : deck) : (over > 0.5 ? odeckHi : deckHi);
@@ -9576,6 +9577,8 @@ function lp3Mesh(L) {
     return 1 + w * (0.62 + 0.55 * Math.max(-0.2, d) - 1);
   };
   const vert = (gx, gy, z, lt, l, k, kind, hs) => { V.push(gx, gy, z, lt, l, k, kind, hs); return V.length / 8 - 1; };
+  // how far up from the feet (0 where the ring meets the lane, 1 from a little way up): the rails grow and the dots fill in
+  const climb = (th) => { let w = clamp(Math.min(th, TAU - th) / 0.8, 0, 1); return w * w * (3 - 2 * w); };
   // a point of the band: angle th, across l, out from the riding surface by o (outward +, toward the ring's middle -)
   const P = (th, l, o) => { const a = (L.r + o) * Math.sin(th), q = loopLat(L, th, l), z = L.r - (L.r + o) * Math.cos(th); return [L.x + L.fx * a + L.nx * q, L.y + L.fy * a + L.ny * q, z]; };
   const parts = { low: [], under: [], over: [] };
@@ -9585,9 +9588,10 @@ function lp3Mesh(L) {
     const t0 = S.th[k], t1 = S.th[k + 1], tm = (t0 + t1) / 2;
     // out from the middle of the ring, here (world)
     const rx = L.fx * Math.sin(tm), ry = L.fy * Math.sin(tm), rz = -Math.cos(tm);
+    const c0 = climb(t0), c1 = climb(t1), r0 = RH * c0, r1 = RH * c1;
     const quad = (A, B, C, D, lt, la, lb, kind) => {   // (A, B at t0; C, D at t1; la across at A/D, lb at B/C)
-      const i0 = vert(A[0], A[1], A[2], lt, la, k, kind, 0), i1 = vert(B[0], B[1], B[2], lt, lb, k, kind, 0);
-      const i2 = vert(C[0], C[1], C[2], lt, lb, k + 1, kind, 0), i3 = vert(D[0], D[1], D[2], lt, la, k + 1, kind, 0);
+      const i0 = vert(A[0], A[1], A[2], lt, la, k, kind, c0), i1 = vert(B[0], B[1], B[2], lt, lb, k, kind, c0);
+      const i2 = vert(C[0], C[1], C[2], lt, lb, k + 1, kind, c1), i3 = vert(D[0], D[1], D[2], lt, la, k + 1, kind, c1);
       I.push(i0, i1, i2, i0, i2, i3);
     };
     // the riding surface (faces the ring's middle) and the underside (faces out)
@@ -9599,8 +9603,9 @@ function lp3Mesh(L) {
       quad(P(t0, sd * W, 0), P(t0, sd * W, TK), P(t1, sd * W, TK), P(t1, sd * W, 0), ln * 0.85, sd * W, sd * W, 2);
       // a rail standing on the deck's edge (toward the ring's middle), and its lit top
       const e = sd * (hw + 1);
-      quad(P(t0, e, 0), P(t0, e, -RH), P(t1, e, -RH), P(t1, e, 0), ln, e, e, 3);
-      quad(P(t0, sd * hw, -RH), P(t0, sd * (hw + 2), -RH), P(t1, sd * (hw + 2), -RH), P(t1, sd * hw, -RH), light(-rx, -ry, -rz, tm), sd * hw, sd * (hw + 2), 4);
+      // (flush with the deck at the feet, as the lane's rim is where it meets the ring, growing as it climbs)
+      quad(P(t0, e, 0), P(t0, e, -r0), P(t1, e, -r1), P(t1, e, 0), ln, e, e, 3);
+      quad(P(t0, sd * hw, -r0), P(t0, sd * (hw + 2), -r0), P(t1, sd * (hw + 2), -r1), P(t1, sd * hw, -r1), light(-rx, -ry, -rz, tm), sd * hw, sd * (hw + 2), 4);
     }
   }
   const M = { key: tr3Key(), vao: gl.createVertexArray(), ranges: {} };
