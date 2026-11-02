@@ -461,6 +461,15 @@ kbd {
 .mcard:hover, .tcard:hover { background: var(--plate-hi); box-shadow: inset 0 0 0 2px var(--rim-hi), inset 0 -3px 0 var(--rim-lo); }
 .mcard[aria-checked="true"], .tcard[aria-pressed="true"] { background: #231d52; box-shadow: inset 0 0 0 2px #ffb04a, inset 0 0 0 4px #4a2a10, inset 0 -5px 0 #b4640f; }
 .mcard:focus-visible, .tcard:focus-visible { outline: none; box-shadow: inset 0 0 0 2px #8ff3ff, inset 0 -3px 0 var(--rim-lo); }
+/* the gamepad on the menus: the button it has picked shows the same ring as keyboard focus does */
+body.padNav button:focus { outline: 3px solid var(--cyan); outline-offset: 2px; }
+body.padNav .btn:focus { outline: none; box-shadow: inset 0 3px 0 #ffe0a6, inset 0 -4px 0 #b4640f, inset 0 0 0 3px #8ff3ff, inset 0 0 0 5px #2a1300; }
+body.padNav .btn:focus::before { opacity: 1; }
+body.padNav .btn.red:focus { box-shadow: inset 0 3px 0 #ff8a8f, inset 0 -4px 0 #7a1219, inset 0 0 0 3px #8ff3ff, inset 0 0 0 5px #3a0006; }
+body.padNav .btn.alt:focus { box-shadow: inset 0 0 0 2px #8ff3ff, inset 0 0 0 4px #0c0a22; color: #c9fbff; }
+body.padNav .chip:focus, body.padNav .ccard:focus { outline: none; box-shadow: inset 0 0 0 2px #8ff3ff; }
+body.padNav .mcard:focus, body.padNav .tcard:focus { outline: none; box-shadow: inset 0 0 0 2px #8ff3ff, inset 0 -3px 0 var(--rim-lo); }
+body.padNav .swatch:focus, body.padNav .vol input[type=range]:focus, body.padNav textarea:focus { outline: 2px solid #8ff3ff; outline-offset: 2px; }
 .tcard canvas { border-radius: 0; box-shadow: inset 0 0 0 1px var(--rim-lo); }
 .tcard dt { font: 500 11.5px/1.3 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .board li { background: var(--plate); box-shadow: inset 0 0 0 1px var(--rim-lo); --n: 3px; border-radius: 0; }
@@ -642,6 +651,9 @@ kbd {
         <div class="ctl"><span><kbd>X</kbd><kbd>B</kbd></span><span>Sideswipe</span></div>
         <div class="ctl"><span><kbd>A</kbd></span><span>Drop a mine</span></div>
         <div class="ctl"><span><kbd>Start</kbd></span><span>Pause</span></div>
+        <div class="ctl"><span><kbd>D-pad</kbd></span><span>Move in menus</span></div>
+        <div class="ctl"><span><kbd>A</kbd><kbd>B</kbd></span><span>Select / back</span></div>
+        <div class="ctl"><span><kbd>LB</kbd><kbd>RB</kbd></span><span>Change speeder</span></div>
       </div>
     </div>
     </div>
@@ -11935,11 +11947,128 @@ window.addEventListener('gamepadconnected', () => toast('Gamepad connected'));
 function padFrame() {
   const st = padPoll();
   if (!st) return;
+  const was = mode;
   if (st.start) { if (mode === 'race') pauseGame(); else if (mode === 'pause' && screens.pause.hidden === false) resumeGame(); }
-  // (presses are kept until the race takes them, so one landing on a frame with no race step isn't lost)
-  for (const k of ['swipeL', 'swipeR', 'mine', 'boost']) if (st[k]) PAD.pend[k] = true;
+  else if (mode !== 'race') padMenu(padState());
+  if (st.start || was === 'race') { const g = padState(); PAD.prevMenu = g.buttons.map((x) => !!(x && x.pressed)); PADNAV.held = null; }   // (so a button held in the race isn't a menu press)
+  // (presses are kept until the race takes them, so one landing on a frame with no race step isn't lost;
+  //  presses made on a menu are the menu's, never a mine or a boost waiting at the start line)
+  if (was === 'race' && mode === 'race') { for (const k of ['swipeL', 'swipeR', 'mine', 'boost']) if (st[k]) PAD.pend[k] = true; }
+  else PAD.pend = {};
   PAD.st = st;
 }
+
+/* ---------- gamepad on the menus ----------
+   D-pad or left stick: move between buttons (held, it repeats). A: press the one picked. B: back (or cancel a
+   confirm box). LB / RB: the previous / next speeder, on the screens that show one. Right stick: scroll. */
+const PADNAV = { held: null, next: 0 };
+const FOCUSABLE = 'button, input, textarea, select, a[href], [tabindex]';
+function padShowing() {
+  for (const k in screens) if (!screens[k].hidden) return screens[k];
+  return null;
+}
+const isShown = (e) => {
+  if (e.disabled || e.closest('[hidden]') || !e.getClientRects().length) return false;
+  const r = e.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden';
+};
+// the part of the screen in charge: an open confirm box or paste panel keeps the pad inside it, like a dialog
+function padScope(scr) {
+  for (const box of scr.querySelectorAll('.confirmBox, #pastePanel')) if (isShown(box)) return box;
+  return scr;
+}
+function padTargets(scope) {
+  return [...scope.querySelectorAll(FOCUSABLE)].filter((e) =>
+    isShown(e) && (e.tabIndex >= 0 || e.closest('#machineList')) && !(e.closest('#machineList') && e.getAttribute('aria-checked') !== 'true'));
+}
+function padFocus(e) {
+  document.body.classList.add('padNav');
+  e.focus({ preventScroll: true });
+  e.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+// the nearest target lying in that direction, favoring ones in line with the current one
+function padMove(dx, dy, scope) {
+  const cur = document.activeElement, list = padTargets(scope);
+  if (!list.length) return;
+  if (!cur || !scope.contains(cur) || !list.includes(cur)) { padFocus(list[0]); return; }
+  const machine = cur.closest('#machineList');
+  if (machine && dx) { stepMachine(dx); document.body.classList.add('padNav'); return; }   // (along the row of speeders: pick the next one)
+  if (cur.type === 'range' && dx) {
+    const v = clamp(+cur.value + dx * (+cur.step || 1), +cur.min || 0, cur.max === '' ? 100 : +cur.max);
+    if (v !== +cur.value) { cur.value = v; cur.dispatchEvent(new Event('input', { bubbles: true })); cur.dispatchEvent(new Event('change', { bubbles: true })); }
+    return;
+  }
+  const a = cur.getBoundingClientRect(), ax = (a.left + a.right) / 2, ay = (a.top + a.bottom) / 2;
+  let best = null, bestS = Infinity;
+  for (const e of list) {
+    if (e === cur) continue;
+    const b = e.getBoundingClientRect(), bx = (b.left + b.right) / 2, by = (b.top + b.bottom) / 2;
+    // how far ahead it is (edge to edge), and how far off to the side (0 when they overlap across the move)
+    let ahead, side;
+    if (dx) {
+      if ((bx - ax) * dx <= 1) continue;
+      ahead = Math.max(0, dx > 0 ? b.left - a.right : a.left - b.right);
+      side = Math.max(0, b.top - a.bottom, a.top - b.bottom);
+    } else {
+      if ((by - ay) * dy <= 1) continue;
+      ahead = Math.max(0, dy > 0 ? b.top - a.bottom : a.top - b.bottom);
+      side = Math.max(0, b.left - a.right, a.left - b.right);
+    }
+    const s = ahead + side * 3 + Math.hypot(bx - ax, by - ay) * 0.1;
+    if (s < bestS) { bestS = s; best = e; }
+  }
+  if (best) padFocus(best);
+}
+function padBack(scope, scr) {
+  if (scope.id === 'pastePanel') { $('pasteCancel').click(); return; }
+  if (scope.classList.contains('confirmBox')) { const no = scope.querySelector('.btn.alt'); if (no) no.click(); return; }
+  if (scr === screens.options) closeOptions();
+  else if (scr === screens.help) closeHelp();
+  else if (scr === screens.pause) resumeGame();
+  else if (scr === screens.tracks) $('tracksBack').click();
+  else if (scr === screens.cup) $('cupBack').click();
+  else if (scr === screens.results) $('backBtn').click();
+}
+function padMenu(g) {
+  const scr = padShowing();
+  if (!g || !scr) { PADNAV.held = null; return; }
+  const scope = padScope(scr);
+  const b = (k) => !!(g.buttons[k] && g.buttons[k].pressed);
+  const prev = PAD.prevMenu || [];
+  const hit = (k) => b(k) && !prev[k];
+  PAD.prevMenu = g.buttons.map((x) => !!(x && x.pressed));
+  // direction: the d-pad, or the left stick pushed well over to one side
+  const lx = g.axes[0] || 0, ly = g.axes[1] || 0;
+  let dir = b(12) ? 'u' : b(13) ? 'd' : b(14) ? 'l' : b(15) ? 'r' : null;
+  if (!dir && Math.max(Math.abs(lx), Math.abs(ly)) > 0.55) dir = Math.abs(lx) > Math.abs(ly) ? (lx > 0 ? 'r' : 'l') : (ly > 0 ? 'd' : 'u');
+  const now = performance.now();
+  if (!dir) PADNAV.held = null;
+  else if (dir !== PADNAV.held || now >= PADNAV.next) {
+    PADNAV.next = now + (dir !== PADNAV.held ? 380 : 120);   // (a first step, then a repeat while it is held)
+    PADNAV.held = dir;
+    padMove(dir === 'l' ? -1 : dir === 'r' ? 1 : 0, dir === 'u' ? -1 : dir === 'd' ? 1 : 0, scope);
+  }
+  if (hit(0)) {
+    const cur = document.activeElement;
+    if (cur && scope.contains(cur) && padTargets(scope).includes(cur)) { if (cur.type !== 'range' && cur.tagName !== 'TEXTAREA') cur.click(); }
+    else { const list = padTargets(scope); if (list.length) padFocus(list[0]); }
+    document.body.classList.add('padNav');
+  }
+  if (hit(1)) padBack(scope, scr);
+  if ((hit(4) || hit(5)) && (scr === screens.tracks || scr === screens.cup)) {
+    const d = hit(5) ? 1 : -1, k = HULL_INFO.findIndex((h) => h.id === PLAYER_HULL), n = HULL_INFO.length;
+    pickMachine(HULL_INFO[(k + d + n) % n].id);
+  }
+  // the right stick scrolls whatever holds the picked button (or the screen)
+  const ry = g.axes[3] || 0;
+  if (Math.abs(ry) > 0.25) {
+    let s = document.activeElement && scr.contains(document.activeElement) ? document.activeElement.parentElement : scr;
+    while (s && s !== document.body && !(s.scrollHeight > s.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
+    (s && s !== document.body ? s : scr).scrollBy(0, ry * 14);
+  }
+}
+// (the pad's focus ring goes away as soon as the mouse or keyboard is used)
+['mousemove', 'mousedown', 'keydown'].forEach((ev) => window.addEventListener(ev, () => document.body.classList.remove('padNav'), true));
 function prepInput() {
   if (mode !== 'race') return;
   const p = W.ships[0];
