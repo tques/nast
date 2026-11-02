@@ -131,9 +131,11 @@ body.cover #stage { position: fixed; left: 50%; top: 50%; transform: translate(-
 #toast { position: absolute; left: 50%; top: 3cqh; transform: translateX(-50%); max-width: 70cqw; text-align: center; font: 700 2.3cqw/1.1 var(--display); padding: 0.8cqh 1.6cqw; background: rgba(10, 8, 26, 0.7); border: 1px solid var(--edge); border-radius: 3px; opacity: 0; transition: opacity 0.25s; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.06em; }
 #toast.on { opacity: 1; }
 /* the rivals' chat: lines stack up above the speed readout, the newest at the bottom (optional flavour: kept small) */
-#chat { position: absolute; left: 2.4cqw; bottom: 20.5cqh; width: 26cqw; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.6cqh; }
-#chat .msg { --pc: #ffb04a; display: flex; align-items: center; gap: 0.7cqw; align-self: flex-start; max-width: 100%; padding: 0.5cqh 0.8cqw 0.5cqh 0.5cqh; background: rgba(10, 8, 26, 0.68); border-left: 2px solid var(--pc); border-radius: 2px; font-size: 0.68em; overflow: hidden; animation: chatIn 0.25s ease-out; transition: opacity 0.4s; }
-#chat .msg.out { opacity: 0; }
+#chat { position: absolute; left: 2.4cqw; bottom: 20.5cqh; width: 25cqw; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.5cqh; pointer-events: none; font-size: clamp(10px, 1.9cqw, 24px); text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7); transition: opacity 1.2s; }
+#chat[hidden] { display: none; }
+#chat.idle { opacity: 0.45; }   /* (quiet for a while: it dims, but stays) */
+#chat.after { z-index: 6; left: auto; right: 2.4cqw; bottom: 4cqh; }   /* (over the results screen once the race is run, clear of its panel) */
+#chat .msg { --pc: #ffb04a; display: flex; align-items: center; gap: 0.7cqw; padding: 0.5cqh 0.8cqw 0.5cqh 0.5cqh; background: rgba(10, 8, 26, 0.68); border-left: 2px solid var(--pc); border-radius: 2px; font-size: 0.68em; overflow: hidden; animation: chatIn 0.25s ease-out; }
 @keyframes chatIn { from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; } to { opacity: 1; max-height: 6cqh; } }
 #chat .av { flex: none; width: 2.4cqw; height: 2.4cqw; border-radius: 2px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.3)), var(--pc); }
 #chat b { display: block; font: 700 0.85em/1.1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--pc); }
@@ -523,10 +525,10 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       </div>
       <div id="pass" hidden></div>
       <div id="toast" role="status"></div>
-      <div id="chat" aria-live="polite"></div>
       <div id="count" hidden></div>
       <div id="wrong" hidden>WRONG WAY</div>
     </div>
+    <div id="chat" aria-live="polite" hidden></div>
   </div>
 </main>
 
@@ -13611,15 +13613,15 @@ const CHAT = {
 };
 let CHAT_ON = true;
 try { CHAT_ON = localStorage.getItem('gatebreaker.chatter') !== 'off'; } catch (e) { /* on */ }
-const CHT = { clock: 0, msgs: [], gap: 0, pend: null, last: {}, said: {}, ahead: null, leader: null, leadT: 0, grid: false };
-const CHAT_KEEP = 3;   // (lines on screen at once: a new one pushes the oldest out)
+const CHT = { clock: 0, quiet: 0, msgs: [], gap: 0, pend: null, last: {}, said: {}, ahead: null, leader: null, leadT: 0, grid: false };
+const CHAT_KEEP = 4;   // (lines kept in the log: a new one pushes the oldest out)
 function chatReset() {
-  Object.assign(CHT, { clock: 0, msgs: [], gap: 0, pend: null, last: {}, said: {}, ahead: null, leader: null, leadT: 0, grid: false });
-  const el = $('chat'); if (el) el.textContent = '';
+  Object.assign(CHT, { clock: 0, quiet: 0, msgs: [], gap: 0, pend: null, last: {}, said: {}, ahead: null, leader: null, leadT: 0, grid: false });
+  const el = $('chat'); if (el) { el.textContent = ''; el.classList.remove('idle'); }
 }
 /* a rival has something to say (it waits its turn, and may be dropped for something more important) */
 function chat(s, ev) {
-  if (!CHAT_ON || !s || s.isPlayer || mode !== 'race' || PLAY === 'trial' || !W || W.ships.length < 2) return;
+  if (!CHAT_ON || !s || s.isPlayer || (mode !== 'race' && mode !== 'results') || PLAY === 'trial' || !W || W.ships.length < 2) return;
   const lines = CHAT[s.name] && CHAT[s.name][ev], rule = CHAT_RULE[ev];
   if (!lines || !rule || Math.random() > rule[1]) return;
   if (rule[0] < 4 && CHT.last[s.name] > CHT.clock - 8) return;   // (a pilot who just spoke lets the small stuff go)
@@ -13636,13 +13638,18 @@ function chatShow(p) {
   row.className = 'msg'; row.style.setProperty('--pc', p.s.col);
   av.className = 'av'; who.textContent = p.s.name; say.textContent = text;
   body.append(who, say); row.append(av, body); $('chat').append(row);
-  CHT.msgs.push({ el: row, t: clamp(4 + text.length * 0.04, 5, 7.5) });
-  while (CHT.msgs.filter((m) => m.t > 0).length > CHAT_KEEP) CHT.msgs.find((m) => m.t > 0).t = 0;
+  CHT.msgs.push({ el: row });
+  while (CHT.msgs.length > CHAT_KEEP) CHT.msgs.shift().el.remove();
+  CHT.quiet = 0; $('chat').classList.remove('idle');
 }
 /* once a step of the race: who has passed whom, who leads, and the log's own timing */
 function chatTick(dt) {
-  if (mode !== 'race' || !CHAT_ON || PLAY === 'trial' || !W || W.ships.length < 2) { if (CHT.msgs.length) chatReset(); return; }
+  const el = $('chat'), on = (mode === 'race' || mode === 'results') && CHAT_ON && PLAY !== 'trial' && W && W.ships.length > 1;
+  if (!on) { if (!el.hidden) { chatReset(); el.hidden = true; } return; }
+  // (it stays up over the results, until the next race or the menu)
+  el.hidden = false; el.classList.toggle('after', mode === 'results');
   CHT.clock += dt;
+  if ((CHT.quiet += dt) > 6 && CHT.msgs.length) el.classList.add('idle');
   const R = W.race, me = W.ships[0];
   if (R.state === 'countdown' && !CHT.grid) { CHT.grid = true; chat(W.ships[1 + Math.floor(Math.random() * (W.ships.length - 1))], 'grid'); }
   if (R.state === 'go' && R.t > 4 && !me.finished) {
@@ -13658,9 +13665,6 @@ function chatTick(dt) {
     CHT.ahead = ahead;
   }
   if (CHT.pend && CHT.pend.exp < CHT.clock) CHT.pend = null;
-  // (each line fades after a while, and is gone once faded)
-  for (const m of CHT.msgs) { m.t -= dt; if (m.t <= 0 && !m.out) { m.out = true; m.el.classList.add('out'); } }
-  while (CHT.msgs.length && CHT.msgs[0].t < -0.4) CHT.msgs.shift().el.remove();
   if (CHT.gap > 0) CHT.gap -= dt;
   else if (CHT.pend) { chatShow(CHT.pend); CHT.pend = null; CHT.gap = 1.2; }
 }
