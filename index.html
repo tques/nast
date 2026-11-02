@@ -470,6 +470,13 @@ body.padNav .btn.alt:focus { box-shadow: inset 0 0 0 2px #8ff3ff, inset 0 0 0 4p
 body.padNav .chip:focus, body.padNav .ccard:focus { outline: none; box-shadow: inset 0 0 0 2px #8ff3ff; }
 body.padNav .mcard:focus, body.padNav .tcard:focus { outline: none; box-shadow: inset 0 0 0 2px #8ff3ff, inset 0 -3px 0 var(--rim-lo); }
 body.padNav .swatch:focus, body.padNav .vol input[type=range]:focus, body.padNav textarea:focus { outline: 2px solid #8ff3ff; outline-offset: 2px; }
+/* the pad stepping through the track screen (padSync): the open step's setting is not shown as picked until A confirms it,
+   and the difficulty bar keeps its room but stays out of sight until a track is picked */
+body.padPick-track .diffChips { visibility: hidden; }
+body.padPick-track .tcard[aria-pressed="true"] { background: var(--plate); box-shadow: inset 0 0 0 2px var(--rim), inset 0 -3px 0 var(--rim-lo); }
+body.padPick-diff .diffChips .chip[aria-pressed="true"], body.padPick-laps #tracks .sideActions .chip[aria-pressed="true"] { color: var(--mute); background: var(--plate); box-shadow: inset 0 0 0 2px var(--rim), inset 0 -2px 0 var(--rim-lo); }
+body.padNav.padPick-track .tcard:focus { box-shadow: inset 0 0 0 2px #8ff3ff, inset 0 -3px 0 var(--rim-lo); }
+body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-laps #tracks .sideActions .chip:focus { color: var(--ink); box-shadow: inset 0 0 0 2px #8ff3ff; }
 .tcard canvas { border-radius: 0; box-shadow: inset 0 0 0 1px var(--rim-lo); }
 .tcard dt { font: 500 11.5px/1.3 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .board li { background: var(--plate); box-shadow: inset 0 0 0 1px var(--rim-lo); --n: 3px; border-radius: 0; }
@@ -12459,9 +12466,11 @@ function padFrame() {
 /* ---------- gamepad on the menus ----------
    D-pad or left stick: move between buttons (held, it repeats). A: press the one picked. B: back (or cancel a
    confirm box). LB / RB: the previous / next speeder, on the screens that show one. Right stick: scroll.
-   The track screen goes in steps (PADNAV.stage), each holding the pad to its own buttons: 'track' (the track cards;
-   it opens on Kessler Loop), A -> 'diff' (the difficulty under the picked card; a time trial has none and skips it),
-   A -> 'side' (the speeder, the laps and Race). B goes back a step, and from the tracks, back to the menu. */
+   The track screen goes in steps (PADNAV.stage), each holding the pad to its own buttons, A moving on to the next:
+   'track' (the track cards; it opens on Kessler Loop) -> 'diff' (the difficulty under the picked card; a time trial
+   has none and skips it) -> 'speeder' (your speeder and its colour) -> 'laps' -> 'race' (the Race button). B goes back a
+   step, and from the tracks, back to the menu. While a step is open, what it sets is not shown as picked (no amber)
+   until A confirms it, and the difficulty bar stays out of sight until a track is picked (see padSync). */
 const PADNAV = { held: null, next: 0, stage: null, scr: null };
 const FOCUSABLE = 'button, input, textarea, select, a[href], [tabindex]';
 function padShowing() {
@@ -12477,35 +12486,46 @@ const isShown = (e) => {
 function padScope(scr) {
   for (const box of scr.querySelectorAll('.confirmBox, #pastePanel')) if (isShown(box)) return box;
   if (scr === screens.tracks) {
-    if (PADNAV.stage === 'track') return $('trackList');
-    if (PADNAV.stage === 'diff') return document.querySelector('.diffChips');
-    if (PADNAV.stage === 'side') return scr.querySelector('.hslot');
+    const st = PADNAV.stage;
+    if (st === 'track') return $('trackList');
+    if (st === 'diff') return document.querySelector('.diffChips');
+    if (st === 'speeder') return $('hangarCol');
+    if (st === 'laps') return scr.querySelector('.sideActions .chips');
+    if (st === 'race') return $('raceBtn').parentNode;
   }
   return scr;
 }
-// (on the track screen's last step: the speeder, the laps and Race; not Back, which B is, nor the pasted-track buttons)
-const PAD_SIDE_SKIP = ['tracksBack', 'pasteTrack', 'removeTrack'];
 function padTargets(scope) {
-  const side = scope.classList && scope.classList.contains('hslot') && PADNAV.stage === 'side';
   // (the tracks step: the cards alone; the difficulty bar hangs inside the list, under the picked card, but is its own step)
   if (scope === $('trackList')) return [...scope.querySelectorAll('.tcard')].filter(isShown);
+  if (PADNAV.stage === 'race' && scope === $('raceBtn').parentNode) return [$('raceBtn')];
   return [...scope.querySelectorAll(FOCUSABLE)].filter((e) =>
-    isShown(e) && (e.tabIndex >= 0 || e.closest('#machineList')) && !(e.closest('#machineList') && e.getAttribute('aria-checked') !== 'true') &&
-    !(side && PAD_SIDE_SKIP.includes(e.id)) && !e.disabled);
+    isShown(e) && (e.tabIndex >= 0 || e.closest('#machineList')) && !(e.closest('#machineList') && e.getAttribute('aria-checked') !== 'true') && !e.disabled);
 }
-// where the pad's highlight goes in a step it has not yet touched: the picked track, the set difficulty, your speeder
+// where the pad's highlight goes in a step it has not yet touched: the picked track, the set difficulty or laps, your speeder
 function padPreferred(scope, list) {
   const pick = scope === $('trackList') ? TRACK_INFO[pickIx] && TRACK_INFO[pickIx].btn
-    : scope.classList && scope.classList.contains('diffChips') ? scope.querySelector('[aria-pressed="true"]')
-    : scope.querySelector('#machineList [aria-checked="true"]');
+    : scope === $('hangarCol') ? scope.querySelector('#machineList [aria-checked="true"]')
+    : scope.querySelector('[aria-pressed="true"]');
   return pick && list.includes(pick) ? pick : list[0];
 }
 /* the track screen's steps */
+const PAD_STEPS = ['track', 'diff', 'speeder', 'laps', 'race'];
 function padStage(st) {
-  if (st === 'diff' && document.querySelector('.diffChips').hidden) st = 'side';   // (a time trial: no difficulty to set)
+  const trial = document.querySelector('.diffChips').hidden;   // (a time trial: no difficulty to set)
+  if (st === 'diff' && trial) st = PADNAV.stage === 'speeder' ? 'track' : 'speeder';
   PADNAV.stage = st;
+  padSync();
   const scope = padScope(screens.tracks), list = padTargets(scope);
   if (list.length) padFocus(padPreferred(scope, list));
+}
+const padNext = () => padStage(PAD_STEPS[PAD_STEPS.indexOf(PADNAV.stage) + 1]);
+const padPrev = () => padStage(PAD_STEPS[PAD_STEPS.indexOf(PADNAV.stage) - 1]);
+/* how the track screen looks while the pad steps through it: the open step's setting not shown as picked until
+   confirmed, and the difficulty bar hidden until a track is picked. Undone as soon as the mouse or keyboard is used. */
+function padSync() {
+  const cl = document.body.classList, st = PAD.on && !screens.tracks.hidden ? PADNAV.stage : null;
+  for (const k of ['track', 'diff', 'laps']) cl.toggle('padPick-' + k, st === k);
 }
 function padTracksOpened() {
   PADNAV.stage = 'track';
@@ -12555,8 +12575,7 @@ function padMove(dx, dy, scope) {
 function padBack(scope, scr) {
   if (scope.id === 'pastePanel') { $('pasteCancel').click(); return; }
   if (scope.classList.contains('confirmBox')) { const no = scope.querySelector('.btn.alt'); if (no) no.click(); return; }
-  if (scr === screens.tracks && PADNAV.stage === 'side') { padStage(document.querySelector('.diffChips').hidden ? 'track' : 'diff'); return; }
-  if (scr === screens.tracks && PADNAV.stage === 'diff') { padStage('track'); return; }
+  if (scr === screens.tracks && PADNAV.stage && PADNAV.stage !== 'track') { padPrev(); return; }
   if (scr === screens.options) closeOptions();
   else if (scr === screens.help) closeHelp();
   else if (scr === screens.pause) resumeGame();
@@ -12566,8 +12585,9 @@ function padBack(scope, scr) {
 }
 function padMenu(g) {
   const scr = padShowing();
-  if (!g || !scr) { PADNAV.held = null; PADNAV.scr = null; return; }
+  if (!g || !scr) { PADNAV.held = null; PADNAV.scr = null; padSync(); return; }
   if (scr !== PADNAV.scr) { PADNAV.scr = scr; if (scr === screens.tracks) padTracksOpened(); else PADNAV.stage = null; }
+  padSync();
   const scope = padScope(scr);
   const b = (k) => !!(g.buttons[k] && g.buttons[k].pressed);
   const prev = PAD.prevMenu || [];
@@ -12588,9 +12608,9 @@ function padMenu(g) {
     const cur = document.activeElement;
     if (cur && scope.contains(cur) && padTargets(scope).includes(cur)) {
       if (cur.type !== 'range' && cur.tagName !== 'TEXTAREA') cur.click();
-      // (the track screen's steps: a track picked, on to the difficulty; the difficulty set, on to the speeder and Race)
-      if (scr === screens.tracks && scope === $('trackList')) padStage('diff');
-      else if (scr === screens.tracks && PADNAV.stage === 'diff' && cur.getAttribute('aria-pressed') === 'true') padStage('side');
+      // (the track screen's steps: each confirmed, on to the next; a colour picked for the speeder stays on that step)
+      const st = scr === screens.tracks ? PADNAV.stage : null;
+      if (st === 'track' || st === 'laps' || (st === 'diff' && cur.getAttribute('aria-pressed') === 'true') || (st === 'speeder' && cur.closest('#machineList'))) padNext();
     }
     else { const list = padTargets(scope); if (list.length) padFocus(padPreferred(scope, list)); }
     document.body.classList.add('padNav');
@@ -12609,7 +12629,7 @@ function padMenu(g) {
   }
 }
 // (the pad's focus ring goes away as soon as the mouse or keyboard is used)
-['mousemove', 'mousedown', 'keydown'].forEach((ev) => window.addEventListener(ev, () => document.body.classList.remove('padNav'), true));
+['mousemove', 'mousedown', 'keydown'].forEach((ev) => window.addEventListener(ev, () => { document.body.classList.remove('padNav'); for (const k of ['track', 'diff', 'laps']) document.body.classList.remove('padPick-' + k); }, true));
 function prepInput() {
   if (mode !== 'race') return;
   const p = W.ships[0];
