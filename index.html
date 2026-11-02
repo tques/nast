@@ -3951,6 +3951,7 @@ function decorSprite(kind, r, v, far) {
 /* an overhead type of the active setting, by the name a track uses (see alias) */
 function overheadOf(name) {
   const o = SET.overhead;
+  if (!o[name] && SET.alias[name] === 'none') return null;   // (a world can turn an overhead off: nothing over that stretch)
   return o[name] || o[SET.alias[name]] || o[Object.keys(o)[0]] || null;
 }
 function overheadSprites(ov) {
@@ -4918,7 +4919,7 @@ function deadTreeStack(r, v, far) {
    crowned trees (a few already turning gold), bushes, mossy boulders, fallen logs, the odd ring of red toadstools,
    meadows of wildflowers in the clearings. Wooded hills roll beside it, crags of bare grey rock stand out of them, a
    river winds through, crossing under the lane where it jumps a gap, and runs into a lake. Branches reach out over
-   sunken stretches from the trees on their banks, vines hanging from them (or a low mist lies in them), and the blurred leaves of branches right in front of the camera
+   sunken stretches from the trees on their banks, vines hanging from them, and the blurred leaves of branches right in front of the camera
    frame the picture. */
 const MOSSY = {
   hi: [196, 194, 176], base: [128, 126, 114], lo: [44, 44, 42],
@@ -5131,30 +5132,11 @@ defineSetting({
       branches: true, step: 2, skip: 0.2, reach: [1.0, 1.55], vine: '#3a6230', vineLeaf: '#5e9a44',
       // (the shared shape every overhead gives, unused by branches)
       perStep: () => 1, pad: 0, midStep: 99, midPerStep: () => 0, alpha: 1, drift: [0, 0], glint: null
-    },
-    mist: {
-      label: 'low mist',
-      make() {
-        const out = [];
-        for (let k = 0; k < 8; k++) {
-          const R = rng(2300 + k), w = 120 + Math.floor(R() * 70), h = Math.round(w * (0.45 + R() * 0.2)), puffs = [];
-          for (let i = 0; i < 6; i++) puffs.push([w * (0.2 + R() * 0.6), h * (0.3 + R() * 0.4), Math.min(w, h) * (0.2 + R() * 0.16)]);
-          out.push([pixelSprite(w, h, (x, y) => {
-            let v = 0;
-            for (const p of puffs) { const dx = x - p[0], dy = y - p[1]; v += Math.exp(-(dx * dx + dy * dy) / (p[2] * p[2])); }
-            if (v > 1.0) return [226, 238, 226, 150];
-            if (v > 0.35) return BAYER8[y & 7][x & 7] < ((v - 0.35) / 0.65) * 64 ? [208, 226, 212, 120] : null;
-            return null;
-          })]);
-        }
-        return out;
-      },
-      step: 4, perStep: (R) => 1 + (R() < 0.4 ? 1 : 0), skip: 0, pad: 40,
-      midStep: 5, midPerStep: (R) => (R() < 0.6 ? 1 : 0),
-      alpha: 0.5, drift: [8, 3], glint: null
     }
   },
-  alias: { ice: 'mist', leaves: 'mist', branches: 'mist', gas: 'mist', storm: 'mist', blizzard: 'mist' }   // (every sunken stretch gets the low mist)
+  // (no clouds, mist or the like over the sunken stretches here: every overhead a track asks for comes to nothing,
+  //  except branches, asked for by name)
+  alias: { ice: 'none', leaves: 'none', gas: 'none', storm: 'none', blizzard: 'none', mist: 'none', smoke: 'none' }
 });
 
 /* ---------- standing scenery, in slices for stacking (see rockStack in the dune world for the shape of it) ---------- */
