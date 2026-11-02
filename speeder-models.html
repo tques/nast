@@ -1,0 +1,416 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>NAST Speeder Models</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Barlow+Semi+Condensed:wght@500;600&display=swap">
+<style>
+/* Layout: the NAST hangar: a row of machines to pick, the model large on the left, how it reads in the race on the right. */
+:root {
+  --bg: #0d0b1e; --panel: #17132f; --rim: #2c2558; --ink: #efe9ff; --mute: #9a90c4; --amber: #ffb04a;
+  --display: 'Pixelify Sans', 'Courier New', monospace; --body: 'Barlow Semi Condensed', 'Arial Narrow', sans-serif;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px; }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 6vw, 52px); margin: 0; color: var(--amber); letter-spacing: 0.02em; }
+.sub { color: var(--mute); margin-top: 2px; max-width: 70ch; }
+.tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 620px) { .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tabs button { font-family: var(--display); font-size: 16px; background: var(--panel); color: var(--ink); border: 2px solid var(--rim); padding: 9px 4px; cursor: pointer; }
+.tabs button[aria-pressed="true"] { background: var(--amber); color: #2a1300; border-color: var(--amber); }
+.tabs button:focus-visible { outline: 2px solid #8ff3ff; outline-offset: 2px; }
+.grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+.stage { position: relative; background: radial-gradient(ellipse at 50% 60%, #241c4e, #0d0b1e 70%); border: 2px solid var(--rim); }
+#view { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; cursor: grab; touch-action: none; }
+#view:active { cursor: grabbing; }
+.hint { position: absolute; left: 12px; bottom: 10px; color: var(--mute); font-size: 13px; pointer-events: none; }
+.tag { position: absolute; left: 14px; top: 12px; pointer-events: none; }
+.tag b { display: block; font-family: var(--display); font-size: 26px; color: var(--ink); }
+.tag span { color: var(--mute); font-size: 14px; }
+.side { display: grid; gap: 12px; align-content: start; }
+.card { background: var(--panel); border: 2px solid var(--rim); padding: 12px 14px; display: grid; gap: 10px; }
+.card h2 { font-family: var(--display); font-weight: 500; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mute); margin: 0; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center; font-size: 13px; color: var(--mute); }
+.pair canvas { width: 100%; max-width: 150px; aspect-ratio: 1; image-rendering: pixelated; background: #2e2a24; border: 1px solid var(--rim); justify-self: center; }
+.paints { display: flex; flex-wrap: wrap; gap: 8px; }
+.paints button { width: 34px; height: 34px; border: 2px solid var(--rim); cursor: pointer; padding: 0; }
+.paints button[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink); }
+.paints button:focus-visible { outline: 2px solid #8ff3ff; outline-offset: 2px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row button { font-family: var(--display); font-size: 14px; background: #2a2459; color: var(--ink); border: 0; padding: 8px 12px; cursor: pointer; }
+.row button[aria-pressed="true"] { background: var(--amber); color: #2a1300; }
+.note { margin: 0; line-height: 1.5; color: var(--mute); font-size: 14px; max-width: 65ch; }
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>The Armed Speeders</h1>
+    <div class="sub">All six machines as low-poly 3D models: flat-shaded, dark-edged, built part for part from their sprites.</div>
+  </div>
+  <div class="tabs" id="tabs" role="group" aria-label="Speeder"></div>
+  <div class="grid">
+    <div class="stage">
+      <canvas id="view" width="800" height="600" aria-label="The selected speeder in 3D: drag to turn it"></canvas>
+      <div class="tag"><b id="tagName">Arrow</b><span id="tagTris"></span></div>
+      <div class="hint">Drag to turn it · it spins on its own when left alone</div>
+    </div>
+    <div class="side">
+      <div class="card">
+        <h2>In the race</h2>
+        <div class="pair">
+          <div><canvas id="game3d" width="25" height="25"></canvas><div>3D model, at sprite size</div></div>
+          <div><canvas id="sprite" width="25" height="25"></canvas><div>Today's sprite</div></div>
+        </div>
+        <div class="row" role="group" aria-label="Game view">
+          <button type="button" id="spinBtn" aria-pressed="true">Turning</button>
+          <button type="button" id="tiltBtn" aria-pressed="false">Banking</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Paint</h2>
+        <div class="paints" id="paints" role="group" aria-label="Paint"></div>
+      </div>
+      <div class="card">
+        <h2>The machine</h2>
+        <p class="note" id="blurb"></p>
+        <p class="note" id="build"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+const PAINTS = [['You', '#ffb04a'], ['Vesper', '#4fd1c5'], ['Kestrel', '#f0629f'], ['Moth', '#a493ff'], ['Orrery', '#e9dd6a'], ['Slate', '#79a6ff']];
+// the hangar's order, the game's own blurbs, and each sprite's pixel rows (top edge down to the centre line, nose right)
+const HULLS = [
+  { id: 'needle', name: 'Needle', paint: 1, blurb: 'Fastest thing on the straights. Brake early for the tight bends: it runs wide, and its boost is thirsty.',
+    build: 'A long needle of a body on one big engine, small canards up by the nose, swept fins and a dorsal blade at the tail.',
+    rows: ['oo...............', 'oHoo.............', 'ohhho............', 'odhhhoooooooo....', 'oeodhhhhhhHHHHooo', 'oeedhhhwwWHHHHHHn'] },
+  { id: 'raptor', name: 'Raptor', paint: 2, blurb: 'Blade wings that carve the bends flat out. Gives a little away down the straights.',
+    build: 'A narrow body with blade wings swept forward, their leading edges lit, a pair of tail stubs and twin engines.',
+    rows: ['........oooo....', '.......ohHHo....', '.....oohhHo.....', '.oo.odhhhhoooo..', 'oeoodhhhhHHHHoo.', 'oeedhhhwwWHHHHHn'] },
+  { id: 'arrow', name: 'Arrow', paint: 0, blurb: 'The all-rounder. No weakness, no edge: it goes where you point it.',
+    build: 'A slim dart: delta wings swept back to fins at the tips, the canopy just behind the middle, twin engines.',
+    rows: ['..oo...........', '.ohho.oo.......', '.ohhdohhoo.....', '.odhhhhhhhooo..', 'oeodhhhhHHHHHoo', 'oeedhhwwWHHHHHn'] },
+  { id: 'moth', name: 'Moth', paint: 3, blurb: 'Quick off the mark and shrugs off a slowdown. Light, so rivals and walls knock it about.',
+    build: 'A short stubby body under two pairs of broad rounded wings, a glassy eye spot on each forewing.',
+    rows: ['..ooooo........', '.oHHHhhoo......', '.ohwwhhhhoo....', '.odhhhhhhhho...', 'oeoddhhhhHHHoo.', 'oeeddhwwWHHHHHn'] },
+  { id: 'twin', name: 'Twin', paint: 4, blurb: 'The gunship: a sixth shot in the magazine. Its shield is slow to come back.',
+    build: 'A catamaran: two long gun pods, each with its own engine and nose light, braced to a small central cockpit.',
+    rows: ['ooooooooooooo..', 'oehhhhhHHHHHHo.', 'oedddhhhhhhhHn.', '.ooooodhoooooo.', '....odhhHHoo...', '...oewwWHHHHHn.'] },
+  { id: 'hammer', name: 'Hammer', paint: 5, blurb: 'Heavy. Shoves rivals aside and gets its shield back fast, but is slow to get going.',
+    build: 'A broad armoured wedge, widest and squarest at the front with its corners darkened, a raised deck down the middle, two big engines.',
+    rows: ['.......ooooooo.', '......oHHHHhhho', '..ooooohhhhhddo', 'oeoddhhhhhhhdo.', 'oeddhhhhhHHHHo.', 'oeddhhwwWHHHHHn'] }
+];
+const mix = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
+
+/* ---------- the parts every speeder is built from (nose along +x, up +y, right +z) ---------- */
+function kit(paint) {
+  const M = {
+    hull: new THREE.MeshStandardMaterial({ color: paint, flatShading: true, roughness: 0.55, metalness: 0.15 }),
+    light: new THREE.MeshStandardMaterial({ color: mix(paint, '#ffffff', 0.38), flatShading: true, roughness: 0.5, metalness: 0.1 }),
+    shade: new THREE.MeshStandardMaterial({ color: mix(paint, '#150f2c', 0.5), flatShading: true, roughness: 0.7, metalness: 0.2 }),
+    trim: new THREE.MeshStandardMaterial({ color: '#241c3e', flatShading: true, roughness: 0.6, metalness: 0.4 }),
+    glass: new THREE.MeshStandardMaterial({ color: '#6fe3ff', emissive: '#1d6f88', flatShading: true, roughness: 0.1, metalness: 0.3 }),
+    glow: new THREE.MeshBasicMaterial({ color: '#ffd48a' }),
+    white: new THREE.MeshBasicMaterial({ color: '#ffffff' })
+  };
+  const ship = new THREE.Group(), outlined = [], flames = [];
+  const add = (geo, mat, line = true) => { const m = new THREE.Mesh(geo, mat); ship.add(m); if (line) outlined.push(m); return m; };
+  const geoOf = (pos) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g; };
+  const K = {
+    M, ship, add,
+    // a lofted body: cross-sections along x (each a ring of [z, y] points), closed at both ends
+    loft(stations, ringOf, mat = M.hull, dz = 0) {
+      const rings = stations.map((s) => ringOf(s).map(([z, y]) => new THREE.Vector3(s.x, y, z + dz)));
+      const pos = [], n = rings[0].length, tri = (a, b, c) => pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+      for (let i = 0; i < rings.length - 1; i++) for (let k = 0; k < n; k++) {
+        const a = rings[i][k], b = rings[i][(k + 1) % n], c = rings[i + 1][(k + 1) % n], d = rings[i + 1][k];
+        tri(a, d, c); tri(a, c, b);
+      }
+      const capS = rings[0], capE = rings[rings.length - 1], cs = new THREE.Vector3(), ce = new THREE.Vector3();
+      capS.forEach((p) => cs.add(p)); cs.divideScalar(n); capE.forEach((p) => ce.add(p)); ce.divideScalar(n);
+      for (let k = 0; k < n; k++) { tri(cs, capS[k], capS[(k + 1) % n]); tri(ce, capE[(k + 1) % n], capE[k]); }
+      return add(geoOf(pos), mat);
+    },
+    // the usual faceted hull cross-section: a spine on top, flat-ish sides, a keel underneath
+    ring: (s) => [[0, s.t], [s.w * 0.55, s.t * 0.82], [s.w, s.t * 0.15], [s.w * 0.92, s.b * 0.55], [s.w * 0.45, s.b], [-s.w * 0.45, s.b], [-s.w * 0.92, s.b * 0.55], [-s.w, s.t * 0.15], [-s.w * 0.55, s.t * 0.82]],
+    // a flat plate (a wing, a fin laid flat, a strut) from an outline in x and z, th thick, its top at y
+    plate(pts, y, th, mat = M.hull, tiltX = 0, line = true) {
+      const sh = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, z)));
+      const g = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false });
+      g.rotateX(Math.PI / 2); g.translate(0, y, 0);
+      const m = add(g, mat, line); m.rotation.x = tiltX; return m;
+    },
+    // an upright blade (a tail or tip fin) from an outline in x and y, th thick, standing at z, leaning out by lean
+    fin(pts, z, th, mat = M.shade, lean = 0) {
+      const sh = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
+      const g = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false }); g.translate(0, 0, -th / 2);
+      const m = add(g, mat); m.position.z = z; m.rotation.x = lean; return m;
+    },
+    // a glass canopy on the spine, from x0 to x1, w wide, rising h above base
+    canopy(x0, x1, w, h, base, dz = 0) {
+      const L = x1 - x0, st = [[0, 0.3, 0], [0.22, 0.9, 0.8], [0.55, 1, 1], [0.85, 0.55, 0.5], [1, 0.1, 0]].map(([f, ww, hh]) => ({ x: x0 + L * f, w: w * ww, h: h * hh }));
+      return K.loft(st, (s) => [[0, base + s.h], [s.w * 0.7, base + s.h * 0.7], [s.w, base], [-s.w, base], [-s.w * 0.7, base + s.h * 0.7]], M.glass, dz);
+    },
+    // an engine: a nozzle in the tail, its hot core, a flame
+    engine(x, y, z, r, len = 0.34) {
+      const noz = add(new THREE.CylinderGeometry(r, r * 1.2, len, 8, 1, true), M.trim);
+      noz.rotation.z = Math.PI / 2; noz.position.set(x, y, z);
+      const core = add(new THREE.CircleGeometry(r * 0.85, 8), M.glow, false);
+      core.rotation.y = -Math.PI / 2; core.position.set(x - len * 0.35, y, z);
+      const fl = new THREE.Mesh(new THREE.ConeGeometry(r * 0.8, r * 4.6, 8, 1, true), new THREE.MeshBasicMaterial({ color: '#ffb45a', transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      fl.rotation.z = Math.PI / 2; fl.position.set(x - len * 0.5 - r * 2.3, y, z); ship.add(fl); flames.push(fl);
+    },
+    noseLight(x, y, z, r = 0.06) { const m = add(new THREE.OctahedronGeometry(r), M.white, false); m.position.set(x, y, z); },
+    // a light stripe along the spine (the sprite's highlight)
+    stripe(x0, x1, w0, w1, t0, t1, dz = 0) {
+      return K.loft([{ x: x0, w: w0, t: t0 }, { x: x1, w: w1, t: t1 }], (s) => [[0, s.t + 0.012], [s.w, s.t - 0.01], [-s.w, s.t - 0.01]], M.light, dz);
+    },
+    done() {
+      const lineMat = new THREE.LineBasicMaterial({ color: '#120d24' });
+      for (const m of outlined) {
+        const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 32), lineMat);
+        e.position.copy(m.position); e.rotation.copy(m.rotation); e.scale.copy(m.scale); ship.add(e);
+      }
+      ship.userData = { flames };
+      return ship;
+    }
+  };
+  return K;
+}
+const both = (f) => { f(1); f(-1); };
+const mirror = (pts) => pts.map(([x, z]) => [x, -z]);
+
+/* ---------- the six machines ---------- */
+const BUILD = {
+  arrow(K) {
+    const st = [{ x: 2.15, w: 0.02, t: 0.02, b: -0.01 }, { x: 1.75, w: 0.2, t: 0.13, b: -0.08 }, { x: 1.05, w: 0.36, t: 0.25, b: -0.15 }, { x: 0.2, w: 0.5, t: 0.33, b: -0.2 }, { x: -0.7, w: 0.56, t: 0.32, b: -0.22 }, { x: -1.45, w: 0.5, t: 0.26, b: -0.2 }, { x: -1.7, w: 0.44, t: 0.22, b: -0.18 }].reverse();
+    K.loft(st, K.ring);
+    K.stripe(0.95, 1.7, 0.07, 0.04, 0.272, 0.15);
+    both((z) => {
+      const w = [[0.75, 0.42], [-1.5, 1.95], [-1.72, 1.95], [-1.42, 0.42]].map(([x, zz]) => [x, zz * z]);
+      K.plate(z > 0 ? w : w.slice().reverse(), 0.02, 0.09);
+      K.plate((z > 0 ? [[-0.4, 1.12], [-1.55, 1.86], [-1.42, 0.55], [-0.2, 0.55]] : [[-0.2, -0.55], [-1.42, -0.55], [-1.55, -1.86], [-0.4, -1.12]]), 0.03, 0.01, K.M.shade, 0, false);
+      K.fin([[-1.72, 0], [-1.42, 0], [-1.62, 0.42], [-1.8, 0.42]], 1.93 * z, 0.05, K.M.shade, -0.18 * z);
+    });
+    K.canopy(-0.35, 1.0, 0.21, 0.2, 0.27);
+    K.engine(-1.78, 0.02, 0.22, 0.15); K.engine(-1.78, 0.02, -0.22, 0.15);
+    K.noseLight(2.13, 0.01, 0);
+  },
+  needle(K) {
+    const st = [{ x: 2.6, w: 0.02, t: 0.02, b: -0.01 }, { x: 2.0, w: 0.15, t: 0.11, b: -0.07 }, { x: 1.0, w: 0.27, t: 0.2, b: -0.13 }, { x: -0.2, w: 0.33, t: 0.25, b: -0.16 }, { x: -1.4, w: 0.34, t: 0.24, b: -0.17 }, { x: -2.1, w: 0.3, t: 0.22, b: -0.16 }].reverse();
+    K.loft(st, K.ring);
+    K.stripe(0.5, 2.15, 0.06, 0.03, 0.24, 0.1);
+    both((z) => {
+      // swept tail fins, flat out to the sides
+      const tf = [[-1.15, 0.28], [-1.95, 1.0], [-2.25, 1.0], [-2.05, 0.28]].map(([x, zz]) => [x, zz * z]);
+      K.plate(z > 0 ? tf : tf.slice().reverse(), 0.0, 0.07);
+      // canards up by the nose
+      const cn = [[1.55, 0.2], [1.1, 0.62], [0.92, 0.62], [1.15, 0.2]].map(([x, zz]) => [x, zz * z]);
+      K.plate(z > 0 ? cn : cn.slice().reverse(), 0.06, 0.05, K.M.shade);
+    });
+    K.fin([[-2.15, 0.15], [-1.35, 0.15], [-1.95, 0.62], [-2.3, 0.62]], 0, 0.05, K.M.shade);   // the dorsal blade
+    K.canopy(-0.45, 0.75, 0.17, 0.17, 0.22);
+    K.engine(-2.2, 0.03, 0, 0.21, 0.4);
+    K.noseLight(2.58, 0.01, 0);
+  },
+  raptor(K) {
+    const st = [{ x: 2.0, w: 0.02, t: 0.02, b: -0.01 }, { x: 1.5, w: 0.17, t: 0.13, b: -0.08 }, { x: 0.6, w: 0.3, t: 0.24, b: -0.15 }, { x: -0.5, w: 0.38, t: 0.28, b: -0.18 }, { x: -1.5, w: 0.36, t: 0.24, b: -0.17 }, { x: -1.85, w: 0.32, t: 0.2, b: -0.15 }].reverse();
+    K.loft(st, K.ring);
+    K.stripe(0.7, 1.65, 0.06, 0.035, 0.235, 0.12);
+    both((z) => {
+      // the blade: swept forward from a root well back to a tip out ahead
+      const bl = [[-0.05, 0.33], [0.8, 1.78], [0.45, 1.86], [-0.95, 0.33]].map(([x, zz]) => [x, zz * z]);
+      K.plate(z > 0 ? bl : bl.slice().reverse(), 0.03, 0.07, K.M.hull, 0.1 * z);
+      // its leading edge lit
+      const le = [[-0.02, 0.4], [0.8, 1.78], [0.66, 1.8], [-0.2, 0.4]].map(([x, zz]) => [x, zz * z]);
+      K.plate(z > 0 ? le : le.slice().reverse(), 0.04, 0.01, K.M.light, 0.1 * z, false);
+      // tail stubs
+      const ts = [[-1.35, 0.28], [-1.8, 0.68], [-1.98, 0.68], [-1.75, 0.28]].map(([x, zz]) => [x, zz * z]);
+      K.plate(z > 0 ? ts : ts.slice().reverse(), 0.0, 0.06, K.M.shade);
+    });
+    K.canopy(-0.55, 0.65, 0.18, 0.18, 0.25);
+    K.engine(-1.9, 0.02, 0.17, 0.13); K.engine(-1.9, 0.02, -0.17, 0.13);
+    K.noseLight(1.98, 0.01, 0);
+  },
+  moth(K) {
+    const st = [{ x: 1.65, w: 0.03, t: 0.03, b: -0.02 }, { x: 1.3, w: 0.24, t: 0.2, b: -0.13 }, { x: 0.5, w: 0.42, t: 0.33, b: -0.2 }, { x: -0.6, w: 0.46, t: 0.33, b: -0.22 }, { x: -1.3, w: 0.4, t: 0.26, b: -0.2 }, { x: -1.5, w: 0.34, t: 0.2, b: -0.16 }].reverse();
+    K.loft(st, K.ring);
+    K.stripe(0.6, 1.35, 0.07, 0.05, 0.3, 0.18);
+    const lobe = (cx, cz, rx, rz, n = 14) => { const p = []; for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; p.push([cx + Math.cos(a) * rx, cz + Math.sin(a) * rz]); } return p; };
+    both((z) => {
+      // forewing and hindwing: broad rounded lobes
+      K.plate(lobe(0.05, 1.0 * z, 1.0, 0.72), 0.05, 0.07);
+      K.plate(lobe(-0.85, 0.82 * z, 0.62, 0.5), 0.02, 0.07, K.M.shade);
+      // the eye spot: a glass disc in a dark ring
+      const ringM = K.add(new THREE.CircleGeometry(0.3, 10), K.M.trim, false); ringM.rotation.x = -Math.PI / 2; ringM.position.set(-0.05, 0.056, 1.08 * z);
+      const eye = K.add(new THREE.CircleGeometry(0.21, 10), K.M.glass, false); eye.rotation.x = -Math.PI / 2; eye.position.set(-0.05, 0.058, 1.08 * z);
+      const pupil = K.add(new THREE.CircleGeometry(0.07, 8), K.M.white, false); pupil.rotation.x = -Math.PI / 2; pupil.position.set(0.0, 0.06, 1.12 * z);
+    });
+    K.canopy(-0.4, 0.9, 0.22, 0.2, 0.32);
+    K.engine(-1.55, 0.03, 0.17, 0.13); K.engine(-1.55, 0.03, -0.17, 0.13);
+    K.noseLight(1.63, 0.02, 0);
+  },
+  twin(K) {
+    // the two gun pods
+    both((z) => {
+      const st = [{ x: 2.0, w: 0.02, t: 0.02, b: -0.01 }, { x: 1.55, w: 0.17, t: 0.15, b: -0.1 }, { x: 0.6, w: 0.26, t: 0.22, b: -0.16 }, { x: -1.0, w: 0.27, t: 0.22, b: -0.16 }, { x: -1.75, w: 0.24, t: 0.19, b: -0.14 }].reverse();
+      K.loft(st, K.ring, K.M.hull, 1.05 * z);
+      K.stripe(-0.3, 1.6, 0.06, 0.035, 0.205, 0.13, 1.05 * z);
+      K.engine(-1.82, 0.02, 1.05 * z, 0.13);
+      K.noseLight(1.98, 0.01, 1.05 * z);
+      // and the struts out to them, front and back
+      const sf = [[0.55, 0.15], [0.75, 0.85], [0.35, 0.85], [0.1, 0.15]].map(([x, zz]) => [x, zz * z]);
+      K.plate(z > 0 ? sf : sf.slice().reverse(), 0.05, 0.08, K.M.shade);
+      const sb = [[-0.75, 0.15], [-0.55, 0.85], [-0.95, 0.85], [-1.15, 0.15]].map(([x, zz]) => [x, zz * z]);
+      K.plate(z > 0 ? sb : sb.slice().reverse(), 0.05, 0.08, K.M.shade);
+    });
+    // the little cockpit between them
+    const cs = [{ x: 1.35, w: 0.02, t: 0.02, b: -0.01 }, { x: 0.95, w: 0.17, t: 0.17, b: -0.1 }, { x: 0.2, w: 0.26, t: 0.27, b: -0.16 }, { x: -0.9, w: 0.25, t: 0.24, b: -0.16 }, { x: -1.25, w: 0.2, t: 0.18, b: -0.13 }].reverse();
+    K.loft(cs, K.ring);
+    K.canopy(-0.45, 0.85, 0.17, 0.18, 0.23);
+    K.engine(-1.32, 0.02, 0, 0.12);
+    K.noseLight(1.33, 0.01, 0);
+  },
+  hammer(K) {
+    // a broad armoured wedge: widest across the front, cut square, no separate head on a stalk
+    const hull = [[1.7, 0], [1.66, 1.05], [1.42, 1.38], [0.72, 1.42], [0.1, 1.02], [-1.25, 0.86], [-1.75, 0.7], [-1.82, 0]];
+    K.plate(hull.concat(mirror(hull).reverse().slice(1, -1)).reverse(), 0.12, 0.3);
+    // a raised armour deck down the middle, its front edge lit, sloping at the nose
+    const deck = [[1.45, 0], [1.38, 0.5], [0.9, 0.62], [-1.3, 0.5], [-1.62, 0.4], [-1.66, 0]];
+    K.plate(deck.concat(mirror(deck).reverse().slice(1, -1)).reverse(), 0.28, 0.16);
+    const lit = [[1.62, 0], [1.58, 0.95], [1.4, 1.22], [1.02, 1.22], [1.0, 0]];
+    K.plate(lit.concat(mirror(lit).reverse().slice(1, -1)).reverse(), 0.125, 0.006, K.M.light, 0, false);
+    both((z) => {
+      // the front corners darkened, like the sprite's, and an armour skirt down each flank
+      const tip = [[1.42, 1.38], [0.72, 1.42], [0.62, 1.15], [1.5, 1.15]].map(([x, zz]) => [x, zz * z]);
+      K.plate(z > 0 ? tip.slice().reverse() : tip, 0.13, 0.32, K.M.shade, 0, false);
+      const sk = [[0.05, 1.0], [-1.25, 0.86], [-1.3, 0.72], [0.0, 0.86]].map(([x, zz]) => [x, zz * z]);
+      K.plate(z > 0 ? sk.slice().reverse() : sk, 0.13, 0.31, K.M.shade, 0, false);
+    });
+    K.canopy(-0.6, 0.5, 0.26, 0.2, 0.44);
+    K.engine(-1.9, 0.0, 0.36, 0.2, 0.36); K.engine(-1.9, 0.0, -0.36, 0.2, 0.36);
+    K.noseLight(1.72, 0.0, 0.55, 0.05); K.noseLight(1.72, 0.0, -0.55, 0.05);
+
+  }
+};
+function buildShip(id, paint, lines = true) {
+  const K = kit(paint); BUILD[id](K); const s = K.done();
+  if (!lines) s.children.filter((c) => c.isLineSegments).forEach((c) => s.remove(c));
+  return s;
+}
+
+/* ---------- the big view ---------- */
+const view = document.getElementById('view');
+const R = new THREE.WebGLRenderer({ canvas: view, antialias: true, alpha: true });
+R.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(32, 4 / 3, 0.1, 100);
+scene.add(new THREE.HemisphereLight('#c9c4ff', '#2a1a10', 0.5));
+const key = new THREE.DirectionalLight('#fff1dc', 0.85); key.position.set(-3, 6, 4); scene.add(key);
+const rim = new THREE.DirectionalLight('#7fb7ff', 0.6); rim.position.set(4, 2, -5); scene.add(rim);
+const sh = new THREE.Mesh(new THREE.CircleGeometry(2, 32), new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.35 }));
+sh.rotation.x = -Math.PI / 2; sh.scale.set(1.3, 1, 0.85); sh.position.y = -0.75; scene.add(sh);
+
+let yaw = 0.7, pitch = 0.42, drag = null, idle = 0;
+view.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY }; view.setPointerCapture(e.pointerId); });
+view.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  yaw += (e.clientX - drag.x) * 0.01; pitch = Math.max(-0.2, Math.min(1.45, pitch + (e.clientY - drag.y) * 0.008));
+  drag = { x: e.clientX, y: e.clientY }; idle = 0;
+});
+view.addEventListener('pointerup', () => { drag = null; });
+function sizeView() { const w = view.clientWidth, h = view.clientHeight; R.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+new ResizeObserver(sizeView).observe(view); sizeView();
+
+/* ---------- the race view: straight down, at the sprite's 25 pixels, with the sprites' 1-pixel outline ---------- */
+const gcv = document.createElement('canvas'); gcv.width = 25; gcv.height = 25;
+const GR = new THREE.WebGLRenderer({ canvas: gcv, antialias: false, alpha: true, preserveDrawingBuffer: true });
+GR.setPixelRatio(1); GR.setSize(25, 25, false);
+const gout = document.getElementById('game3d').getContext('2d');
+function outlineCopy() {
+  gout.clearRect(0, 0, 25, 25); gout.drawImage(gcv, 0, 0);
+  const im = gout.getImageData(0, 0, 25, 25), d = im.data, a = (x, y) => (x < 0 || y < 0 || x > 24 || y > 24 ? 0 : d[(y * 25 + x) * 4 + 3]);
+  const rimPx = [];
+  for (let y = 0; y < 25; y++) for (let x = 0; x < 25; x++) {
+    const i = (y * 25 + x) * 4;
+    if (d[i + 3] < 128) { d[i + 3] = 0; if (a(x - 1, y) >= 128 || a(x + 1, y) >= 128 || a(x, y - 1) >= 128 || a(x, y + 1) >= 128) rimPx.push(i); }
+    else d[i + 3] = 255;
+  }
+  for (const i of rimPx) { d[i] = 0x12; d[i + 1] = 0x0d; d[i + 2] = 0x24; d[i + 3] = 255; }
+  gout.putImageData(im, 0, 0);
+}
+const gscene = new THREE.Scene();
+gscene.add(new THREE.HemisphereLight('#c9c4ff', '#2a1a10', 0.55));
+const gkey = new THREE.DirectionalLight('#fff1dc', 0.9); gkey.position.set(-3, 6, 4); gscene.add(gkey);
+const gcam = new THREE.OrthographicCamera(-3.6, 3.6, 3.6, -3.6, 0.1, 20);
+gcam.position.set(0, 10, 0); gcam.up.set(0, 0, -1); gcam.lookAt(0, 0, 0);
+
+function drawSprite(rows, paint, ang) {
+  const W = Math.max(...rows.map((r) => r.length)), top = rows.map((r) => (r + '.'.repeat(W)).slice(0, W)), full = top.concat(top.slice(0, -1).reverse()), RH = full.length;
+  const pal = { o: '#120d24', h: paint, H: '#' + mix(paint, '#ffffff', 0.38).getHexString(), d: '#' + mix(paint, '#150f2c', 0.5).getHexString(), e: '#ffd48a', w: '#6fe3ff', W: '#eafcff', n: '#ffffff' };
+  const g = document.getElementById('sprite').getContext('2d'); g.clearRect(0, 0, 25, 25);
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  for (let y = 0; y < 25; y++) for (let x = 0; x < 25; x++) {
+    const vx = x + 0.5 - 12.5, vy = y + 0.5 - 12.5;
+    const sx = Math.floor(vx * ca + vy * sa + W / 2), sy = Math.floor(-vx * sa + vy * ca + RH / 2);
+    if (sx < 0 || sx >= W || sy < 0 || sy >= RH || full[sy][sx] === '.') continue;
+    g.fillStyle = pal[full[sy][sx]]; g.fillRect(x, y, 1, 1);
+  }
+}
+
+/* ---------- picking a machine and a paint ---------- */
+let cur = HULLS[2], paint = PAINTS[0][1], ship = null, gship = null, spin = true, bank = false;
+function show() {
+  if (ship) scene.remove(ship); if (gship) gscene.remove(gship);
+  ship = buildShip(cur.id, paint); scene.add(ship);
+  gship = buildShip(cur.id, paint, false); gscene.add(gship);
+  let n = 0; ship.traverse((o) => { if (o.isMesh) { const g = o.geometry; n += (g.index ? g.index.count : g.attributes.position.count) / 3; } });
+  document.getElementById('tagName').textContent = cur.name;
+  document.getElementById('tagTris').textContent = n + ' triangles';
+  document.getElementById('blurb').textContent = cur.blurb;
+  document.getElementById('build').textContent = cur.build;
+  document.querySelectorAll('#tabs button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.id === cur.id ? 'true' : 'false'));
+  document.querySelectorAll('#paints button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.col === paint ? 'true' : 'false'));
+}
+HULLS.forEach((h) => {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = h.name; b.dataset.id = h.id;
+  // (each machine comes up in its own breaker's paint; the paint buttons change it)
+  b.addEventListener('click', () => { cur = h; paint = PAINTS[h.paint][1]; show(); });
+  document.getElementById('tabs').appendChild(b);
+});
+PAINTS.forEach(([name, col]) => {
+  const b = document.createElement('button'); b.type = 'button'; b.style.background = col; b.dataset.col = col; b.setAttribute('aria-label', name + ' paint');
+  b.addEventListener('click', () => { paint = col; show(); });
+  document.getElementById('paints').appendChild(b);
+});
+const spinBtn = document.getElementById('spinBtn'), tiltBtn = document.getElementById('tiltBtn');
+spinBtn.addEventListener('click', () => { spin = !spin; spinBtn.setAttribute('aria-pressed', spin); spinBtn.textContent = spin ? 'Turning' : 'Still'; });
+tiltBtn.addEventListener('click', () => { bank = !bank; tiltBtn.setAttribute('aria-pressed', bank); });
+show();
+
+/* ---------- run ---------- */
+const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let last = performance.now(), gAng = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  idle += dt;
+  if (!drag && idle > 1.5 && !reduce) yaw += dt * 0.35;
+  cam.position.set(Math.cos(yaw) * Math.cos(pitch) * 9, Math.sin(pitch) * 9, Math.sin(yaw) * Math.cos(pitch) * 9);
+  cam.lookAt(0, -0.1, 0);
+  for (const s of [ship, gship]) for (const f of s.userData.flames) { const k = 0.8 + Math.random() * 0.4; f.scale.set(1, k, 1); f.material.opacity = 0.55 + Math.random() * 0.3; }
+  R.render(scene, cam);
+  if (spin && !reduce) gAng += dt * 0.9;
+  gship.rotation.set(bank ? 0.45 : 0, -gAng, 0, 'YXZ');
+  GR.render(gscene, gcam); outlineCopy();
+  drawSprite(cur.rows, paint, gAng);
+}
+requestAnimationFrame(frame);
+</script>
+
+</body></html>
