@@ -139,6 +139,7 @@ select { flex: 1; min-width: 0; padding: 7px 8px; }
         <button class="tool" type="button" data-tool="gap" aria-pressed="false"><i style="background: #0a0918; box-shadow: inset 0 0 0 2px #ffc24a"></i>Gap<kbd>8</kbd></button>
         <button class="tool" type="button" data-tool="loop" aria-pressed="false"><i style="background: #0a0918; border-radius: 50%; box-shadow: inset 0 0 0 3px #62d6cc"></i>Loop<kbd>9</kbd></button>
         <button class="tool" type="button" data-tool="fall" aria-pressed="false"><i style="background: linear-gradient(135deg, #ffc478 50%, #0a0918 50%); box-shadow: inset 0 0 0 2px #ffc24a"></i>Fall gap<kbd>0</kbd></button>
+        <button class="tool" type="button" data-tool="landmark" aria-pressed="false"><i style="background: #e88cff; border-radius: 50% 50% 50% 0"></i>Landmark<kbd>L</kbd></button>
       </div>
       <p class="hint" id="hint"></p>
     </section>
@@ -176,7 +177,7 @@ select { flex: 1; min-width: 0; padding: 7px 8px; }
     <section>
       <h2>Track code</h2>
       <div class="row"><button class="btn go" type="button" id="copy">Copy track code</button></div>
-      <p class="small">Paste this to Claude to have the track built into the game. Pickups and asteroids are placed automatically.</p>
+      <p class="small">Paste this to Claude to have the track built into the game: Claude draws any landmarks from their descriptions. Pickups and asteroids are placed automatically. Pasted straight into the game (Paste track code), the track races the same but its landmarks are left out.</p>
       <textarea id="code" readonly rows="5" aria-label="Track code"></textarea>
       <h2 style="margin-top: 14px">Edit a game track</h2>
       <div class="row"><select id="lib" aria-label="Game tracks"></select><button class="btn" type="button" id="libLoad">Edit</button></div>
@@ -203,6 +204,7 @@ select { flex: 1; min-width: 0; padding: 7px 8px; }
       <span><i style="background: #b6ff6a"></i>Jump</span>
       <span><i style="background: #0a0918; box-shadow: inset 0 0 0 2px #ffc24a"></i>Gap</span>
       <span><i style="background: #20476a; box-shadow: inset 0 0 0 2px #62d6cc"></i>Loop</span>
+      <span><i style="background: rgba(232,140,255,0.25); box-shadow: inset 0 0 0 2px #e88cff; border-radius: 50%"></i>Landmark</span>
     </div>
     <div id="toast" role="status"></div>
   </main>
@@ -227,7 +229,8 @@ function loopNeed(r) {
   for (let th = 0; th <= TAU; th += 0.01) w = Math.max(w, 2 * g * r * (1 - Math.cos(th)) - 2 * a * r * th + g * r * (LOOP.GRIP - Math.cos(th)));
   return Math.sqrt(w);
 }
-const SPD = { cruise: 250, full: 300, boost: 440, slow: 200 };   // m/s: comfortable, flat out, boosting, slowest flight shown
+const SPD = { cruise: 250, full: 300, boost: 440, slow: 200 };
+const LM = { MIN: 30, MAX: 400 };   // a landmark's radius, metres   // m/s: comfortable, flat out, boosting, slowest flight shown
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const cyc = (v, n) => ((v % n) + n) % n;
@@ -322,7 +325,7 @@ function blankDoc() {
   const pts = [];
   for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU - Math.PI / 2; pts.push([Math.round(Math.cos(a) * 1150), Math.round(Math.sin(a) * 620)]); }
   // start on the top straight, racing clockwise
-  return { name: 'New track', setting: 'space', points: pts, shortcuts: [], elevation: [], barricades: [], jumps: [], gaps: [], loops: [] };
+  return { name: 'New track', setting: 'space', points: pts, shortcuts: [], elevation: [], barricades: [], jumps: [], gaps: [], loops: [], landmarks: [] };
 }
 let doc = null, G = null;
 function rebuild() { G = buildGeom(doc.points); computeHeights(); runChecks(); refreshCode(); refreshSel(); save(); draw(); const st = document.getElementById('setting'); if (st && doc.setting && st.value !== doc.setting) st.value = doc.setting; }
@@ -673,6 +676,15 @@ function runChecks() {
     if (clash >= 0) issue('bad', name + ' stands on another part of the track.', [clash]);
     issue('info', name + ' (radius ' + Math.round(q.r) + ' m, ' + Math.round(TAU * q.r) + ' m of track, comes out to the ' + (q.side === 'left' ? 'left' : 'right') + '): racers need about ' + Math.round(loopNeed(q.r)) + ' m/s going in, and a clean line round it to come out fast.', [li]);
   });
+  // landmarks: decoration beside the track, described for Claude to draw
+  stats.infos = infos;
+  doc.landmarks.forEach((L, k) => {
+    const name = 'Landmark ' + (k + 1), at = nearestSample(G, L.x, L.y, -1, 0);
+    if (!L.desc.trim()) issue('warn', name + ' has no description. Claude draws it from its description, so say what it is.', [at.i]);
+    const onCorr = stats.infos && stats.infos.some((c) => polyDist(c.P, L.x, L.y).d < CHW + L.r * 0.6);
+    if (at.d < HW + L.r * 0.6 || onCorr) issue('warn', name + ' sits on the track' + (onCorr ? ' (a shortcut corridor)' : '') + '. It is only decoration: racers would pass straight through it. Move it beside the lane.', [at.i]);
+    else if (L.desc.trim()) issue('info', name + ': "' + (L.desc.trim().length > 60 ? L.desc.trim().slice(0, 57) + '...' : L.desc.trim()) + '". ' + (L.art ? 'The game already draws it.' : 'Claude draws it when it builds this track into the game.'), [at.i]);
+  });
   stats.lIdx = lIdx;
   stats.gaps = gaps; stats.jIdx = jIdx;
   stats.L = G.L; stats.infos = infos;
@@ -724,6 +736,8 @@ function exportDoc() {
     loops: doc.loops.map((q) => ({ at: r5(anchorFrac(G, q.a)), r: Math.round(q.r), side: q.side === 'left' ? 'left' : 'right' }))
   };
   if (!out.loops.length) delete out.loops;
+  // landmarks: decoration, drawn by Claude from the description when it builds the track in (see the game's LANDMARK_ART)
+  if (doc.landmarks.length) out.landmarks = doc.landmarks.map((L) => { const o = { at: [Math.round(L.x), Math.round(L.y)], r: Math.round(L.r), desc: L.desc.trim() }; if (L.art) o.art = L.art; return o; });
   return JSON.stringify(out);
 }
 function importCode(text) {
@@ -743,7 +757,12 @@ function importCode(text) {
     barricades: (d.barricades || []).map((f) => fracToAnchor(g, +f)),
     jumps: (d.jumps || []).map((j) => ({ a: fracToAnchor(g, +(typeof j === 'number' ? j : j.at)), side: j.side === 'left' || j.side === 'right' ? j.side : null })),
     gaps: (d.gaps || []).map((q) => ({ a: fracToAnchor(g, +q.from), b: fracToAnchor(g, +q.to) })),
-    loops: (d.loops || []).map((q) => ({ a: fracToAnchor(g, +(typeof q === 'number' ? q : q.at)), r: clamp(+q.r || LOOP.R, LOOP.MIN_R, LOOP.MAX_R), side: q.side === 'left' ? 'left' : 'right' }))
+    loops: (d.loops || []).map((q) => ({ a: fracToAnchor(g, +(typeof q === 'number' ? q : q.at)), r: clamp(+q.r || LOOP.R, LOOP.MIN_R, LOOP.MAX_R), side: q.side === 'left' ? 'left' : 'right' })),
+    landmarks: (d.landmarks || []).filter((L) => L && Array.isArray(L.at)).map((L) => {
+      const o = { x: Math.round(+L.at[0]), y: Math.round(+L.at[1]), r: clamp(Math.round(+L.r || 90), LM.MIN, LM.MAX), desc: String(L.desc || '').slice(0, 400) };
+      if (L.art) o.art = String(L.art);   // (the game's drawing of it, if it has one: kept)
+      return o;
+    })
   };
 }
 function refreshCode() { $('code').value = exportDoc(); }
@@ -1027,6 +1046,18 @@ function draw() {
     const T0 = loopFoot(li, q, Math.PI / 2, 0), P = toScreen(T0[0] + G.tx[li] * 120, T0[1] + G.ty[li] * 120);
     label('LOOP · ' + Math.round(loopNeed(q.r)) + '+ M/S', P[0], P[1], '#62d6cc');
   });
+  // landmarks: their footprint, a marker and what they are
+  doc.landmarks.forEach((L, k) => {
+    const P = toScreen(L.x, L.y), r = Math.max(6, L.r * z), on = sel && sel.type === 'landmark' && sel.i === k, hot = !on && tool === 'landmark' && hover && hover.type === 'landmark' && hover.i === k;
+    ctx.fillStyle = on ? 'rgba(232,140,255,0.28)' : 'rgba(232,140,255,0.14)'; ctx.beginPath(); ctx.arc(P[0], P[1], r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = on ? '#ffffff' : hot ? '#f6c8ff' : '#e88cff'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]);
+    const m = Math.max(5, Math.min(12, r * 0.35));
+    ctx.fillStyle = '#e88cff'; ctx.beginPath();
+    for (let q = 0; q < 10; q++) { const a = -Math.PI / 2 + (q / 10) * TAU, rr = q % 2 ? m * 0.45 : m; ctx.lineTo(P[0] + Math.cos(a) * rr, P[1] + Math.sin(a) * rr); }
+    ctx.closePath(); ctx.fill();
+    const t = L.desc.trim();
+    label(t ? (t.length > 28 ? t.slice(0, 26) + '...' : t).toUpperCase() : 'LANDMARK · DESCRIBE IT', P[0], P[1] + r + 14, '#e88cff');
+  });
   // elevation labels
   doc.elevation.forEach((e) => {
     const sp = stretchSamples(e), i = cyc(sp.s0 + (sp.span >> 1), N), P = toScreen(G.x[i] + G.nx[i] * (HW + 40), G.y[i] + G.ny[i] * (HW + 40));
@@ -1124,6 +1155,7 @@ const HINTS = {
   start: 'Click the lane to move the start line there. Use Reverse direction to race the other way.',
   jump: 'Click the lane to place a jump pad. Racers who cross it fly up over the walls for about 1.7 s, then come down. The lime band shows where they land (slow to boosting); the thin line is a straight-ahead flight, for jumping across to another part of the track. Click a pad to select it: it can cover the whole lane or one half.',
   loop: 'Click the lane to put a loop-de-loop there: racers climb a full ring and come out beside where they went in. It needs a flat, fairly straight run-up and way out, clear of other features (Checks says what is wrong). Click a loop to select it: change its size, or which side it comes out on.',
+  landmark: 'Click anywhere off the track to place a landmark: a one-off piece of scenery (a crashed freighter, a lighthouse, a giant statue...). Describe it in the box that opens; when you send the track code to Claude, it draws the landmark to match. Drag one to move it; select it to change its size or description. Pasted straight into the game, landmarks are left out.',
   fall: 'Click near a ramp going down (the end of a raised stretch, or the start of a sunken one): a gap is fitted over it, so racers fly off the higher deck and drop onto the lower track beyond, no jump pad needed. Select one to make it shorter (easier: less speed needed) or longer.',
   gap: 'Click where a gap starts, then where it ends: on the ground, or inside a raised or sunken stretch. Clear it with a jump pad before it, or let racers drop across it onto lower track (over the ramp at the end of a raised stretch, say). Racers who fall in are put back just past it.'
 };
@@ -1145,6 +1177,10 @@ function pick(sx, sy) {
   }
   if (tool === 'jump') {
     for (let k = 0; k < doc.jumps.length; k++) { const i = anchorIdx(G, doc.jumps[k].a); if (Math.hypot(G.x[i] - wx, G.y[i] - wy) < HW * 0.6) return { type: 'jump', i: k }; }
+  }
+  if (tool === 'landmark') {
+    for (let k = doc.landmarks.length - 1; k >= 0; k--) { const L = doc.landmarks[k]; if (Math.hypot(L.x - wx, L.y - wy) < Math.max(L.r, 10 / view.z)) return { type: 'landmark', i: k }; }
+    return null;   // (anywhere else: a new one goes there)
   }
   if (tool === 'loop') {
     for (let k = 0; k < doc.loops.length; k++) {
@@ -1187,6 +1223,16 @@ cv.addEventListener('pointerdown', (e) => {
   focusAt = null;
   if (e.button === 1 || e.button === 2) { drag = { kind: 'pan', sx, sy, vx: view.x, vy: view.y }; cv.classList.add('grab'); return; }
   const h = pick(sx, sy);
+  if (tool === 'landmark') {
+    remember();
+    if (h && h.type === 'landmark') { sel = h; drag = { kind: 'landmark', i: h.i, moved: false, dx: doc.landmarks[h.i].x - toWorld(sx, sy)[0], dy: doc.landmarks[h.i].y - toWorld(sx, sy)[1] }; refreshSel(); draw(); return; }
+    const [wx, wy] = toWorld(sx, sy);
+    doc.landmarks.push({ x: Math.round(wx / 5) * 5, y: Math.round(wy / 5) * 5, r: 90, desc: '' });
+    sel = { type: 'landmark', i: doc.landmarks.length - 1 }; rebuild();
+    // (once the click has finished: the browser moves focus off whatever was focused as it does)
+    setTimeout(() => { const ta = document.getElementById('lmDesc'); if (ta) ta.focus(); }, 0);
+    return;
+  }
   if (tool === 'shape') {
     if (h && h.type === 'point') { remember(); sel = { type: 'point', i: h.i }; drag = { kind: 'point', i: h.i, moved: false }; rebuild(); return; }
     if (h && h.type === 'lane') {
@@ -1244,6 +1290,11 @@ cv.addEventListener('pointermove', (e) => {
     doc.shortcuts[drag.i].via[drag.j] = [Math.round(wx / 5) * 5, Math.round(wy / 5) * 5];
     drag.moved = true; rebuild(); return;
   }
+  if (drag && drag.kind === 'landmark') {
+    const [wx, wy] = toWorld(sx, sy), L = doc.landmarks[drag.i];
+    L.x = Math.round((wx + drag.dx) / 5) * 5; L.y = Math.round((wy + drag.dy) / 5) * 5;
+    drag.moved = true; rebuild(); return;
+  }
   if (drag && drag.kind === 'target') {
     const [wx, wy] = toWorld(sx, sy), a = nearestAnchor(G, wx, wy), i = anchorIdx(G, a);
     const lat = clamp((wx - G.x[i]) * G.nx[i] + (wy - G.y[i]) * G.ny[i], -(HW - 13), HW - 13);
@@ -1261,7 +1312,7 @@ cv.addEventListener('pointermove', (e) => {
   draw();
 });
 const endDrag = () => {
-  if (drag && (drag.kind === 'point' || drag.kind === 'via' || drag.kind === 'target') && !drag.moved) undoStack.pop(), syncUndo();
+  if (drag && (drag.kind === 'point' || drag.kind === 'via' || drag.kind === 'target' || drag.kind === 'landmark') && !drag.moved) undoStack.pop(), syncUndo();
   drag = null; cv.classList.remove('grab');
 };
 cv.addEventListener('pointerup', endDrag);
@@ -1292,6 +1343,7 @@ function deleteSel() {
   else if (sel.type === 'jump') doc.jumps.splice(sel.i, 1);
   else if (sel.type === 'gap') doc.gaps.splice(sel.i, 1);
   else if (sel.type === 'loop') doc.loops.splice(sel.i, 1);
+  else if (sel.type === 'landmark') doc.landmarks.splice(sel.i, 1);
   sel = null; rebuild();
 }
 function refreshSel() {
@@ -1341,6 +1393,18 @@ function refreshSel() {
       };
       add('Shorter', move(1)); add('Longer', move(-1));
     }
+  } else if (sel.type === 'landmark') {
+    const L = doc.landmarks[sel.i];
+    t.textContent = 'Landmark ' + (sel.i + 1) + ', ' + Math.round(L.r * 2) + ' m across. Describe it: Claude draws it to match when it builds this track in.';
+    // (the description box keeps its place while you type: only rebuilt when the selection changes)
+    const ta = document.createElement('textarea');
+    ta.id = 'lmDesc'; ta.rows = 3; ta.maxLength = 400; ta.value = L.desc; ta.placeholder = 'What is it? e.g. a crashed cargo freighter, broken in two, its hull lights still blinking';
+    ta.setAttribute('aria-label', 'Landmark description'); ta.style.width = '100%';
+    let first = true;
+    ta.addEventListener('input', () => { if (first) { remember(); first = false; } L.desc = ta.value; refreshCode(); save(); runChecks(); draw(); });
+    b.appendChild(ta);
+    const size = (d) => () => { const r = clamp(L.r + d, LM.MIN, LM.MAX); if (r === L.r) return; remember(); L.r = r; rebuild(); };
+    add('Smaller', size(-15)); add('Larger', size(15));
   } else if (sel.type === 'loop') {
     const q = doc.loops[sel.i];
     t.textContent = 'Loop ' + (sel.i + 1) + ': radius ' + Math.round(q.r) + ' m (' + Math.round(TAU * q.r) + ' m round), comes out to the ' + q.side + '. Racers need ' + Math.round(loopNeed(q.r)) + '+ m/s going in.';
@@ -1364,7 +1428,8 @@ function runPanel() {
     ['Overpasses', String(stats.crossings)],
     ['Barricades', String(doc.barricades.length)],
     ['Jumps / gaps', doc.jumps.length + ' / ' + doc.gaps.length],
-    ['Loops', String(doc.loops.length)]
+    ['Loops', String(doc.loops.length)],
+    ['Landmarks', String(doc.landmarks.length)]
   ];
   st.textContent = '';
   for (const [k, v] of rows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; st.append(dt, dd); }
@@ -1397,7 +1462,7 @@ function restore() {
   try {
     const s = localStorage.getItem(SAVE_KEY), d = s ? JSON.parse(s) : null;
     if (d && d.shortcuts) for (const c of d.shortcuts) { c.via = c.via || []; c.target = c.target || null; }
-    if (d) { d.jumps = d.jumps || []; d.gaps = d.gaps || []; d.loops = d.loops || []; d.setting = d.setting || 'space'; }
+    if (d) { d.jumps = d.jumps || []; d.gaps = d.gaps || []; d.loops = d.loops || []; d.landmarks = d.landmarks || []; d.setting = d.setting || 'space'; }
     return d;
   } catch (e) { return null; }
 }
@@ -1446,6 +1511,7 @@ window.addEventListener('keydown', (e) => {
   const tools = ['shape', 'shortcut', 'raise', 'sink', 'barricade', 'start', 'jump', 'gap', 'loop'];
   if (k >= '1' && k <= '9') setTool(tools[+k - 1]);
   if (k === '0') setTool('fall');
+  if (k === 'l' || k === 'L') setTool('landmark');
 });
 window.addEventListener('resize', resize);
 

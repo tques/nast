@@ -886,6 +886,9 @@ function segDist(px, py, ax, ay, bx, by) {
                  of track, comes back down beside where it went up (on the given side) and edges back onto its line.
      setting     the world around the track (js/05b-settings.js): 'space' if left out. A sunken stretch's canopy
                  names one of that setting's overhead types.
+     landmarks   one-off pieces of scenery beside the track, from the editor's Landmark tool: {at: [x, y], r, desc,
+                 art?}. Drawn only when art names an entry in LANDMARK_ART (see the landmarks section): the
+                 description says what it should look like, for whoever draws it.
    Optional: pickups [[fraction, sideways offset, 'cell' | 'sting'], ...] and asteroids [fraction, ...];
    when left out they are placed automatically. */
 const RAMP = 144;
@@ -1360,8 +1363,8 @@ function buildRocks(seed) {
   // where a raised stretch flies over the asteroid field, the rocks may sit under it: measure clearance to the rest only
   const N0 = T.N, over = new Uint8Array(N0);
   for (const r of T.runs) if (r.rocks) for (let q = 0; q < r.n; q++) { const i = (r.s + q) % N0; if (T.h[i] > 0.55) over[i] = 1; }
-  const anyOver = over.some((v) => v);
-  const clear = (x, y) => {
+  const anyOver = over.some((v) => v), LMS = landmarks();
+  const clear0 = (x, y) => {
     if (!anyOver) return sd(x, y, -1);
     let best = 1e18;
     for (let i = 0; i < N0; i++) { if (over[i]) continue; const dx = x - T.x[i], dy = y - T.y[i], d = dx * dx + dy * dy; if (d < best) best = d; }
@@ -1369,6 +1372,8 @@ function buildRocks(seed) {
     for (const c of T.chords) d = Math.min(d, chordDist(c, x, y) - c.hw);
     return d;
   };
+  // (and none on a landmark's footprint)
+  const clear = (x, y) => { let d = clear0(x, y); for (const L of LMS) d = Math.min(d, Math.hypot(x - L.at[0], y - L.at[1]) - L.r - 6); return d; };
   const R = rng(seed), rocks = [], grid = new Map();
   const key = (x, y) => Math.floor(x / 90) + ',' + Math.floor(y / 90);
   function free(x, y, r) {
@@ -6944,6 +6949,12 @@ function groundClear() {
     if (!cells.has(k)) cells.set(k, []);
     cells.get(k).push(T.x[i], T.y[i], rad);
   }
+  // (and a landmark's footprint)
+  for (const L of landmarks()) {
+    const k = Math.floor(L.at[0] / C) + ',' + Math.floor(L.at[1] / C);
+    if (!cells.has(k)) cells.set(k, []);
+    cells.get(k).push(L.at[0], L.at[1], L.r + 10);
+  }
   // (and a shortcut corridor's raised or sunken parts)
   for (const c of T.chords) if (c.lift) for (const p of chordPts(c)) {
     const rad = p.h > 0.01 ? c.hw + 6 + slope * p.h + 8 : p.h < -0.01 ? c.hw + chordLip(c, p, 1) + 6 : 0;
@@ -7542,6 +7553,53 @@ function drawPlants() {
   }
 }
 const PLANT_Q = [], PLANT_ORD = [];
+/* ================= landmarks =================
+   A track can stand landmarks beside it: one-off pieces of scenery, placed and described in the track editor's Landmark
+   tool ({at: [x, y], r, desc}). The description is for whoever builds the track into the game: they draw the landmark
+   to match as an entry in LANDMARK_ART, and name it on the landmark (art: 'its-id'). A landmark with no art (pasted
+   straight in from the editor, say) is not drawn at all.
+   An entry: { size: its canvas, in pixels across (the landmark centred in it; 2R + its overhang), height: how many
+   levels it stands up (0: flat on the ground), n: how many slices, slice(g, k, n, S, R, L): paint slice k of n (0 the
+   lowest) onto g, a fresh S x S canvas, the landmark's middle at (S/2, S/2), R its radius in pixels, L the landmark;
+   and optionally over(lc, ec, x, y, f, time, R, L): drawn each frame on top, for anything that moves or glows (blinking
+   lights, a turning beacon, steam): x, y where its middle is drawn (scene pixels), f its top's scale, ec the glow layer }.
+   The slices are stacked at rising heights, each scaled by its own height about the middle of the screen, as standing
+   scenery is, so it stands up off the ground; a soft shadow falls from it away from the sun. Lit from the upper left.
+   Decoration only: racers pass through it (the editor warns if one is placed on the track). */
+const LANDMARK_ART = {};
+const LM_CACHE = {};
+function landmarks() { return (TRACK.landmarks || []).filter((L) => L && L.art && LANDMARK_ART[L.art] && Array.isArray(L.at)); }
+function landmarkSlices(L) {
+  const A = LANDMARK_ART[L.art], R = Math.max(8, +L.r || 60), key = L.art + ':' + R;
+  if (LM_CACHE[key]) return LM_CACHE[key];
+  const S = Math.ceil(A.size || R * 2.4), n = Math.max(1, A.n || 1), sl = [];
+  for (let k = 0; k < n; k++) { const c = mkCanvas(S, S), g = c.getContext('2d'); g.imageSmoothingEnabled = false; A.slice(g, k, n, S, R, L); sl.push(c); }
+  // its shadow: its own outline (every slice together), in shadow
+  const sh = mkCanvas(S, S), sg = sh.getContext('2d');
+  for (const c of sl) sg.drawImage(c, 0, 0);
+  sg.globalCompositeOperation = 'source-in'; sg.fillStyle = '#000'; sg.fillRect(0, 0, S, S);
+  return (LM_CACHE[key] = { S, sl, A, sh });
+}
+function drawTrackLandmarks(time) {
+  const f0 = fscale(0);
+  for (const L of landmarks()) {
+    const st = landmarkSlices(L), A = st.A, x = L.at[0], y = L.at[1], H = A.height || 0, n = st.sl.length;
+    if (offscreen(x, y, fscale(H), st.S * 0.8)) continue;
+    setScale(1);
+    // its shadow, its own outline cast away from the sun: further off the taller it is
+    const R = Math.max(8, +L.r || 60), off = 4 + 90 * H, w0 = Math.round(st.S * f0);
+    lc.globalAlpha = 0.32;
+    lc.drawImage(st.sh, Math.round(CX + (x + off * 0.6 - CX) * f0 - w0 / 2), Math.round(CY + (y + off * 0.8 - CY) * f0 - w0 / 2), w0, w0);
+    lc.globalAlpha = 1;
+    // the slices, lowest first
+    for (let k = 0; k < n; k++) {
+      const h = n > 1 ? H * k / (n - 1) : 0, f = fscale(h), w = Math.round(st.S * f);
+      lc.drawImage(st.sl[k], Math.round(CX + (x - CX) * f - w / 2), Math.round(CY + (y - CY) * f - w / 2), w, w);
+    }
+    if (A.over) { const f = fscale(H); A.over(lc, ec, CX + (x - CX) * f, CY + (y - CY) * f, f, time, R, L); }
+  }
+}
+
 /* ---------- hills: the ground rising under a raised stretch ----------
    On the ground, a raised road runs along the top of a hill. The hill is a height field over the ground, worked out
    once per track: every bit of raised road (not where it is a bridge, nor over a gap) raises the ground around it,
@@ -9356,6 +9414,7 @@ function renderFrame(time) {
   // (every ship at the scale of its own height, the same as the deck at that height)
   for (const s of W.ships) { if (s.loop) continue; items.push({ k: shipKey(s), y: s.y, fn: () => atPos(s.h, s.x, s.y, (f) => drawShip(s, time, f)) }); }
   ghostItem(items, time);   // (a time trial's ghost)
+  if (TRACK.landmarks && TRACK.landmarks.length) items.push({ k: 0.33, y: 0, fn: () => drawTrackLandmarks(time) });   // (landmarks with art)
   if (T.chords.some((c) => c.lift)) corridorItems(items);   // (shortcut corridors off the ground)
   const bb9 = [[], [], [], [], [], [], [], [], []], pp9 = [[], [], [], [], [], [], [], [], []];
   for (const b of W.bullets) bb9[clamp(Math.round(b.h * 4) + 4, 0, 8)].push(b);
@@ -13476,7 +13535,7 @@ function trackFromCode(text) {
   let hsh = 7; for (const ch of JSON.stringify(d.points) + name) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0;
   const def = { id: 'custom-' + (hsh >>> 0).toString(36), name, custom: true, seed: (hsh >>> 0) % 997 + 3, points: d.points };
   if (d.setting && SETTINGS[d.setting]) def.setting = d.setting;
-  for (const k of ['shortcuts', 'elevation', 'barricades', 'jumps', 'gaps', 'loops']) if (Array.isArray(d[k]) && d[k].length) def[k] = d[k];
+  for (const k of ['shortcuts', 'elevation', 'barricades', 'jumps', 'gaps', 'loops', 'landmarks']) if (Array.isArray(d[k]) && d[k].length) def[k] = d[k];   // (landmarks come without art: not drawn)
   const keep = TRACK;
   try { buildTrack(def); buildRocks(def.seed); } catch (e) { buildTrack(keep); throw new Error("That track couldn't be built: " + e.message); }
   buildTrack(keep);
