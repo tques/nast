@@ -2542,7 +2542,8 @@ function driftIn(sl) {
   r.vy = -T.ny[gi] * sl.side * s + T.ty[gi] * (Math.random() - 0.5) * 10;
 }
 function stepRocks(dt) {
-  if (!W.rocksOn) {
+  // (none in a time trial: there it is you, the track and the clock)
+  if (!W.rocksOn && !W.solo) {
     const lead = W.order[0];
     if (lead && lead.u >= T.N) { W.rocksOn = true; W.slots.forEach((sl, i) => { sl.timer = 1.5 + i * 2.2; }); }
   }
