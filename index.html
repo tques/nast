@@ -12458,8 +12458,11 @@ function padFrame() {
 
 /* ---------- gamepad on the menus ----------
    D-pad or left stick: move between buttons (held, it repeats). A: press the one picked. B: back (or cancel a
-   confirm box). LB / RB: the previous / next speeder, on the screens that show one. Right stick: scroll. */
-const PADNAV = { held: null, next: 0 };
+   confirm box). LB / RB: the previous / next speeder, on the screens that show one. Right stick: scroll.
+   The track screen goes in steps (PADNAV.stage), each holding the pad to its own buttons: 'track' (the track cards;
+   it opens on Kessler Loop), A -> 'diff' (the difficulty under the picked card; a time trial has none and skips it),
+   A -> 'side' (the speeder, the laps and Race). B goes back a step, and from the tracks, back to the menu. */
+const PADNAV = { held: null, next: 0, stage: null, scr: null };
 const FOCUSABLE = 'button, input, textarea, select, a[href], [tabindex]';
 function padShowing() {
   for (const k in screens) if (!screens[k].hidden) return screens[k];
@@ -12473,11 +12476,43 @@ const isShown = (e) => {
 // the part of the screen in charge: an open confirm box or paste panel keeps the pad inside it, like a dialog
 function padScope(scr) {
   for (const box of scr.querySelectorAll('.confirmBox, #pastePanel')) if (isShown(box)) return box;
+  if (scr === screens.tracks) {
+    if (PADNAV.stage === 'track') return $('trackList');
+    if (PADNAV.stage === 'diff') return document.querySelector('.diffChips');
+    if (PADNAV.stage === 'side') return scr.querySelector('.hslot');
+  }
   return scr;
 }
+// (on the track screen's last step: the speeder, the laps and Race; not Back, which B is, nor the pasted-track buttons)
+const PAD_SIDE_SKIP = ['tracksBack', 'pasteTrack', 'removeTrack'];
 function padTargets(scope) {
+  const side = scope.classList && scope.classList.contains('hslot') && PADNAV.stage === 'side';
+  // (the tracks step: the cards alone; the difficulty bar hangs inside the list, under the picked card, but is its own step)
+  if (scope === $('trackList')) return [...scope.querySelectorAll('.tcard')].filter(isShown);
   return [...scope.querySelectorAll(FOCUSABLE)].filter((e) =>
-    isShown(e) && (e.tabIndex >= 0 || e.closest('#machineList')) && !(e.closest('#machineList') && e.getAttribute('aria-checked') !== 'true'));
+    isShown(e) && (e.tabIndex >= 0 || e.closest('#machineList')) && !(e.closest('#machineList') && e.getAttribute('aria-checked') !== 'true') &&
+    !(side && PAD_SIDE_SKIP.includes(e.id)) && !e.disabled);
+}
+// where the pad's highlight goes in a step it has not yet touched: the picked track, the set difficulty, your speeder
+function padPreferred(scope, list) {
+  const pick = scope === $('trackList') ? TRACK_INFO[pickIx] && TRACK_INFO[pickIx].btn
+    : scope.classList && scope.classList.contains('diffChips') ? scope.querySelector('[aria-pressed="true"]')
+    : scope.querySelector('#machineList [aria-checked="true"]');
+  return pick && list.includes(pick) ? pick : list[0];
+}
+/* the track screen's steps */
+function padStage(st) {
+  if (st === 'diff' && document.querySelector('.diffChips').hidden) st = 'side';   // (a time trial: no difficulty to set)
+  PADNAV.stage = st;
+  const scope = padScope(screens.tracks), list = padTargets(scope);
+  if (list.length) padFocus(padPreferred(scope, list));
+}
+function padTracksOpened() {
+  PADNAV.stage = 'track';
+  if (!PAD.on) return;   // (opened with the mouse or keyboard: leave its pick as it is)
+  const k = TRACKS.findIndex((t) => t.id === 'kessler-loop');
+  if (k >= 0) pickTrack(k);
+  padStage('track');
 }
 function padFocus(e) {
   document.body.classList.add('padNav');
@@ -12488,7 +12523,7 @@ function padFocus(e) {
 function padMove(dx, dy, scope) {
   const cur = document.activeElement, list = padTargets(scope);
   if (!list.length) return;
-  if (!cur || !scope.contains(cur) || !list.includes(cur)) { padFocus(list[0]); return; }
+  if (!cur || !scope.contains(cur) || !list.includes(cur)) { padFocus(padPreferred(scope, list)); return; }
   const machine = cur.closest('#machineList');
   if (machine && dx) { stepMachine(dx); document.body.classList.add('padNav'); return; }   // (along the row of speeders: pick the next one)
   if (cur.type === 'range' && dx) {
@@ -12520,6 +12555,8 @@ function padMove(dx, dy, scope) {
 function padBack(scope, scr) {
   if (scope.id === 'pastePanel') { $('pasteCancel').click(); return; }
   if (scope.classList.contains('confirmBox')) { const no = scope.querySelector('.btn.alt'); if (no) no.click(); return; }
+  if (scr === screens.tracks && PADNAV.stage === 'side') { padStage(document.querySelector('.diffChips').hidden ? 'track' : 'diff'); return; }
+  if (scr === screens.tracks && PADNAV.stage === 'diff') { padStage('track'); return; }
   if (scr === screens.options) closeOptions();
   else if (scr === screens.help) closeHelp();
   else if (scr === screens.pause) resumeGame();
@@ -12529,7 +12566,8 @@ function padBack(scope, scr) {
 }
 function padMenu(g) {
   const scr = padShowing();
-  if (!g || !scr) { PADNAV.held = null; return; }
+  if (!g || !scr) { PADNAV.held = null; PADNAV.scr = null; return; }
+  if (scr !== PADNAV.scr) { PADNAV.scr = scr; if (scr === screens.tracks) padTracksOpened(); else PADNAV.stage = null; }
   const scope = padScope(scr);
   const b = (k) => !!(g.buttons[k] && g.buttons[k].pressed);
   const prev = PAD.prevMenu || [];
@@ -12548,8 +12586,13 @@ function padMenu(g) {
   }
   if (hit(0)) {
     const cur = document.activeElement;
-    if (cur && scope.contains(cur) && padTargets(scope).includes(cur)) { if (cur.type !== 'range' && cur.tagName !== 'TEXTAREA') cur.click(); }
-    else { const list = padTargets(scope); if (list.length) padFocus(list[0]); }
+    if (cur && scope.contains(cur) && padTargets(scope).includes(cur)) {
+      if (cur.type !== 'range' && cur.tagName !== 'TEXTAREA') cur.click();
+      // (the track screen's steps: a track picked, on to the difficulty; the difficulty set, on to the speeder and Race)
+      if (scr === screens.tracks && scope === $('trackList')) padStage('diff');
+      else if (scr === screens.tracks && PADNAV.stage === 'diff' && cur.getAttribute('aria-pressed') === 'true') padStage('side');
+    }
+    else { const list = padTargets(scope); if (list.length) padFocus(padPreferred(scope, list)); }
     document.body.classList.add('padNav');
   }
   if (hit(1)) padBack(scope, scr);
