@@ -1589,9 +1589,9 @@ const ROSTER = [
 /* the player, then the five rivals in this race */
 let RIVALS = ROSTER.slice(0, 5);
 const RACERS = [{ name: 'You', col: '#ffb04a', skill: 1.0, hull: 'arrow' }].concat(RIVALS);
-/* five rivals at random for the next race (or cup) */
+/* five rivals at random for the next race (or cup), never one flying the machine you have picked */
 function pickRivals() {
-  const pool = ROSTER.slice();
+  const pool = ROSTER.filter((r) => r.hull !== (PLAYER_HULL || RACERS[0].hull));
   RIVALS = [];
   while (RIVALS.length < 5) RIVALS.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
   RACERS.length = 1; RACERS.push(...RIVALS);
@@ -1604,6 +1604,12 @@ let PLAYER_COL = PLAYER_BASE_COL;
 function racerDefs() {
   const defs = RACERS.map((r) => Object.assign({}, r));
   if (PLAYER_HULL) defs[0].hull = PLAYER_HULL;
+  // (no rival flies your machine: should a cup's five include its pilot, after a change of machine mid-cup, that pilot
+  //  takes a machine nobody in this race is flying)
+  for (let j = 1; j < defs.length; j++) if (defs[j].hull === defs[0].hull) {
+    const free = HULL_INFO.find((h) => !defs.some((d) => d.hull === h.id));
+    if (free) defs[j].hull = free.id;
+  }
   if (PLAYER_COL && PLAYER_COL !== defs[0].col) {
     const j = defs.findIndex((d) => d.col === PLAYER_COL);
     if (j > 0) defs[j].col = defs[0].col;
