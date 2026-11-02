@@ -560,6 +560,13 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       </span>
     </div>
     <div class="optRow">
+      <h2>Trial ghost</h2>
+      <span class="chips" role="group" aria-label="Race your best time trial's ghost">
+        <button class="chip" type="button" data-ghost="on" aria-pressed="true" title="In a time trial, your best run on that track and number of laps races beside you">On</button>
+        <button class="chip" type="button" data-ghost="off" aria-pressed="false">Off</button>
+      </span>
+    </div>
+    <div class="optRow">
       <h2>Frame rate</h2>
       <span class="chips" role="group" aria-label="Frame rate limit">
         <button class="chip" type="button" data-fpscap="on" aria-pressed="true" title="At most 60 frames a second: less work on a fast screen">60 cap</button>
@@ -3393,6 +3400,7 @@ function stepWorld(dt) {
     }
   }
   rankShips();
+  if (W.solo) ghostRecord();   // (a time trial: the run, recorded for its ghost)
   const p = W.ships[0];
   if (R.state === 'go' && p.finished) { R.state = 'done'; R.doneT = 0; }
   if (R.state === 'done') {
@@ -9197,6 +9205,7 @@ function renderFrame(time) {
   loopItems(items, time);
   // (every ship at the scale of its own height, the same as the deck at that height)
   for (const s of W.ships) { if (s.loop) continue; items.push({ k: shipKey(s), y: s.y, fn: () => atPos(s.h, s.x, s.y, (f) => drawShip(s, time, f)) }); }
+  ghostItem(items, time);   // (a time trial's ghost)
   const bb9 = [[], [], [], [], [], [], [], [], []], pp9 = [[], [], [], [], [], [], [], [], []];
   for (const b of W.bullets) bb9[clamp(Math.round(b.h * 4) + 4, 0, 8)].push(b);
   for (const p of W.parts) pp9[clamp(Math.round(p.h * 4) + 4, 0, 8)].push(p);
@@ -12124,6 +12133,7 @@ function startRace() {
   // (every racer's turning frames made now, at the start, rather than mid-race the first time each is drawn)
   for (const d of racerDefs()) shipSprites(d.col, d.hull);
   newWorld(laps, PLAY === 'trial' && !TOUR);
+  ghostStart();
   hud.classList.toggle('trial', W.solo);
   applyDifficulty();
   applyCupPace();
@@ -12181,6 +12191,7 @@ function showResults() {
   $('resPlace').textContent = ord(p.finPos || p.rank);
   $('resTitle').textContent = p.finPos === 1 ? 'Winner' : 'Finished';
   const nb = recordBest(p);
+  const newGhost = W.solo && ghostSave(p);
   logResult(p);
   $('resMedal').hidden = true;
   $('resNote').textContent = 'Time ' + fmt(p.finT) + (nb.race ? ' (new best)' : '') + (p.bestLap ? '  ·  Best lap ' + fmt(p.bestLap) + (nb.lap ? ' (new best)' : '') : '') + '  ·  Targets hit ' + p.hits;
@@ -12189,7 +12200,7 @@ function showResults() {
   if (W.solo) {   // a time trial: the time is the result
     $('resTitle').textContent = 'Time trial · ' + TRACKS[trackIx].name;
     $('resPlace').textContent = fmt(p.finT);
-    $('resNote').textContent = (nb.race ? 'New best time!' : 'Best ' + fmt(loadBest()[TRACKS[trackIx].id].trial[laps])) + (p.bestLap ? '  ·  Best lap ' + fmt(p.bestLap) + (nb.lap ? ' (new best)' : '') : '') + '  ·  ' + laps + ' laps';
+    $('resNote').textContent = (nb.race ? 'New best time!' : 'Best ' + fmt(loadBest()[TRACKS[trackIx].id].trial[laps])) + (p.bestLap ? '  ·  Best lap ' + fmt(p.bestLap) + (nb.lap ? ' (new best)' : '') : '') + '  ·  ' + laps + ' laps' + (newGhost ? '  ·  Ghost saved' : '');
   }
   if (TOUR) {
     const last = TOUR.round >= TOUR.list.length, n = TOUR.list.length;
@@ -13297,6 +13308,84 @@ function recordBest(p) {
   if (p.bestLap && (!b[LK] || p.bestLap < b[LK])) { b[LK] = p.bestLap; out.lap = true; }
   try { localStorage.setItem(BEST_KEY, JSON.stringify(all)); } catch (e) { /* storage unavailable: best times just are not kept */ }
   return out;
+}
+
+/* ---------- time trial ghosts ----------
+   In a time trial your run is recorded (ten samples a second: where you are, which way you face, how high, and where
+   you are drawn while on a loop). Finish faster than your saved ghost on that track and number of laps (or with no
+   ghost there yet) and the run becomes the new ghost, kept in this browser. Next time, it races beside you: a
+   see-through speeder that touches nothing, there only to beat. Options > Trial ghost turns it off. */
+const GHOST_KEY = 'gatebreaker.ghost.v1.', GHOST_STEP = 0.1, GH_LOOP = 9999, GH_GONE = 9998;
+const GHOST = { rec: null, play: null };
+let GHOST_ON = true;
+try { GHOST_ON = localStorage.getItem('gatebreaker.ghost') !== 'off'; } catch (e) { /* on */ }
+function setGhostOn(on) {
+  GHOST_ON = on;
+  try { localStorage.setItem('gatebreaker.ghost', on ? 'on' : 'off'); } catch (e) { /* this visit only */ }
+  document.querySelectorAll('.chip[data-ghost]').forEach((c) => c.setAttribute('aria-pressed', (c.dataset.ghost === 'on') === on ? 'true' : 'false'));
+}
+document.querySelectorAll('.chip[data-ghost]').forEach((b) => b.addEventListener('click', () => setGhostOn(b.dataset.ghost === 'on')));
+setGhostOn(GHOST_ON);
+const ghostKey = () => GHOST_KEY + TRACKS[trackIx].id + '.' + laps;
+function ghostLoad() { try { const g = JSON.parse(localStorage.getItem(ghostKey())); return g && Array.isArray(g.d) && g.d.length >= 5 ? g : null; } catch (e) { return null; } }
+/* a new run: recording (in a time trial) and, with the option on, the ghost to race */
+function ghostStart() {
+  GHOST.rec = W.solo ? { d: [], hull: PLAYER_HULL, col: PLAYER_COL } : null;
+  GHOST.play = W.solo && GHOST_ON ? ghostLoad() : null;
+}
+/* each step of the world: catch up the recording to the clock, a sample every GHOST_STEP seconds */
+function ghostRecord() {
+  const G = GHOST.rec, R = W.race, p = W.ships[0];
+  if (!G || R.state !== 'go') return;
+  while (G.d.length / 5 <= R.t / GHOST_STEP) {
+    if (p.wreck > 0) G.d.push(Math.round(p.x), Math.round(p.y), 0, GH_GONE, p.idx);
+    else if (p.loop) G.d.push(Math.round(p.loop.px), Math.round(p.loop.py), Math.round(p.ang * 100), GH_LOOP, p.idx);
+    else G.d.push(Math.round(p.x), Math.round(p.y), Math.round(p.ang * 100), Math.round(p.h * 100), p.idx);
+  }
+}
+/* the run just finished: kept as the ghost if it beats the one saved (or there is none). True if it was. */
+function ghostSave(p) {
+  const G = GHOST.rec;
+  if (!G || !p.finished || G.d.length < 25) return false;
+  const old = ghostLoad();
+  if (old && old.t <= p.finT) return false;
+  try { localStorage.setItem(ghostKey(), JSON.stringify({ t: p.finT, hull: G.hull, col: G.col, step: GHOST_STEP, d: G.d })); } catch (e) { return false; }
+  return true;
+}
+/* the ghost now: where it is, blended between its two nearest samples */
+function ghostAt(t) {
+  const g = GHOST.play, n = g.d.length / 5, u = Math.max(0, t) / g.step, i = Math.floor(u);
+  if (i >= n - 1) return null;   // (its run is over: gone)
+  const k = u - i, a = i * 5, b = a + 5, d = g.d;
+  const gone = d[a + 3] === GH_GONE || d[b + 3] === GH_GONE, loopA = d[a + 3] === GH_LOOP, loopB = d[b + 3] === GH_LOOP;
+  if (gone) return null;
+  let da = (d[b + 2] - d[a + 2]) / 100; da = Math.atan2(Math.sin(da), Math.cos(da));
+  const near = k < 0.5 ? a : b;
+  return {
+    x: d[a] + (d[b] - d[a]) * k, y: d[a + 1] + (d[b + 1] - d[a + 1]) * k, ang: d[a + 2] / 100 + da * k,
+    // (on a loop: drawn where it was drawn, over the ring; at the step on or off it, from the nearer sample)
+    loop: loopA && loopB ? true : loopA !== loopB ? d[near + 3] === GH_LOOP : false,
+    h: loopA || loopB ? (d[near + 3] === GH_LOOP ? 0 : d[near + 3] / 100) : (d[a + 3] + (d[b + 3] - d[a + 3]) * k) / 100,
+    idx: d[near + 4]
+  };
+}
+/* the ghost, for the renderer's draw list (just under racers at its level; over a loop's ring while on it) */
+function ghostItem(items, time) {
+  const g = GHOST.play;
+  if (!g || !W.solo) return;
+  const q = ghostAt(W.race.state === 'countdown' ? 0 : W.race.t);
+  if (!q) return;
+  const draw = (x, y, f) => {
+    const spr = shipSprites(g.col, g.hull), fi = shipFrameIndex(q.ang), S = Math.round(24 * f), o = S >> 1;
+    lc.globalAlpha = 0.55 + 0.08 * Math.sin(time * 5);   // (see-through, with a slow shimmer)
+    lc.drawImage(spr.frames[fi], Math.round(x) - o - 1, Math.round(y) - o - 3, S, S);
+    lc.globalAlpha = 1;
+    // a pale glow about it, so it reads as a ghost (and stands out on a busy track) rather than a racer
+    glow(ec, '#cfefff', Math.round(22 * f), x, y - 2, 0.55);
+    ec.globalAlpha = 0.35; ec.drawImage(spr.frames[fi], Math.round(x) - o - 1, Math.round(y) - o - 3, S, S); ec.globalAlpha = 1;
+  };
+  if (q.loop) items.push({ k: 0.93, y: q.y, fn: () => { setScale(1); if (!offscreen(q.x, q.y, 1, 30)) draw(q.x, q.y, 1); } });
+  else items.push({ k: LKEY(q.h, q.idx, 3.5), y: q.y, fn: () => atPos(q.h, q.x, q.y, (f) => { if (!offscreen(q.x, q.y, f, 30)) draw(q.x, q.y, f); }) });
 }
 
 /* every finished race and time trial, newest first (kept in this browser, the last 200) */
