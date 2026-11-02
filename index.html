@@ -130,12 +130,14 @@ body.cover #stage { position: fixed; left: 50%; top: 50%; transform: translate(-
 #pass[hidden] { display: none; }
 #toast { position: absolute; left: 50%; top: 3cqh; transform: translateX(-50%); max-width: 70cqw; text-align: center; font: 700 2.3cqw/1.1 var(--display); padding: 0.8cqh 1.6cqw; background: rgba(10, 8, 26, 0.7); border: 1px solid var(--edge); border-radius: 3px; opacity: 0; transition: opacity 0.25s; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.06em; }
 #toast.on { opacity: 1; }
-/* a rival's line: their colour for an avatar, their name, what they said */
-#chat { --pc: #ffb04a; position: absolute; left: 2.4cqw; top: 25cqh; max-width: 30cqw; display: flex; align-items: center; gap: 1cqw; padding: 0.9cqh 1.2cqw 0.9cqh 0.9cqh; background: rgba(10, 8, 26, 0.78); border: 1px solid var(--edge); border-left: 3px solid var(--pc); border-radius: 3px; opacity: 0; transform: translateX(-1.5cqw); transition: opacity 0.2s, transform 0.2s; }
-#chat.on { opacity: 1; transform: none; }
-#chat .av { flex: none; width: 4.4cqw; height: 4.4cqw; border-radius: 3px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.3)), var(--pc); box-shadow: 0 0 8px var(--pc); }
-#chat b { display: block; font: 700 0.8em/1.1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--pc); }
-#chat span { display: block; margin-top: 0.3cqh; font-size: 0.9em; line-height: 1.25; color: var(--ink); }
+/* the rivals' chat: lines stack up above the speed readout, the newest at the bottom (optional flavour: kept small) */
+#chat { position: absolute; left: 2.4cqw; bottom: 20.5cqh; width: 26cqw; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.6cqh; }
+#chat .msg { --pc: #ffb04a; display: flex; align-items: center; gap: 0.7cqw; align-self: flex-start; max-width: 100%; padding: 0.5cqh 0.8cqw 0.5cqh 0.5cqh; background: rgba(10, 8, 26, 0.68); border-left: 2px solid var(--pc); border-radius: 2px; font-size: 0.68em; overflow: hidden; animation: chatIn 0.25s ease-out; transition: opacity 0.4s; }
+#chat .msg.out { opacity: 0; }
+@keyframes chatIn { from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; } to { opacity: 1; max-height: 6cqh; } }
+#chat .av { flex: none; width: 2.4cqw; height: 2.4cqw; border-radius: 2px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.3)), var(--pc); }
+#chat b { display: block; font: 700 0.85em/1.1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--pc); }
+#chat span { display: block; line-height: 1.2; color: var(--ink); }
 #count { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font: 700 20cqw/1 var(--numbers); color: var(--ink); text-shadow: 0 0.6cqw 0 rgba(0, 0, 0, 0.5), 0 0 3cqw rgba(255, 176, 74, 0.6); text-transform: uppercase; letter-spacing: 0.06em; }
 #count.go { color: var(--amber); }
 #wrong { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); font: 700 3.4cqw/1 var(--display); color: var(--rose); letter-spacing: 0.1em; text-transform: uppercase; }
@@ -495,7 +497,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
 .pickbar { background: linear-gradient(0deg, rgba(8, 6, 20, 0.97) 70%, rgba(8, 6, 20, 0)); }
 .foot kbd { --n: 2px; }
 @media (max-width: 560px) { .ctl { grid-template-columns: 1fr; gap: 2px; } }
-@media (prefers-reduced-motion: reduce) { #toast, #chat { transition: none; } }
+@media (prefers-reduced-motion: reduce) { #toast, #chat .msg { transition: none; animation: none; } }
 </style>
 
 <main>
@@ -521,7 +523,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       </div>
       <div id="pass" hidden></div>
       <div id="toast" role="status"></div>
-      <div id="chat" aria-live="polite"><i class="av" aria-hidden="true"></i><div><b id="chatWho"></b><span id="chatSay"></span></div></div>
+      <div id="chat" aria-live="polite"></div>
       <div id="count" hidden></div>
       <div id="wrong" hidden>WRONG WAY</div>
     </div>
@@ -13609,57 +13611,58 @@ const CHAT = {
 };
 let CHAT_ON = true;
 try { CHAT_ON = localStorage.getItem('gatebreaker.chatter') !== 'off'; } catch (e) { /* on */ }
-const CH = { clock: 0, cur: null, t: 0, gap: 0, pend: null, last: {}, said: {}, ahead: null, leader: null, leadT: 0, grid: false };
+const CHT = { clock: 0, msgs: [], gap: 0, pend: null, last: {}, said: {}, ahead: null, leader: null, leadT: 0, grid: false };
+const CHAT_KEEP = 3;   // (lines on screen at once: a new one pushes the oldest out)
 function chatReset() {
-  Object.assign(CH, { clock: 0, cur: null, t: 0, gap: 0, pend: null, last: {}, said: {}, ahead: null, leader: null, leadT: 0, grid: false });
-  const el = $('chat'); if (el) el.classList.remove('on');
+  Object.assign(CHT, { clock: 0, msgs: [], gap: 0, pend: null, last: {}, said: {}, ahead: null, leader: null, leadT: 0, grid: false });
+  const el = $('chat'); if (el) el.textContent = '';
 }
 /* a rival has something to say (it waits its turn, and may be dropped for something more important) */
 function chat(s, ev) {
   if (!CHAT_ON || !s || s.isPlayer || mode !== 'race' || PLAY === 'trial' || !W || W.ships.length < 2) return;
   const lines = CHAT[s.name] && CHAT[s.name][ev], rule = CHAT_RULE[ev];
   if (!lines || !rule || Math.random() > rule[1]) return;
-  if (rule[0] < 4 && CH.last[s.name] > CH.clock - 8) return;   // (a pilot who just spoke lets the small stuff go)
-  if (CH.pend && CH.pend.pr >= rule[0]) return;
-  CH.pend = { s, ev, pr: rule[0], exp: CH.clock + (rule[0] >= 5 ? 2.5 : 1.2) };
+  if (rule[0] < 4 && CHT.last[s.name] > CHT.clock - 8) return;   // (a pilot who just spoke lets the small stuff go)
+  if (CHT.pend && CHT.pend.pr >= rule[0]) return;
+  CHT.pend = { s, ev, pr: rule[0], exp: CHT.clock + (rule[0] >= 5 ? 2.5 : 1.2) };
 }
+/* a line joins the bottom of the log, like a game's chat, nudging the ones above it up */
 function chatShow(p) {
   const all = CHAT[p.s.name][p.ev].split('|'), k = p.s.name + p.ev;
   let i = Math.floor(Math.random() * all.length);
-  if (all.length > 1 && i === CH.said[k]) i = (i + 1) % all.length;
-  CH.said[k] = i; CH.last[p.s.name] = CH.clock;
-  const text = all[i];
-  $('chatWho').textContent = p.s.name; $('chatSay').textContent = text;
-  const el = $('chat'); el.style.setProperty('--pc', p.s.col); el.classList.add('on');
-  CH.cur = p; CH.t = clamp(2.2 + text.length * 0.035, 2.6, 4.5);
+  if (all.length > 1 && i === CHT.said[k]) i = (i + 1) % all.length;
+  CHT.said[k] = i; CHT.last[p.s.name] = CHT.clock;
+  const text = all[i], row = document.createElement('div'), av = document.createElement('i'), body = document.createElement('div'), who = document.createElement('b'), say = document.createElement('span');
+  row.className = 'msg'; row.style.setProperty('--pc', p.s.col);
+  av.className = 'av'; who.textContent = p.s.name; say.textContent = text;
+  body.append(who, say); row.append(av, body); $('chat').append(row);
+  CHT.msgs.push({ el: row, t: clamp(4 + text.length * 0.04, 5, 7.5) });
+  while (CHT.msgs.filter((m) => m.t > 0).length > CHAT_KEEP) CHT.msgs.find((m) => m.t > 0).t = 0;
 }
-/* once a step of the race: who has passed whom, who leads, and the bubble's own timing */
+/* once a step of the race: who has passed whom, who leads, and the log's own timing */
 function chatTick(dt) {
-  const el = $('chat');
-  if (mode !== 'race' || !CHAT_ON || PLAY === 'trial' || !W || W.ships.length < 2) { if (CH.cur) { el.classList.remove('on'); CH.cur = null; } return; }
-  CH.clock += dt;
+  if (mode !== 'race' || !CHAT_ON || PLAY === 'trial' || !W || W.ships.length < 2) { if (CHT.msgs.length) chatReset(); return; }
+  CHT.clock += dt;
   const R = W.race, me = W.ships[0];
-  if (R.state === 'countdown' && !CH.grid) { CH.grid = true; chat(W.ships[1 + Math.floor(Math.random() * (W.ships.length - 1))], 'grid'); }
+  if (R.state === 'countdown' && !CHT.grid) { CHT.grid = true; chat(W.ships[1 + Math.floor(Math.random() * (W.ships.length - 1))], 'grid'); }
   if (R.state === 'go' && R.t > 4 && !me.finished) {
     const lead = W.order[0];
-    if (CH.leader && lead !== CH.leader && !lead.finished && CH.clock > CH.leadT) { chat(lead, 'lead'); CH.leadT = CH.clock + 25; }   // (a lead swapping back and forth gets one line)
-    CH.leader = lead;
+    if (CHT.leader && lead !== CHT.leader && !lead.finished && CHT.clock > CHT.leadT) { chat(lead, 'lead'); CHT.leadT = CHT.clock + 25; }   // (a lead swapping back and forth gets one line)
+    CHT.leader = lead;
     const ahead = W.ships.map((o) => o.rank < me.rank);
-    if (CH.ahead) for (let i = 1; i < W.ships.length; i++) {
+    if (CHT.ahead) for (let i = 1; i < W.ships.length; i++) {
       const o = W.ships[i];
-      if (ahead[i] === CH.ahead[i] || o.finished || o.wreck > 0 || Math.hypot(o.x - me.x, o.y - me.y) > 260) continue;
+      if (ahead[i] === CHT.ahead[i] || o.finished || o.wreck > 0 || Math.hypot(o.x - me.x, o.y - me.y) > 260) continue;
       chat(o, ahead[i] ? 'passYou' : 'passed');
     }
-    CH.ahead = ahead;
+    CHT.ahead = ahead;
   }
-  if (CH.pend && CH.pend.exp < CH.clock) CH.pend = null;
-  if (CH.cur) {
-    CH.t -= dt;
-    // (something important cuts a passing remark short)
-    if (CH.pend && CH.pend.pr >= 4 && CH.cur.pr <= 2 && CH.t < 3.5) CH.t = 0;
-    if (CH.t <= 0) { el.classList.remove('on'); CH.cur = null; CH.gap = 0.7; }
-  } else if (CH.gap > 0) CH.gap -= dt;
-  else if (CH.pend) { chatShow(CH.pend); CH.pend = null; }
+  if (CHT.pend && CHT.pend.exp < CHT.clock) CHT.pend = null;
+  // (each line fades after a while, and is gone once faded)
+  for (const m of CHT.msgs) { m.t -= dt; if (m.t <= 0 && !m.out) { m.out = true; m.el.classList.add('out'); } }
+  while (CHT.msgs.length && CHT.msgs[0].t < -0.4) CHT.msgs.shift().el.remove();
+  if (CHT.gap > 0) CHT.gap -= dt;
+  else if (CHT.pend) { chatShow(CHT.pend); CHT.pend = null; CHT.gap = 1.2; }
 }
 function setChatter(on) {
   CHAT_ON = on;
