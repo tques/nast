@@ -1404,7 +1404,7 @@ TRACKS.push(
     barricades: [0.09493, 0.76174]
   },
   {
-    id: 'perihelion', name: 'Perihelion', setting: 'vegas', seed: 52,
+    id: 'perihelion', name: 'Perihelion', setting: 'vegas', seed: 52, loop3d: true,   // (its loop drawn in real 3D: see drawLoops3D)
     points: [[155, 1685], [-65, 1685], [-405, 1815], [-650, 1495], [-1000, 1620], [-1255, 1365], [-1010, 1095], [-1170, 870], [-1520, 925], [-1800, 1225], [-1945, 1250], [-2235, 1170], [-2530, 990], [-2565, 635], [-2280, 380], [-2230, 70], [-2505, -125], [-2470, -375], [-2370, -545], [-2220, -730], [-2020, -940], [-2090, -1435], [-1610, -1700], [-1250, -1445], [-985, -1515], [-745, -1610], [-465, -1685], [-175, -1725], [110, -1730], [655, -1650], [735, -1105], [945, -870], [1250, -1075], [1455, -1225], [1715, -1100], [1980, -990], [2245, -870], [2495, -730], [2715, -540], [2830, -280], [2770, 0], [2590, 225], [2370, 410], [2135, 585], [1930, 785], [1775, 1030], [1620, 1275], [1415, 1475], [920, 1020], [670, 995], [540, 1190], [755, 1415], [750, 1645], [450, 1685]],
     shortcuts: [{from: [1972, -993], to: [2124, 595], via: [[2325, -250]], target: [0.66958, -57]}],
     elevation: [{from: 0.82287, to: 0.88346, level: 1, rocks: true}, {from: 0.18794, to: 0.36515, level: 1}],
@@ -9479,6 +9479,7 @@ function drawLoopFx(time) {
 }
 /* everything a loop adds to the frame, for the renderer's draw list */
 function loopItems(items, time) {
+  if (TRACK.loop3d && lp3Init()) { loopItems3D(items, time); return; }
   for (const L of T.loops) {
     items.push({ k: 0.02, y: 0, fn: () => { setScale(1); drawLoopGround(L, time); } });
     items.push({ k: 0.2, y: 0, fn: () => { setScale(1); drawLoopLow(L, time); } });
@@ -9486,6 +9487,182 @@ function loopItems(items, time) {
     items.push({ k: 0.92, y: 0, fn: () => { setScale(1); drawLoopOver(L, time); } });
   }
   // a racer on the lower half rides on top of its deck; one upside down rides under the deck overhead (seen through it)
+  for (const s of W.ships) if (s.loop && s.wreck <= 0) items.push({ k: (Math.cos(s.loop.th) < 0 ? 0.915 : 0.925) + s.id * 0.0001, y: 0, fn: () => { setScale(1); drawLoopShip(s, time); } });
+  if (W.fx.length) items.push({ k: 0.95, y: 0, fn: () => { setScale(1); drawLoopFx(time); } });
+}
+
+/* ================= loop-de-loops in real 3D (WebGL), on a track that asks for it (loop3d) =================
+   The ring is a solid band in the world: its riding surface on the inside, its underside on the outside, a thickness
+   between them showing at its edges, and a rail standing along each edge of the deck. It is seen through the same
+   camera the 2D ring is drawn with (looking down at an angle: a point at height z shows z x LOOP.KZ further up the
+   screen, see loopPt), so every point of it lands exactly where the 2D ring put it and racers ride it unchanged. What
+   is new: a real depth test (the band's own parts hide one another correctly all round), and light by which way each
+   surface faces. As in 2D it is drawn in three parts, so racers can be layered between them: its feet (under racers on
+   the lane), the half below a racer riding it, and the half overhead (seen through, as its deck is dotted). All three
+   are drawn in one go each frame, side by side on one canvas, and laid on the scene at their own places in the order. */
+const LP3 = { cv: null, gl: null, prog: null, loc: {}, failed: false, frame: -1 };
+function lp3Init() {
+  if (LP3.prog) return true;
+  if (LP3.failed) return false;
+  LP3.cv = mkCanvas(VW * 3, VH);
+  let gl = null;
+  try { gl = LP3.cv.getContext('webgl2', { antialias: false, premultipliedAlpha: true, preserveDrawingBuffer: true, alpha: true, depth: true }); } catch (e) { gl = null; }
+  if (!gl) { LP3.failed = true; return false; }
+  const vs = `#version 300 es
+in vec4 a;   // ground x, y, height, light
+in vec4 b;   // across the deck, along the ring (steps), kind (0 deck, 1 underside, 2 band edge, 3 rail side, 4 rail top), height share (0 foot .. 1 top)
+uniform vec2 cam; uniform vec2 halfV; uniform vec2 up; uniform float KZ;
+out vec4 v; out float lt;
+void main() {
+  vec2 s = a.xy + up * KZ * a.z;   // (the 2D ring's camera: higher, further up the screen)
+  vec2 d = s - cam;
+  // depth along the camera's line of sight: higher is nearer, and so is lower down the screen
+  float dep = (KZ * dot(a.xy - cam, up) - a.z) / 6000.0;
+  gl_Position = vec4(d.x / halfV.x, -d.y / halfV.y, clamp(dep, -0.99, 0.99), 1.0);
+  v = b; lt = a.w;
+}`;
+  const B8 = []; for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) B8.push(BAYER8[y][x].toFixed(1));
+  const fs = `#version 300 es
+precision highp float;
+in vec4 v; in float lt;
+uniform float hw; uniform float over; uniform float time; uniform vec2 dOff; uniform float VHp; uniform float rx;
+uniform vec3 deck, deckHi, odeck, odeckHi, under, edge, rim, railSide, dash;
+const float B8[64] = float[64](${B8.join(', ')});
+out vec4 o;
+float seg(vec2 p, vec2 a, vec2 b) { vec2 ab = b - a; float t = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0); return length(p - a - ab * t); }
+void main() {
+  int kind = int(v.z + 0.5);
+  ivec2 q = ivec2(mod(floor(gl_FragCoord.x) - rx - dOff.x, 8.0), mod(VHp - 1.0 - floor(gl_FragCoord.y) - dOff.y, 8.0));
+  float bay = B8[q.y * 8 + q.x];
+  vec3 c;
+  if (kind <= 1) {
+    float u = abs(v.x);
+    // the dots: half the deck low down, as on the lane; overhead (both faces), more see-through, the same holes in each
+    float k = floor((over > 0.5 ? 0.36 : 0.5) * 64.0 + 0.5);
+    if (u <= hw && (kind == 0 || over > 0.5) && bay >= k) discard;
+    if (kind == 0) {
+      c = u > hw ? rim : u > hw - 15.0 ? (over > 0.5 ? odeck : deck) : (over > 0.5 ? odeckHi : deckHi);
+      if (u < 1.0 && mod(v.y, 2.0) < 1.0) c = mix(c, dash, 0.22);
+      float kc = floor((v.y - 4.0) / 8.0 + 0.5) * 8.0 + 4.0;   // (chevrons every 8 steps, the way racers ride it)
+      vec2 pq = vec2((v.y - kc) * 8.6, v.x);
+      if (u <= hw && min(seg(pq, vec2(-5.0, 9.0), vec2(5.0, 0.0)), seg(pq, vec2(5.0, 0.0), vec2(-5.0, -9.0))) < 1.0) c = mix(c, rim, 0.2 + 0.1 * sin(time * 3.0 - kc * 0.3));
+    } else c = under;
+  } else if (kind == 2) c = edge;
+  else c = kind == 3 ? railSide : rim;
+  // the light on it, by which way it faces (none at the feet, where it must match the lane)
+  o = vec4(c * lt, 1.0);
+}`;
+  try {
+    const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+    const p = gl.createProgram();
+    gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+    gl.bindAttribLocation(p, 0, 'a'); gl.bindAttribLocation(p, 1, 'b'); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    LP3.prog = p;
+    for (const n of ['cam', 'halfV', 'up', 'KZ', 'hw', 'over', 'time', 'dOff', 'VHp', 'rx', 'deck', 'deckHi', 'odeck', 'odeckHi', 'under', 'edge', 'rim', 'railSide', 'dash']) LP3.loc[n] = gl.getUniformLocation(p, n);
+  } catch (e) { console.warn('3D loops unavailable:', e.message); LP3.failed = true; return false; }
+  LP3.gl = gl;
+  return true;
+}
+/* a loop's band as a mesh, built once per loop: index ranges for its three parts (feet, under, over) */
+function lp3Mesh(L) {
+  if (L.mesh3 && L.mesh3.key === tr3Key()) return L.mesh3;
+  const gl = LP3.gl, S = loopShape(L), n = S.n, hw = T.hw, W = hw + 2, TK = 10, RH = 6, V = [];
+  const sun = HILL_SUN;
+  // light for a surface facing (x, y, z) in the world, eased to none at the ring's feet (where it meets the lane)
+  const light = (nx, ny, nz, th) => {
+    const l = Math.hypot(nx, ny, nz) || 1, d = (nx * sun[0] + ny * sun[1] + nz * sun[2]) / l;
+    let w = clamp(Math.min(th, TAU - th) / 0.8, 0, 1); w = w * w * (3 - 2 * w);
+    return 1 + w * (0.62 + 0.55 * Math.max(-0.2, d) - 1);
+  };
+  const vert = (gx, gy, z, lt, l, k, kind, hs) => { V.push(gx, gy, z, lt, l, k, kind, hs); return V.length / 8 - 1; };
+  // a point of the band: angle th, across l, out from the riding surface by o (outward +, toward the ring's middle -)
+  const P = (th, l, o) => { const a = (L.r + o) * Math.sin(th), q = loopLat(L, th, l), z = L.r - (L.r + o) * Math.cos(th); return [L.x + L.fx * a + L.nx * q, L.y + L.fy * a + L.ny * q, z]; };
+  const parts = { low: [], under: [], over: [] };
+  const lowK = new Set(loopSteps(L, S, 'low')), overK = new Set(loopSteps(L, S, 'over'));
+  for (let k = 0; k < n; k++) {
+    const I = lowK.has(k) ? parts.low : overK.has(k) ? parts.over : parts.under;
+    const t0 = S.th[k], t1 = S.th[k + 1], tm = (t0 + t1) / 2;
+    // out from the middle of the ring, here (world)
+    const rx = L.fx * Math.sin(tm), ry = L.fy * Math.sin(tm), rz = -Math.cos(tm);
+    const quad = (A, B, C, D, lt, la, lb, kind) => {   // (A, B at t0; C, D at t1; la across at A/D, lb at B/C)
+      const i0 = vert(A[0], A[1], A[2], lt, la, k, kind, 0), i1 = vert(B[0], B[1], B[2], lt, lb, k, kind, 0);
+      const i2 = vert(C[0], C[1], C[2], lt, lb, k + 1, kind, 0), i3 = vert(D[0], D[1], D[2], lt, la, k + 1, kind, 0);
+      I.push(i0, i1, i2, i0, i2, i3);
+    };
+    // the riding surface (faces the ring's middle) and the underside (faces out)
+    quad(P(t0, -W, 0), P(t0, W, 0), P(t1, W, 0), P(t1, -W, 0), light(-rx, -ry, -rz, tm), -W, W, 0);
+    quad(P(t0, -W, TK), P(t0, W, TK), P(t1, W, TK), P(t1, -W, TK), light(rx, ry, rz, tm) * 0.8, -W, W, 1);
+    for (const sd of [-1, 1]) {
+      const ln = light(L.nx * sd, L.ny * sd, 0, tm);
+      // the band's thickness at this edge
+      quad(P(t0, sd * W, 0), P(t0, sd * W, TK), P(t1, sd * W, TK), P(t1, sd * W, 0), ln * 0.85, sd * W, sd * W, 2);
+      // a rail standing on the deck's edge (toward the ring's middle), and its lit top
+      const e = sd * (hw + 1);
+      quad(P(t0, e, 0), P(t0, e, -RH), P(t1, e, -RH), P(t1, e, 0), ln, e, e, 3);
+      quad(P(t0, sd * hw, -RH), P(t0, sd * (hw + 2), -RH), P(t1, sd * (hw + 2), -RH), P(t1, sd * hw, -RH), light(-rx, -ry, -rz, tm), sd * hw, sd * (hw + 2), 4);
+    }
+  }
+  const M = { key: tr3Key(), vao: gl.createVertexArray(), ranges: {} };
+  gl.bindVertexArray(M.vao);
+  const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(V), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 32, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 16);
+  const all = [], off = {};
+  for (const k of ['low', 'under', 'over']) { off[k] = [all.length, parts[k].length]; all.push(...parts[k]); }
+  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(all), gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  M.ranges = off; L.mesh3 = M;
+  return M;
+}
+/* every loop in view, all three parts, side by side on the loop canvas (once a frame) */
+function drawLoops3D(time) {
+  const gl = LP3.gl, U = LP3.loc, rgb = (c) => hexRgb(c).map((v) => v / 255);
+  if (LP3.cv.width !== VW * 3 || LP3.cv.height !== VH) { LP3.cv.width = VW * 3; LP3.cv.height = VH; }
+  gl.disable(gl.SCISSOR_TEST); gl.depthMask(true); gl.colorMask(true, true, true, true);
+  gl.viewport(0, 0, VW * 3, VH); gl.clearColor(0, 0, 0, 0); gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+  gl.useProgram(LP3.prog);
+  gl.uniform2f(U.cam, CX, CY); gl.uniform2f(U.halfV, VW / 2, VH / 2); gl.uniform1f(U.KZ, LOOP.KZ); gl.uniform1f(U.hw, T.hw);
+  gl.uniform1f(U.time, time); gl.uniform2f(U.dOff, VW / 2 - CX, VH / 2 - CY); gl.uniform1f(U.VHp, VH);
+  const cols = { deck: COL.dot, deckHi: COL.dotHi, odeck: COL.overDeck, odeckHi: COL.overDeckHi, under: mixHex(COL.side, COL.overDeck, 0.6), edge: COL.side, rim: COL.rim, railSide: mixHex(COL.rim, COL.side, 0.55), dash: '#8fa6ff' };
+  for (const k in cols) { const c = rgb(cols[k]); gl.uniform3f(U[k], c[0], c[1], c[2]); }
+  for (const L of T.loops) {
+    if (!loopVisible(L)) continue;
+    const M = lp3Mesh(L);
+    gl.uniform2f(U.up, L.ux, L.uy);
+    gl.bindVertexArray(M.vao);
+    ['low', 'under', 'over'].forEach((part, r) => {
+      const [o, n] = M.ranges[part];
+      if (!n) return;
+      gl.viewport(r * VW, 0, VW, VH); gl.uniform1f(U.rx, r * VW); gl.uniform1f(U.over, part === 'over' ? 1 : 0);
+      gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_INT, o * 4);
+    });
+  }
+  gl.bindVertexArray(null);
+}
+/* one part of the loops onto the scene, and the glow of its rims */
+function lp3Part(r, part, time) {
+  if (LP3.frame !== frameN) { LP3.frame = frameN; drawLoops3D(time); }
+  lc.setTransform(1, 0, 0, 1, 0, 0); lc.drawImage(LP3.cv, r * VW, 0, VW, VH, 0, 0, VW, VH);
+  setScale(1);
+  ec.strokeStyle = COL.rim; ec.lineWidth = 3; ec.globalAlpha = 0.5; ec.beginPath();
+  for (const L of T.loops) {
+    if (!loopVisible(L)) continue;
+    const S = loopShape(L);
+    for (const k of loopSteps(L, S, part)) { ec.moveTo(S.near[k][0], S.near[k][1]); ec.lineTo(S.near[k + 1][0], S.near[k + 1][1]); ec.moveTo(S.far[k][0], S.far[k][1]); ec.lineTo(S.far[k + 1][0], S.far[k + 1][1]); }
+  }
+  ec.stroke(); ec.globalAlpha = 1;
+}
+/* the draw list for 3D loops: as loopItems, the three parts at the same places in the order */
+function loopItems3D(items, time) {
+  const any = T.loops.some(loopVisible);
+  for (const L of T.loops) items.push({ k: 0.02, y: 0, fn: () => { setScale(1); drawLoopGround(L, time); } });
+  if (any) {
+    items.push({ k: 0.2, y: 0, fn: () => lp3Part(0, 'low', time) });
+    items.push({ k: 0.91, y: 0, fn: () => lp3Part(1, 'under', time) });
+    items.push({ k: 0.92, y: 0, fn: () => lp3Part(2, 'over', time) });
+  }
   for (const s of W.ships) if (s.loop && s.wreck <= 0) items.push({ k: (Math.cos(s.loop.th) < 0 ? 0.915 : 0.925) + s.id * 0.0001, y: 0, fn: () => { setScale(1); drawLoopShip(s, time); } });
   if (W.fx.length) items.push({ k: 0.95, y: 0, fn: () => { setScale(1); drawLoopFx(time); } });
 }
