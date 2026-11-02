@@ -2706,7 +2706,7 @@ const HULL_STATS = {
   wasp:   { acc: 1.12, turn: 1.1, top: 0.985, mag: 4 },                         // darts off the line and through the bends; less top end, one shot fewer
   flare:  { boost: 1.15, boostCost: 15, top: 0.975, grip: 0.95 },              // a hard, cheap boost; slower and looser without it
   manta:  { grip: 1.12, mass: 1.1, acc: 0.9, top: 0.99 },                      // glued to the deck round the bends; slow to get going
-  lancer: { top: 1.035, acc: 1.04, mass: 0.85, turn: 0.95, shieldReset: 3.6, slowTime: 3 },   // the fastest of all, and fragile: knocked about, slow to recover
+  lancer: { top: 1.025, acc: 1.04, mass: 0.85, turn: 0.95, shieldReset: 3.6, slowTime: 3 },   // the fastest of all, and fragile: knocked about, slow to recover
   bastion: { mass: 1.25, mag: 6, magRegen: 3, top: 0.985, turn: 0.95, acc: 0.95 },            // an armoured gunship: heavy, two turrets' worth of shots; ponderous
   wraith: { magRegen: 2.8, slowTime: 1.9, top: 1.02, turn: 0.96, grip: 0.96, boost: 0.94 }     // reloads fast and shrugs off a slowdown; a weak boost, a little loose
 };
@@ -2865,7 +2865,8 @@ function aiStyle(st) {
   const h = st.turn * st.grip;
   return {
     apex: clamp(0.08 + (h - 1) * 0.35, 0, 0.2),   // (kept shallow: deeper lines only clip the inside wall, measured)
-    line: 0.3,     // how much its line opens the bends up (radius gained over the lane's centre line)
+    line: clamp(0.3 + (1 - h) * 2, 0.3, 0.7),   // how much its line opens the bends up (radius gained over the lane's centre line):
+                                               // a machine that runs wide needs the room (the needle was ~3% slow on 0.3, measured)
     trust: 0.95,   // how close to its cornering limit it dares to run
     straight: clamp(0.985 + (1 - h) * 0.03, 0.965, 0.995),
     reserve: (st.boostCost - HULL_BASE.boostCost) * 3,
