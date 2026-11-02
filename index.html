@@ -1159,7 +1159,21 @@ function loopTan(L, th) {
   return [x / l, y / l];
 }
 /* the middle of the ring, as drawn */
-function loopCentre(L) { return [L.cx, L.cy]; }
+function loopCentre(L) { return loopTop() ? [L.x, L.y] : [L.cx, L.cy]; }
+/* a 3D loop seen from straight above, as the rest of the track is (TRACK.loop3d: 'top'), rather than at an angle
+   ('angled', or true). Riding it is the same either way (see loopPt); only how it is drawn changes. Its top is
+   LOOP_TOP_LV levels up, and anything on it is scaled about the middle of the screen by its height, as raised
+   stretches are (fscale). */
+const LOOP_TOP_LV = 1.6;
+const loopTop = () => TRACK.loop3d === 'top';
+const loopLv = (L, z) => (z / (2 * L.r)) * LOOP_TOP_LV;   // (height on the ring in pixels -> levels)
+/* where a racer on a loop is drawn (scene coordinates, as lp.px / lp.py are for the angled ring) */
+function loopDrawn(s) {
+  const lp = s.loop;
+  if (!loopTop()) return [lp.px, lp.py];
+  const f = fscale(loopLv(lp.L, lp.z));
+  return [CX + (s.x - CX) * f, CY + (s.y - CY) * f];
+}
 /* across the deck at angle th, as drawn (unit, toward +l) */
 function loopAcross(L, th) {
   const p = loopPt(L, th, -1), q = loopPt(L, th, 1), x = q[0] - p[0], y = q[1] - p[1], l = Math.hypot(x, y) || 1;
@@ -1404,7 +1418,7 @@ TRACKS.push(
     barricades: [0.09493, 0.76174]
   },
   {
-    id: 'perihelion', name: 'Perihelion', setting: 'vegas', seed: 52, loop3d: true,   // (its loop drawn in real 3D: see drawLoops3D)
+    id: 'perihelion', name: 'Perihelion', setting: 'vegas', seed: 52, loop3d: 'top',   // (its loop drawn in real 3D, seen from straight above: see drawLoops3D)
     points: [[155, 1685], [-65, 1685], [-405, 1815], [-650, 1495], [-1000, 1620], [-1255, 1365], [-1010, 1095], [-1170, 870], [-1520, 925], [-1800, 1225], [-1945, 1250], [-2235, 1170], [-2530, 990], [-2565, 635], [-2280, 380], [-2230, 70], [-2505, -125], [-2470, -375], [-2370, -545], [-2220, -730], [-2020, -940], [-2090, -1435], [-1610, -1700], [-1250, -1445], [-985, -1515], [-745, -1610], [-465, -1685], [-175, -1725], [110, -1730], [655, -1650], [735, -1105], [945, -870], [1250, -1075], [1455, -1225], [1715, -1100], [1980, -990], [2245, -870], [2495, -730], [2715, -540], [2830, -280], [2770, 0], [2590, 225], [2370, 410], [2135, 585], [1930, 785], [1775, 1030], [1620, 1275], [1415, 1475], [920, 1020], [670, 995], [540, 1190], [755, 1415], [750, 1645], [450, 1685]],
     shortcuts: [{from: [1972, -993], to: [2124, 595], via: [[2325, -250]], target: [0.66958, -57]}],
     elevation: [{from: 0.82287, to: 0.88346, level: 1, rocks: true}, {from: 0.18794, to: 0.36515, level: 1}],
@@ -8531,7 +8545,8 @@ function updateCamera(dt, mouse, follow, snap) {
   if (lf) { fx = lf[0]; fy = lf[1]; mk = 0.06; }   // dropping off a loop: watch it fall before going on
   else if (follow.loop) {   // riding a loop: frame the whole ring, leaning toward the racer
     const L = follow.loop.L, c = loopCentre(L), cx = c[0], cy = c[1];
-    fx = cx + (follow.loop.px - cx) * 0.35; fy = cy + (follow.loop.py - cy) * 0.35; mk = 0.06;
+    const dx = loopTop() ? follow.x : follow.loop.px, dy = loopTop() ? follow.y : follow.loop.py;   // (from above: where it is over the ground)
+    fx = cx + (dx - cx) * 0.35; fy = cy + (dy - cy) * 0.35; mk = 0.06;
   }
   const tx = fx + (m.x - VW / 2) * mk;
   const ty = fy + (m.y - VH / 2) * mk;
@@ -9421,14 +9436,16 @@ function drawLoopOver(L, time) { if (loopVisible(L)) loopDeck(L, loopShape(L), l
 /* a racer riding the ring */
 function drawLoopShip(s, time) {
   const lp = s.loop, L = lp.L;
-  if (offscreen(lp.px, lp.py, 1, 40)) return;
+  const D = loopDrawn(s);
+  if (offscreen(D[0], D[1], 1, 40)) return;
   const spr = shipSprites(s.col, s.hull), fi = shipFrameIndex(s.ang), h = lp.z / (2 * L.r);
-  // the ring is drawn at the lane's own scale all the way round, and so is a racer on it
-  const f = 1, S = Math.round(24 * f), o = S >> 1;
+  // the angled ring is drawn at the lane's own scale all the way round, and so is a racer on it; from above, a racer
+  // up on the ring is nearer the camera and drawn bigger, as on a raised stretch
+  const f = loopTop() ? fscale(loopLv(L, lp.z)) : 1, S = Math.round(24 * f), o = S >> 1;
   const g = loopGround(L, lp.th, lp.l);
   lc.globalAlpha = 0.55 * (1 - h);
   lc.drawImage(spr.shadows[fi], Math.round(g[0]) - 12 + 4, Math.round(g[1]) - 12 + 7, 24, 24);
-  const x = Math.round(lp.px), y = Math.round(lp.py);
+  const x = Math.round(D[0]), y = Math.round(D[1]);
   const boosting = s.boostT > 0, fx = Math.cos(s.ang), fy = Math.sin(s.ang);
   glow(ec, boosting ? '#ffe2a0' : s.col, boosting ? 34 : 22, x - fx * 8, y - fy * 8, boosting ? 0.8 : 0.4);
   lc.globalAlpha = (s.safe > 0 && ((time * 18) | 0) % 2) ? 0.45 : 1;
@@ -9512,8 +9529,16 @@ function lp3Init() {
 in vec4 a;   // ground x, y, height, light
 in vec4 b;   // across the deck, along the ring (steps), kind (0 deck, 1 underside, 2 band edge, 3 rail side, 4 rail top), height share (0 foot .. 1 top)
 uniform vec2 cam; uniform vec2 halfV; uniform vec2 up; uniform float KZ;
+uniform int topdown; uniform float lv; uniform float K;
 out vec4 v; out float lt;
 void main() {
+  v = b; lt = a.w;
+  if (topdown == 1) {   // from straight above: scaled about the middle of the screen by height, as raised things are
+    float f = 1.0 + K * a.z * lv;
+    vec2 e = (a.xy - cam) * f;
+    gl_Position = vec4(e.x / halfV.x, -e.y / halfV.y, clamp(-a.z / 3000.0, -0.99, 0.99), 1.0);   // (higher is nearer)
+    return;
+  }
   vec2 s = a.xy + up * KZ * a.z;   // (the 2D ring's camera: higher, further up the screen)
   vec2 d = s - cam;
   // depth along the camera's line of sight: higher is nearer, and so is lower down the screen
@@ -9560,7 +9585,7 @@ void main() {
     gl.bindAttribLocation(p, 0, 'a'); gl.bindAttribLocation(p, 1, 'b'); gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     LP3.prog = p;
-    for (const n of ['cam', 'halfV', 'up', 'KZ', 'hw', 'over', 'time', 'dOff', 'VHp', 'rx', 'deck', 'deckHi', 'odeck', 'odeckHi', 'under', 'edge', 'rim', 'railSide', 'dash']) LP3.loc[n] = gl.getUniformLocation(p, n);
+    for (const n of ['cam', 'halfV', 'up', 'KZ', 'topdown', 'lv', 'K', 'hw', 'over', 'time', 'dOff', 'VHp', 'rx', 'deck', 'deckHi', 'odeck', 'odeckHi', 'under', 'edge', 'rim', 'railSide', 'dash']) LP3.loc[n] = gl.getUniformLocation(p, n);
   } catch (e) { console.warn('3D loops unavailable:', e.message); LP3.failed = true; return false; }
   LP3.gl = gl;
   return true;
@@ -9630,12 +9655,13 @@ function drawLoops3D(time) {
   gl.useProgram(LP3.prog);
   gl.uniform2f(U.cam, CX, CY); gl.uniform2f(U.halfV, VW / 2, VH / 2); gl.uniform1f(U.KZ, LOOP.KZ); gl.uniform1f(U.hw, T.hw);
   gl.uniform1f(U.time, time); gl.uniform2f(U.dOff, VW / 2 - CX, VH / 2 - CY); gl.uniform1f(U.VHp, VH);
+  gl.uniform1i(U.topdown, loopTop() ? 1 : 0); gl.uniform1f(U.K, PAR.K);
   const cols = { deck: COL.dot, deckHi: COL.dotHi, odeck: COL.overDeck, odeckHi: COL.overDeckHi, under: mixHex(COL.side, COL.overDeck, 0.6), edge: COL.side, rim: COL.rim, railSide: mixHex(COL.rim, COL.side, 0.55), dash: '#8fa6ff' };
   for (const k in cols) { const c = rgb(cols[k]); gl.uniform3f(U[k], c[0], c[1], c[2]); }
   for (const L of T.loops) {
     if (!loopVisible(L)) continue;
     const M = lp3Mesh(L);
-    gl.uniform2f(U.up, L.ux, L.uy);
+    gl.uniform2f(U.up, L.ux, L.uy); gl.uniform1f(U.lv, LOOP_TOP_LV / (2 * L.r));
     gl.bindVertexArray(M.vao);
     ['low', 'under', 'over'].forEach((part, r) => {
       const [o, n] = M.ranges[part];
@@ -9655,7 +9681,10 @@ function lp3Part(r, part, time) {
   for (const L of T.loops) {
     if (!loopVisible(L)) continue;
     const S = loopShape(L);
-    for (const k of loopSteps(L, S, part)) { ec.moveTo(S.near[k][0], S.near[k][1]); ec.lineTo(S.near[k + 1][0], S.near[k + 1][1]); ec.moveTo(S.far[k][0], S.far[k][1]); ec.lineTo(S.far[k + 1][0], S.far[k + 1][1]); }
+    // (the rims where they are drawn: from above, each point of the ground under the ring raised by its height)
+    const at = loopTop() ? (G, k) => { const f = fscale(loopLv(L, S.z[k])); return [CX + (G[k][0] - CX) * f, CY + (G[k][1] - CY) * f]; } : (G, k) => G[k];
+    const A = loopTop() ? S.gnear : S.near, B = loopTop() ? S.gfar : S.far;
+    for (const k of loopSteps(L, S, part)) { for (const E of [A, B]) { const p0 = at(E, k), p1 = at(E, k + 1); ec.moveTo(p0[0], p0[1]); ec.lineTo(p1[0], p1[1]); } }
   }
   ec.stroke(); ec.globalAlpha = 1;
 }
@@ -12599,7 +12628,8 @@ function prepInput() {
   else { i.mx = 0; i.my = 0; }
   const w = mouseToWorld(mouse.x, mouse.y);
   // (on a loop the ship is drawn up on the ring, so aim from there)
-  i.aim = p.loop ? Math.atan2(w.y - p.loop.py, w.x - p.loop.px) : Math.atan2(w.y - p.y, w.x - p.x);
+  const pd = p.loop ? loopDrawn(p) : null;
+  i.aim = pd ? Math.atan2(w.y - pd[1], w.x - pd[0]) : Math.atan2(w.y - p.y, w.x - p.x);
   i.fire = !!(keys.KeyW || keys.ArrowUp);
   if (boostQueued) { i.boostPress = true; boostQueued = false; }
   if (swipeQueued) { i.swipe = swipeQueued; swipeQueued = 0; }
