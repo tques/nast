@@ -6817,6 +6817,8 @@ function paintTrack(l, e) {
   t.globalCompositeOperation = 'destination-in'; t.fillStyle = DKEEP[ditherK(0)]; t.fillRect(BAKE.x, BAKE.y, BAKE.w, BAKE.h);
   l.drawImage(tmp, BAKE.x, BAKE.y);
   l.setLineDash([10, 16]); strokeP(l, FLAT_PATH, 2, '#8fa6ff', 0, 0.22); l.setLineDash([]);
+  // (the lane hides the glow of what runs underneath it: a shortcut corridor's glowing edge, where the two meet)
+  e.lineCap = 'square'; e.globalCompositeOperation = 'destination-out'; strokeP(e, FLAT_PATH, hw * 2 - 2, '#000'); e.globalCompositeOperation = 'source-over'; e.lineCap = 'butt';
   }
   // the gaps themselves: open space, with a lit edge on either side
   l.globalCompositeOperation = 'destination-out'; e.globalCompositeOperation = 'destination-out'; l.fillStyle = '#000'; e.fillStyle = '#000';
@@ -6846,7 +6848,9 @@ function paintRoad(l, e, hw) {
   strokeP(l, FLAT_PATH, hw * 2 - 30, R.hi);
   strokeP(l, FLAT_PATH, hw * 2, roadGrain(l));
   l.setLineDash([10, 16]); strokeP(l, FLAT_PATH, 2, R.line, 0, 0.35); l.setLineDash([]);
-  // (the glow of its edges is on the rails standing on them: drawRails)
+  // (the glow of its edges is on the rails standing on them: drawRails; the lane hides the glow of what runs underneath
+  //  it, a shortcut corridor's glowing edge where the two meet)
+  e.lineCap = 'square'; e.globalCompositeOperation = 'destination-out'; strokeP(e, FLAT_PATH, hw * 2 - 2, '#000'); e.globalCompositeOperation = 'source-over'; e.lineCap = 'butt';
 }
 /* on the ground: is a thing of radius r at (x, y) clear of every embankment (and its rounded ends) and trench opening? */
 function groundClear() {
@@ -8052,12 +8056,24 @@ function railChunks() {
   const key = TRACK.id + ':' + T.N + ':' + SET.id;
   if (RAIL.key === key) return RAIL.chunks;
   const N = T.N, w = T.hw + 1, out = [], flat = (i) => T.runOf[i] < 0 && T.loopOf[i] < 0 && !T.gap[i];
-  // (runs of flat samples, started where the flat lane is broken, so none runs over the lap's seam)
-  let st = 0; while (st < N && flat(st)) st++;
-  const seqs = [];
-  if (st === N) seqs.push(Array.from({ length: N + 1 }, (_, q) => q % N));
-  else { let cur = null; for (let q = 0; q < N; q++) { const i = (st + q) % N; if (flat(i)) { if (!cur) seqs.push((cur = [])); cur.push(i); } else cur = null; } }
-  for (const sd of [1, -1]) for (const S of seqs) for (let a = 0; a < S.length - 1; a += 24) {
+  // (no rail where a shortcut corridor meets the lane's edge: its mouth stays open, as it is to racers)
+  const mouth = [new Uint8Array(N), new Uint8Array(N)];
+  for (const c of T.chords) for (let k = 0; k < c.px.length; k++) {
+    const x = c.px[k], y = c.py[k], r = c.hw + 6;
+    for (let i = 0; i < N; i++) {
+      const dx = x - T.x[i], dy = y - T.y[i];
+      if (dx * dx + dy * dy > (T.hw + r + 12) ** 2) continue;
+      for (let si = 0; si < 2; si++) { const sd = si ? 1 : -1, ex = T.x[i] + T.nx[i] * w * sd - x, ey = T.y[i] + T.ny[i] * w * sd - y; if (ex * ex + ey * ey < r * r) mouth[si][i] = 1; }
+    }
+  }
+  for (const sd of [1, -1]) {
+    const ok = (i) => flat(i) && !mouth[sd > 0 ? 1 : 0][i];
+    // (runs of railed samples, started where the rail is broken, so none runs over the lap's seam)
+    let st = 0; while (st < N && ok(st)) st++;
+    const seqs = [];
+    if (st === N) seqs.push(Array.from({ length: N + 1 }, (_, q) => q % N));
+    else { let cur = null; for (let q = 0; q < N; q++) { const i = (st + q) % N; if (ok(i)) { if (!cur) seqs.push((cur = [])); cur.push(i); } else cur = null; } }
+    for (const S of seqs) for (let a = 0; a < S.length - 1; a += 24) {
     const c = { p: new Path2D(), x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 };
     for (let q = a; q <= Math.min(S.length - 1, a + 24); q++) {   // (each piece overlaps the next by a sample: no seam)
       const i = S[q], x = T.x[i] + T.nx[i] * w * sd, y = T.y[i] + T.ny[i] * w * sd;
@@ -8065,6 +8081,7 @@ function railChunks() {
       c.x0 = Math.min(c.x0, x); c.y0 = Math.min(c.y0, y); c.x1 = Math.max(c.x1, x); c.y1 = Math.max(c.y1, y);
     }
     out.push(c);
+    }
   }
   RAIL.key = key; RAIL.chunks = out;
   return out;
