@@ -6820,6 +6820,21 @@ function paintTrack(l, e) {
   // (the lane hides the glow of what runs underneath it: a shortcut corridor's glowing edge, where the two meet)
   e.lineCap = 'square'; e.globalCompositeOperation = 'destination-out'; strokeP(e, FLAT_PATH, hw * 2 - 2, '#000'); e.globalCompositeOperation = 'source-over'; e.lineCap = 'butt';
   }
+  // each shortcut's mouth: the lane's edge (its rim, kerb or side) cut away where the corridor meets it, the corridor's
+  // own deck and edge lines running on through to the lane, so the way in reads as open (see drawRails for the rails)
+  if (CHORD_PATHS.length) {
+    const tmp = mkCanvas(BAKE.w, BAKE.h), t = tmp.getContext('2d');
+    t.translate(-BAKE.x, -BAKE.y); t.lineJoin = 'round'; t.lineCap = 'butt';
+    CHORD_PATHS.forEach((p, k) => {
+      const c = T.chords[k], cu = !!c.catchup;
+      strokeP(t, p, c.hw * 2 + 4, cu ? COL.catchRim : COL.corrRim);
+      strokeP(t, p, c.hw * 2, cu ? COL.catchCorr : COL.corr);
+    });
+    // (only the band along the lane's edge: from just inside its rim out past its kerb and side)
+    t.globalCompositeOperation = 'destination-in'; t.lineCap = 'round'; strokeP(t, FLAT_PATH, hw * 2 + 26, '#000');
+    t.globalCompositeOperation = 'destination-out'; strokeP(t, FLAT_PATH, hw * 2 - 2, '#000');
+    l.drawImage(tmp, BAKE.x, BAKE.y);
+  }
   // the gaps themselves: open space, with a lit edge on either side
   l.globalCompositeOperation = 'destination-out'; e.globalCompositeOperation = 'destination-out'; l.fillStyle = '#000'; e.fillStyle = '#000';
   for (const P of flatGaps) { stripFill(l, P, hw + 7, 0); stripFill(e, P, hw + 7, 0); }
