@@ -8973,18 +8973,27 @@ function drawJump(j, time, f) {
   lc.globalAlpha = 1; lc.lineJoin = 'round';
   quad(ec, [P(-A, lo), P(-A, hi), P(A, hi), P(A, lo)]); ec.globalAlpha = 0.28 + 0.1 * Math.sin(time * 5); ec.fillStyle = '#b6ff6a'; ec.fill(); ec.globalAlpha = 1;
 }
-/* a hole in the deck: its walls going down (lit from the upper left, in the scene's perspective, so a hole off to the
-   side shows its far wall) to a dark floor; then (drawPitRim, over anything falling in) its yellow and black rim */
+/* a hole in the deck: on solid ground its walls going down (lit from the upper left, in the scene's perspective, so a
+   hole off to the side shows its far wall) to a dark floor; in a deck of dots (space, gale, the neon strip) simply open,
+   the sky below showing through; then (drawPitRim, over anything falling in) its yellow and black rim */
 const PIT_COL = { floor: '#09080e', back: '#16121e', wall: ['#211c2b', '#352e44', '#51496a', '#776e93'], yel: '#ffd23a', blk: '#1a150d' };
 function pitScreen(P, f) { const o = []; for (const q of P) o.push([VW / 2 + (q[0] - CX) * f, VH / 2 + (q[1] - CY) * f]); return o; }
 function pitPath(ctx, P) { ctx.beginPath(); ctx.moveTo(P[0][0], P[0][1]); for (let k = 1; k < P.length; k++) ctx.lineTo(P[k][0], P[k][1]); ctx.closePath(); }
-function drawPit(p) {
+function drawPit(p, time) {
   const h = T.h[p.i], f0 = fscale(h), f1 = fscale(h - PIT.DEPTH);
   if (offscreen(p.x, p.y, f0, p.R + 10)) return;
   const R = pitScreen(p.rim, f0), F = pitScreen(p.rim, f1), K = R.length;
   const cx = R.reduce((a, q) => a + q[0], 0) / K, cy = R.reduce((a, q) => a + q[1], 0) / K;
   lc.setTransform(1, 0, 0, 1, 0, 0);
   lc.save(); pitPath(lc, R); lc.clip();
+  if (!SET.ground) {   // (a see-through deck of dots, out in space: no walls, just open sky down through it, as behind everything)
+    const BACK = backdropOf(), bw = BACK.width, bh = BACK.height, bd = SET.backdropDepth != null ? SET.backdropDepth : 0.05;
+    const bx = mod(CX * bd, bw), by = mod(CY * bd, bh);
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) lc.drawImage(BACK, Math.round(-bx + i * bw), Math.round(-by + j * bh));
+    drawStars(CX, CY, time); lc.setTransform(1, 0, 0, 1, 0, 0);
+    lc.restore();
+    return;
+  }
   lc.fillStyle = PIT_COL.back; lc.fill();
   for (let k = 0; k < K; k++) {
     const k2 = (k + 1) % K, mx = (R[k][0] + R[k2][0]) / 2, my = (R[k][1] + R[k2][1]) / 2;
@@ -9744,7 +9753,7 @@ function renderFrame(time) {
   for (const t of W.targets) items.push({ k: LKEY(t.h, t.idx, 3), y: t.y, fn: () => atPos(t.h, t.x, t.y, (f) => drawTarget(t, time, f)) });
   for (const j of T.jumps) items.push({ k: LKEY(T.h[j.i], j.i, 0.5), y: 0, fn: () => atLevel(T.h[j.i], (f) => drawJump(j, time, f)) });
   for (const p of T.pits) {
-    items.push({ k: LKEY(T.h[p.i], p.i, 0.4), y: 0, fn: () => { drawPit(p); setScale(1); } });
+    items.push({ k: LKEY(T.h[p.i], p.i, 0.4), y: 0, fn: () => { drawPit(p, time); setScale(1); } });
     items.push({ k: LKEY(T.h[p.i], p.i, 0.42), y: 0, fn: () => { drawPitRim(p, time); setScale(1); } });
   }
   loopItems(items, time);
