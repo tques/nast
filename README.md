@@ -13,8 +13,9 @@ A browser racing game. Everything is self-contained HTML: open a file in a brows
 
 The soundtrack is recorded tracks embedded in `index.html`, all by DavidKBD from the *Electric Pulse* pack:
 the menu plays “Electric Dreams of Infinity”, and each world has its own race theme (“Electric Pulse”, “Digital
-Horizon”, “Cyber Lights”, “Retrochrome Nights”, “Neon Arcadia Awakening”). **Options > Soundtrack > Synth** switches
+Horizon”, “Cyber Lights”, “Retrochrome Nights”, “Neon Arcadia Awakening”, “Time Warp”, “Quantum Ripples of
+Sound”). **Options > Soundtrack > Synth** switches
 back to the original themes, synthesized live with Web Audio (they also stand in if a browser can't decode a track).
 
-With the music in it, `index.html` is about 36 MB: past the 16 MB a claude.ai artifact can hold, so play it from the
+With the music in it, `index.html` is about 48 MB: past the 16 MB a claude.ai artifact can hold, so play it from the
 file itself.
