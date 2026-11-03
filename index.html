@@ -14253,9 +14253,13 @@ function trackFromCode(text) {
   if (d.points.length < 4 || !d.points.every((p) => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]))) throw new Error('A track needs at least 4 points.');
   const name = String(d.name || 'Custom track').slice(0, 40);
   let hsh = 7; for (const ch of JSON.stringify(d.points) + name) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0;
-  const def = { id: 'custom-' + (hsh >>> 0).toString(36), name, custom: true, seed: (hsh >>> 0) % 997 + 3, points: d.points };
+  const def = { id: '', name, custom: true, seed: (hsh >>> 0) % 997 + 3, points: d.points };
   if (d.setting && SETTINGS[d.setting]) def.setting = d.setting;
   for (const k of ['shortcuts', 'elevation', 'barricades', 'jumps', 'gaps', 'holes', 'loops', 'landmarks']) if (Array.isArray(d[k]) && d[k].length) def[k] = d[k];   // (landmarks come without art: not drawn)
+  // (its id comes from everything in it, not just its shape: a track edited in the editor and pasted again is a new
+  //  track to the caches, best times and ghosts, never the old one under the same name)
+  let full = 7; for (const ch of JSON.stringify(def)) full = (full * 31 + ch.charCodeAt(0)) | 0;
+  def.id = 'custom-' + (full >>> 0).toString(36);
   const keep = TRACK;
   try { buildTrack(def); buildRocks(def.seed); } catch (e) { buildTrack(keep); throw new Error("That track couldn't be built: " + e.message); }
   buildTrack(keep);
@@ -14270,7 +14274,22 @@ function addCustomTrack(code, quiet) {
   const def = trackFromCode(code);
   def.code = code;
   const old = TRACKS.findIndex((t) => t.id === def.id);
-  if (old >= 0) return old;   // (already here)
+  if (old >= 0) { TRACKS[old].dup = true; return old; }   // (exactly this track: already here)
+  // the same track (by name) pasted again after an edit: the new version takes the old one's place, card and all
+  const same = TRACKS.findIndex((t) => t.custom && t.name === def.name);
+  if (same >= 0) {
+    TRACKS[same] = def;
+    addTrackCard(def);
+    const card = TRACK_INFO.pop();
+    const was = TRACK_INFO[same];
+    for (const ch of [...was.slot.children]) if (ch !== was.btn) card.slot.appendChild(ch);   // (the difficulty buttons, if they hang under it)
+    was.slot.replaceWith(card.slot); TRACK_INFO[same] = card;
+    def.updated = true;
+    if (TRACK) buildTrack(TRACKS[trackIx]);
+    if (!quiet) saveCustom();
+    syncTrackCards();
+    return same;
+  }
   TRACKS.push(def);
   addTrackCard(def);
   if (TRACK) buildTrack(TRACKS[trackIx]);
@@ -14546,7 +14565,7 @@ $('pasteAdd').addEventListener('click', () => {
     $('pastePanel').hidden = true;
     pickTrack(ix);
     TRACK_INFO[ix].btn.scrollIntoView({ block: 'nearest' });
-    toast('Added ' + TRACKS[ix].name);
+    const t = TRACKS[ix]; toast((t.dup ? 'Already here: ' : t.updated ? 'Updated ' : 'Added ') + t.name); t.dup = t.updated = false;
   } catch (e) { $('pasteMsg').textContent = e.message; }
 });
 $('removeTrack').addEventListener('click', () => removeCustomTrack(pickIx));
