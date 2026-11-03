@@ -908,6 +908,10 @@ function segDist(px, py, ax, ay, bx, by) {
                  A ship that crosses one flies AIR.H levels up for a moment (over walls too), then comes down.
      gaps        stretches with no deck, {from, to}. Cross one with a jump, or drop off it onto lower track beyond;
                  a ship that comes down over nothing falls out and is put back past the gap.
+     holes       pits in the deck, {at: fraction, side?: 'left' | 'right'}: a hole shaped like a 0, ringed in yellow and
+                 black, over one half of the lane (or, without a side, across all of it: jump it or fall in). On the
+                 ground or on the flat of a raised or sunken stretch, straight or bending; never on a ramp. The walls
+                 are untouched. A racer that runs onto one drops in and is put back past it (see PIT).
      loops       loop-de-loops, {at: fraction, r?: radius in metres (LOOP.R if left out), side?: 'left' | 'right'}.
                  The loop is spliced into the lap at that point of a straight: the lane edges over, climbs a full ring
                  of track, comes back down beside where it went up (on the given side) and edges back onto its line.
@@ -919,6 +923,9 @@ function segDist(px, py, ax, ay, bx, by) {
    Optional: pickups [[fraction, sideways offset, 'cell' | 'sting'], ...] and asteroids [fraction, ...];
    when left out they are placed automatically. */
 const RAMP = 144;
+/* holes: A how long one is along the lane, for each metre of its width (taller than wide, like a 0); EDGE: the deck
+   left between a half-lane hole and the wall (or the lane's middle); DEPTH: how far down its floor is drawn (levels) */
+const PIT = { A: 1.45, EDGE: 5, DEPTH: 1.6 };
 // flight off a jump pad: rise H levels at RISE levels a second, hang for HOLD seconds, then fall under G (levels/s²)
 const AIR = { H: 1.25, RISE: 3.6, HOLD: 0.7, G: 5.5, VREF: 300, QMIN: 0.45, QMAX: 1.4 };
 /* a jump goes higher and hangs longer the faster you hit the pad: height and hang time scale with speed / VREF */
@@ -1094,7 +1101,16 @@ function buildTrack(def) {
     // left of the racing line is -normal
     return { i: atF(at), side, lo: side === 'right' ? 0 : -T.hw, hi: side === 'left' ? 0 : T.hw };
   });
+  T.pits = (TRACK.holes || []).map((h) => {
+    const side = h.side === 'left' || h.side === 'right' ? h.side : null, i = atF(h.at);
+    const lo = side === 'right' ? 0 : -T.hw, hi = side === 'left' ? 0 : T.hw;
+    const w = (hi - lo) / 2 - PIT.EDGE * (side ? 1 : 1.6), A = (side ? w : T.hw / 2) * PIT.A;
+    const n = Math.ceil(A / T.step) + 1;
+    return { i, side, c: (lo + hi) / 2, w, A, n, a: wr(i - n), b: wr(i + n) };
+  });
+  T.pits.forEach(pitOutline);
   T.gaps.forEach((g) => Object.assign(g, gapNeed(g)));
+  pitZones();
   T.loops = S.loops.map(makeLoop);
 
   T.chords = [];
@@ -1241,6 +1257,39 @@ function loopAcross(L, th) {
 /* How fast a racer has to be going to clear a gap: off the jump pad before it (if there is one within 720 m),
    or by dropping off its edge onto lower track. need = Infinity when it cannot be cleared at all.
    (The editor works this out the same way.) */
+/* a hole's outline, as world points round its rim: an oval in the lane's own frame, so it bends with the lane */
+function pitOutline(p) {
+  const K = 36, N = T.N;
+  const at = (al, lat) => {   // (al metres along the lane from the hole's middle, lat across it)
+    const u = al / T.step, k = Math.floor(u), t = u - k, i0 = ((p.i + k) % N + N) % N, i1 = (i0 + 1) % N;
+    const x = T.x[i0] + (T.x[i1] - T.x[i0]) * t, y = T.y[i0] + (T.y[i1] - T.y[i0]) * t;
+    const nx = T.nx[i0] + (T.nx[i1] - T.nx[i0]) * t, ny = T.ny[i0] + (T.ny[i1] - T.ny[i0]) * t, nl = Math.hypot(nx, ny) || 1;
+    return [x + (nx / nl) * lat, y + (ny / nl) * lat];
+  };
+  const ring = (dA, dW) => { const r = []; for (let k = 0; k < K; k++) { const a = (k / K) * TAU; r.push(at((p.A + dA) * Math.cos(a), p.c + (p.w + dW) * Math.sin(a))); } return r; };
+  p.rim = ring(0, 0); p.outer = ring(5, 5); p.inner = ring(-4, -4);
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const q of p.outer) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); }
+  p.x = (x0 + x1) / 2; p.y = (y0 + y1) / 2; p.R = Math.hypot(x1 - x0, y1 - y0) / 2;
+}
+/* a hole across the whole lane is a gap to the computer drivers: they line up for the pad before it, at the speed */
+function pitZones() {
+  T.aiGaps = T.gaps.concat(T.pits.filter((p) => !p.side).map((p) => { const g = { a: p.a, n: 2 * p.n + 1, b: p.b, pit: p }; return Object.assign(g, gapNeed(g)); }));
+}
+/* the hole (if any) at a point on the deck at height h, idx the lane sample it is on; m widens (+) or narrows (-) it */
+function pitAt(x, y, idx, h, m) {
+  for (const p of T.pits) {
+    if (Math.abs(T.h[p.i] - h) > 0.25) continue;
+    let d = idx - p.i; const N = T.N;
+    if (d > N / 2) d -= N; else if (d < -N / 2) d += N;
+    if (d < -p.n - 1 || d > p.n + 1) continue;
+    const ex = x - T.x[idx], ey = y - T.y[idx];
+    const al = d * T.step + ex * T.tx[idx] + ey * T.ty[idx], lat = ex * T.nx[idx] + ey * T.ny[idx];
+    const ka = al / Math.max(1, p.A + m), kw = (lat - p.c) / Math.max(1, p.w + m);
+    if (ka * ka + kw * kw < 1) return p;
+  }
+  return null;
+}
 function gapNeed(g) {
   const N = T.N, wr = (v) => ((v % N) + N) % N;
   const pre = wr(g.a - 1), post = wr(g.a + g.n), hN = T.h[pre], hF = T.h[post];
@@ -2055,11 +2104,13 @@ function fallOut(s) {
     const ahead = wrapIdx(g.a - from), inside = wrapIdx(s.idx - g.a) < g.n || wrapIdx(from - g.a) < g.n;
     if (inside || ahead <= 70) { const d = inside ? -1 : ahead; if (d < bd) { bd = d; ri = wrapIdx(g.a + g.n + 6); } }
   }
+  const pit = s.pit; s.pit = null;
+  if (pit) ri = wrapIdx(pit.b + 6);   // (out of a hole: back on just past it)
   if (ri < 0) { const on = wrapIdx(s.idx - from); ri = on > 12 && on < N / 2 ? s.idx : wrapIdx(from + 12); }
   CURH = s.h;
   burst(s.x, s.y, 10, 60, '#8ff3ff', 0.5, true);
   outAt(s, ri);
-  emit('fall', s);
+  emit('fall', s, pit ? 'pit' : null);
 }
 /* out of the race for a moment, then put back on the lane at sample ri (a little lower on power) */
 function outAt(s, ri) {
@@ -2073,7 +2124,7 @@ function land(s, i, h) {
   // back to an earlier part only costs the racer)
   const hard = s.air === 3 ? clamp(-s.vh / 6, 0, 1) : 0;
   moveIdx(s, i);
-  s.h = h; s.floorH = h; s.air = 0; s.vh = 0;
+  s.h = h; s.floorH = h; s.air = 0; s.vh = 0; s.pit = null;
   s.vx *= 0.96 - 0.06 * hard; s.vy *= 0.96 - 0.06 * hard;
   CURH = h;
   burst(s.x, s.y, 8 + Math.round(hard * 10), 90, '#d8f6ff', 0.3, true);
@@ -2100,13 +2151,14 @@ function stepAir(s, dt) {
   if (s.inCorr && chordDist(s.inCorr, s.x, s.y) < s.inCorr.hw) { const ch = chordH(s.inCorr, _cs); if (ch <= s.h + 0.02 && fl < ch) { fl = ch; fi = s.idx; } }
   s.floorH = fl > -1e8 ? fl : null;
   if (fl > -1e8 && laneOpen(s.x, s.y, fi)) { fl = -1e9; s.floorH = null; }   // (open water: no deck there)
+  if (fl > -1e8 && T.pits.length) { const pt = pitAt(s.x, s.y, fi, fl, -3); if (pt) { fl = -1e9; s.floorH = null; s.pit = pt; } }   // (nor in a hole)
   if (s.air === 3 && fl > -1e8 && s.h <= fl + 0.001) { land(s, fi, fl); s.doomed = false; return; }
   // coming down onto the lane is forgiving: a racer that clips the lane's edge, or meets a deck above it (coming in
   // low beside a raised stretch), lands on it rather than slipping past and falling out
   if (s.air === 3 && !s.edgeFall) {
     // (a raised stretch it comes in under, up to a level above it: it scrambles up onto the deck, losing some speed)
     const fc = floorAt(s.x, s.y, Math.max(h0, s.h) + 1.05, 20), fci = _fi;
-    if (fc > -1e8 && s.h <= fc + 0.001 && !laneOpen(s.x, s.y, fci)) {
+    if (fc > -1e8 && s.h <= fc + 0.001 && !laneOpen(s.x, s.y, fci) && !(T.pits.length && pitAt(s.x, s.y, fci, fc, -3))) {
       const dx = s.x - T.x[fci], dy = s.y - T.y[fci], d = Math.hypot(dx, dy), lim = T.hw - CFG.shipR - 1;
       if (d > lim) { s.x = T.x[fci] + dx / d * lim; s.y = T.y[fci] + dy / d * lim; }
       if (fc > s.h + 0.2) { s.vx *= 0.85; s.vy *= 0.85; }
@@ -2359,6 +2411,10 @@ function stepShip(s, dt, locked) {
       startFall(s); s.lava = true;
       CURH = s.h; burst(s.x, s.y, 18, 110, SET.ground && SET.ground.river && SET.ground.river.glow || '#8ff3ff', 0.6, true);
       emit('splash', s);
+    }
+    else if (T.pits.length && !s.inCorr && !s.loop && (s.pit = pitAt(s.x, s.y, s.idx, s.h, -3))) {   // into a hole
+      startFall(s); s.edgeFall = true;
+      emit('pit', s);
     }
     else if (s.idx !== prevIdx) {
       // ran over a jump pad (going forwards, on the part of the lane it covers)
@@ -3048,7 +3104,7 @@ function aiThink(s, dt) {
   s.speedMul = cruise ? 0.55 : a.skill * (1 + clamp(gap / 60, 0, 1) * 0.03 + behind * 0.11 * a.cu) * (1 - a.ease * ahead);
   // a gap coming up (from its run-up to its far edge): carry enough speed, stay on line, hit the pad
   let zone = null;
-  for (const g of T.gaps) {
+  for (const g of T.aiGaps) {
     if (wrapIdx(g.launch - s.idx) <= 45 || wrapIdx(s.idx - g.launch) <= wrapIdx(g.a + g.n - g.launch)) { zone = g; break; }
   }
   a.zone = zone;
@@ -3124,10 +3180,11 @@ function aiThink(s, dt) {
     }
   }
   // blockades: aim for the middle of the gap
+  let gateClose = false;
   for (const g of W.gates) {
     if (g.kind !== 'shift' || !weaponsLive(s) || (g.soft > 0 && g.owner === s.id)) continue;   // (its own glass: straight through)
     const ahead = wrapIdx(g.gi - s.idx);
-    if (ahead <= look + 3) { ti = wrapIdx(g.gi + 4); lane = g.side === 0 ? -T.hw * 0.62 : T.hw * 0.62; }
+    if (ahead <= look + 3) { ti = wrapIdx(g.gi + 4); lane = g.side === 0 ? -T.hw * 0.62 : T.hw * 0.62; gateClose = true; }
     else if (ahead <= 45) lane = g.side === 0 ? -T.hw * 0.62 : T.hw * 0.62;
   }
   // on for a jump shortcut: onto the pad (this outranks everything else on the run-up)
@@ -3140,6 +3197,17 @@ function aiThink(s, dt) {
       if (j.side) ti = wrapIdx(s.idx + Math.min(look, 6));
       if (ahead < 3 && (sp < a.jp.v - 50 || sp > a.jp.v + 80)) a.jp = null;   // not at the speed it takes after all: carry on
     }
+  }
+  // a hole over half the lane ahead: keep to the other half, with room to spare (until past it). Last, so that
+  // nothing else (a power cell, a blockade's gap) can steer it in
+  a.pitNear = false;
+  for (const p of T.pits) {
+    if (!p.side || gateClose || Math.abs(T.h[p.i] - s.h) > 0.25) continue;   // (a blockade right ahead comes first)
+    const ahead = wrapIdx(p.a - s.idx), inside = wrapIdx(s.idx - p.a) <= 2 * p.n + 1;
+    if (!inside && ahead > look + 24) continue;
+    lane = -p.c;   // (the middle of the open half)
+    a.pitNear = ahead < look + 12 || inside;
+    if (inside || ahead < look) ti = wrapIdx(s.idx + Math.min(look, 6));   // (close to it: a short look, so it doesn't cut in)
   }
   let tx = T.x[ti] + T.nx[ti] * lane, ty = T.y[ti] + T.ny[ti] * lane;
 
@@ -3242,6 +3310,12 @@ function aiThink(s, dt) {
     const c = a.sc.c, p = chordAt(c, c.doorS + 40), ddx = p[0] - s.x, ddy = p[1] - s.y, dd = Math.hypot(ddx, ddy);
     const ang = Math.abs(angDiff(Math.atan2(s.vy, s.vx), Math.atan2(ddy, ddx)));
     if (dd > 1 && ang > 0.03) a.vCorner = Math.min(a.vCorner, Math.sqrt(cornerLimit(s, s.boostT > 0) * sty.trust * dd / (2 * Math.sin(Math.min(ang, 1.5)))));
+  }
+  // a hole over half the lane just ahead: no faster than the swerve onto the open half allows (the arc from here,
+  // along its travel, to the point it steers for), or it slides wide into the hole
+  if (a.pitNear && !s.air && sp > 1) {
+    const ddx = tx - s.x, ddy = ty - s.y, dd = Math.hypot(ddx, ddy), ang = Math.abs(angDiff(Math.atan2(s.vy, s.vx), Math.atan2(ddy, ddx)));
+    if (dd > 1 && ang > 0.03) a.vCorner = Math.min(a.vCorner, Math.max(90, Math.sqrt(cornerLimit(s, s.boostT > 0) * sty.trust * 0.85 * dd / (2 * Math.sin(Math.min(ang, 1.5))))));   // (never down to a crawl: it would stall)
   }
   const over = sp - a.vCorner;
   if (over > 0 && sp > 1) {
@@ -7996,6 +8070,7 @@ function buildHills() {
     }
     for (let i = 0; i < N; i++) if (base[i] >= 0.005 && T.loopOf[i] < 0) T.h[i] = Math.max(0, nh[i]);
     T.gaps.forEach((g) => Object.assign(g, gapNeed(g)));
+    pitZones();
   }
   // what casts shadows: the hills only (the road itself casts none)
   const OCC = Float32Array.from(H), OCO = Int16Array.from(OWN);
@@ -8898,6 +8973,47 @@ function drawJump(j, time, f) {
   lc.globalAlpha = 1; lc.lineJoin = 'round';
   quad(ec, [P(-A, lo), P(-A, hi), P(A, hi), P(A, lo)]); ec.globalAlpha = 0.28 + 0.1 * Math.sin(time * 5); ec.fillStyle = '#b6ff6a'; ec.fill(); ec.globalAlpha = 1;
 }
+/* a hole in the deck: its walls going down (lit from the upper left, in the scene's perspective, so a hole off to the
+   side shows its far wall) to a dark floor; then (drawPitRim, over anything falling in) its yellow and black rim */
+const PIT_COL = { floor: '#09080e', back: '#16121e', wall: ['#211c2b', '#352e44', '#51496a', '#776e93'], yel: '#ffd23a', blk: '#1a150d' };
+function pitScreen(P, f) { const o = []; for (const q of P) o.push([VW / 2 + (q[0] - CX) * f, VH / 2 + (q[1] - CY) * f]); return o; }
+function pitPath(ctx, P) { ctx.beginPath(); ctx.moveTo(P[0][0], P[0][1]); for (let k = 1; k < P.length; k++) ctx.lineTo(P[k][0], P[k][1]); ctx.closePath(); }
+function drawPit(p) {
+  const h = T.h[p.i], f0 = fscale(h), f1 = fscale(h - PIT.DEPTH);
+  if (offscreen(p.x, p.y, f0, p.R + 10)) return;
+  const R = pitScreen(p.rim, f0), F = pitScreen(p.rim, f1), K = R.length;
+  const cx = R.reduce((a, q) => a + q[0], 0) / K, cy = R.reduce((a, q) => a + q[1], 0) / K;
+  lc.setTransform(1, 0, 0, 1, 0, 0);
+  lc.save(); pitPath(lc, R); lc.clip();
+  lc.fillStyle = PIT_COL.back; lc.fill();
+  for (let k = 0; k < K; k++) {
+    const k2 = (k + 1) % K, mx = (R[k][0] + R[k2][0]) / 2, my = (R[k][1] + R[k2][1]) / 2;
+    const nx = cx - mx, ny = cy - my, nl = Math.hypot(nx, ny) || 1, lit = (nx * -0.6 + ny * -0.8) / nl;   // (the inside face, toward the light)
+    lc.fillStyle = PIT_COL.wall[clamp(Math.round((lit + 1) * 1.5), 0, 3)];
+    lc.beginPath(); lc.moveTo(R[k][0], R[k][1]); lc.lineTo(R[k2][0], R[k2][1]); lc.lineTo(F[k2][0], F[k2][1]); lc.lineTo(F[k][0], F[k][1]); lc.closePath(); lc.fill();
+    lc.strokeStyle = lc.fillStyle; lc.lineWidth = 1; lc.stroke();   // (no seams between the facets)
+  }
+  pitPath(lc, F); lc.fillStyle = PIT_COL.floor; lc.fill();
+  lc.restore();
+}
+function drawPitRim(p, time) {
+  const f0 = fscale(T.h[p.i]);
+  if (offscreen(p.x, p.y, f0, p.R + 10)) return;
+  const O = pitScreen(p.outer, f0), I = pitScreen(p.inner, f0), K = O.length;
+  lc.setTransform(1, 0, 0, 1, 0, 0); ec.setTransform(1, 0, 0, 1, 0, 0);
+  // (the band only: the outer ring with the inner one cut out of it)
+  lc.beginPath(); lc.moveTo(O[0][0], O[0][1]); for (let k = 1; k < K; k++) lc.lineTo(O[k][0], O[k][1]); lc.closePath();
+  lc.moveTo(I[0][0], I[0][1]); for (let k = 1; k < K; k++) lc.lineTo(I[k][0], I[k][1]); lc.closePath();
+  lc.fillStyle = PIT_COL.blk; lc.fill('evenodd');
+  lc.fillStyle = PIT_COL.yel;
+  for (let k = 0; k < K; k += 4) {   // (hazard stripes, slanted)
+    const a = k, b = (k + 2) % K, c = (k + 3) % K, d = (k + 1) % K;
+    lc.beginPath(); lc.moveTo(O[a][0], O[a][1]); lc.lineTo(O[b][0], O[b][1]); lc.lineTo(I[c][0], I[c][1]); lc.lineTo(I[d][0], I[d][1]); lc.closePath(); lc.fill();
+  }
+  pitPath(lc, I); lc.strokeStyle = PIT_COL.blk; lc.lineWidth = 1; lc.stroke();
+  pitPath(lc, O); lc.strokeStyle = '#0b0906'; lc.stroke();
+  pitPath(ec, O); ec.strokeStyle = PIT_COL.yel; ec.globalAlpha = 0.16 + 0.06 * Math.sin(time * 4); ec.lineWidth = 3; ec.stroke(); ec.globalAlpha = 1;
+}
 function drawRock(r, f) {
   if (offscreen(r.x, r.y, f, 30)) return;
   const sp = decorSprite('hazard', r.r, r.v, false), w = Math.round(sp.w * f), h = Math.round(sp.h * f);
@@ -9627,9 +9743,26 @@ function renderFrame(time) {
   for (const r of W.rocks) items.push({ k: LKEY(r.h, r.idx, 2), y: r.y, fn: () => atPos(r.h, r.x, r.y, (f) => drawRock(r, f)) });
   for (const t of W.targets) items.push({ k: LKEY(t.h, t.idx, 3), y: t.y, fn: () => atPos(t.h, t.x, t.y, (f) => drawTarget(t, time, f)) });
   for (const j of T.jumps) items.push({ k: LKEY(T.h[j.i], j.i, 0.5), y: 0, fn: () => atLevel(T.h[j.i], (f) => drawJump(j, time, f)) });
+  for (const p of T.pits) {
+    items.push({ k: LKEY(T.h[p.i], p.i, 0.4), y: 0, fn: () => { drawPit(p); setScale(1); } });
+    items.push({ k: LKEY(T.h[p.i], p.i, 0.42), y: 0, fn: () => { drawPitRim(p, time); setScale(1); } });
+  }
   loopItems(items, time);
   // (every ship at the scale of its own height, the same as the deck at that height)
-  for (const s of W.ships) { if (s.loop) continue; items.push({ k: shipKey(s), y: s.y, fn: () => atPos(s.h, s.x, s.y, (f) => drawShip(s, time, f)) }); }
+  for (const s of W.ships) {
+    if (s.loop) continue;
+    if (s.pit && s.air) {   // (dropping into a hole: seen down inside it, under its rim)
+      const p = s.pit;
+      items.push({ k: LKEY(T.h[p.i], p.i, 0.41), y: s.y, fn: () => {
+        lc.save(); ec.save(); lc.setTransform(1, 0, 0, 1, 0, 0); ec.setTransform(1, 0, 0, 1, 0, 0);
+        const R = pitScreen(p.rim, fscale(T.h[p.i])); pitPath(lc, R); lc.clip(); pitPath(ec, R); ec.clip();
+        atPos(s.h, s.x, s.y, (f) => drawShip(s, time, f));
+        lc.restore(); ec.restore(); setScale(1);
+      } });
+      continue;
+    }
+    items.push({ k: shipKey(s), y: s.y, fn: () => atPos(s.h, s.x, s.y, (f) => drawShip(s, time, f)) });
+  }
   ghostItem(items, time);   // (a time trial's ghost)
   if (TRACK.landmarks && TRACK.landmarks.length) items.push({ k: 0.33, y: 0, fn: () => drawTrackLandmarks(time) });   // (landmarks with art)
   if (T.chords.some((c) => c.lift)) corridorItems(items);   // (shortcut corridors off the ground)
@@ -13860,7 +13993,7 @@ function handleEvents() {
       case 'fall':
         if (!e.a.isPlayer) chat(e.a, 'crash');
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.fall();
-        if (e.a.isPlayer && mode === 'race') toast('Fell off! Back on past the gap');
+        if (e.a.isPlayer && mode === 'race') toast(e.b === 'pit' ? 'Into a hole! Back on past it' : 'Fell off! Back on past the gap');
         break;
       case 'hurt':
         W.shake = Math.max(W.shake, 0.35);
@@ -14060,7 +14193,7 @@ function addTrackCard(d) {
       if (gap(i, j) <= 40 || Math.hypot(T.x[i] - T.x[j], T.y[i] - T.y[j]) >= T.hw) continue;
       if (!xs.some((c) => (gap(c[0], i) < 25 && gap(c[1], j) < 25) || (gap(c[0], j) < 25 && gap(c[1], i) < 25))) xs.push([i, j]);
     }
-    const info = { L: T.L, shortcuts: T.chords.length, hills: T.runs.filter((r) => r.lv > 0).length, trenches: T.runs.filter((r) => r.lv < 0).length, over: xs.length, bars: (d.barricades || []).length, jumps: T.jumps.length, gaps: T.gaps.length, loops: T.loops.length };
+    const info = { L: T.L, shortcuts: T.chords.length, hills: T.runs.filter((r) => r.lv > 0).length, trenches: T.runs.filter((r) => r.lv < 0).length, over: xs.length, bars: (d.barricades || []).length, jumps: T.jumps.length, gaps: T.gaps.length, loops: T.loops.length, holes: T.pits.length };
     // preview
     const cv = document.createElement('canvas'); cv.width = 320; cv.height = 180;
     const g = cv.getContext('2d'), b = T.bounds, k = Math.min(300 / (b.x1 - b.x0 - 400), 160 / (b.y1 - b.y0 - 400));
@@ -14081,6 +14214,7 @@ function addTrackCard(d) {
       g.lineCap = 'butt'; g.lineWidth = T.hw * 2 + 30; g.strokeStyle = '#0b0a1c'; g.stroke(p); g.lineCap = 'round';
     }
     for (const j of T.jumps) { const i = j.i; g.lineWidth = 40; g.strokeStyle = '#b6ff6a'; g.beginPath(); g.moveTo(T.x[i] + T.nx[i] * (j.lo + 10), T.y[i] + T.ny[i] * (j.lo + 10)); g.lineTo(T.x[i] + T.nx[i] * (j.hi - 10), T.y[i] + T.ny[i] * (j.hi - 10)); g.stroke(); }
+    for (const q of T.pits) { g.fillStyle = '#ffd23a'; g.beginPath(); for (const [x, y] of q.outer) g.lineTo(x, y); g.closePath(); g.fill(); }   // holes
     g.fillStyle = '#f4efe6'; g.beginPath(); g.arc(T.x[0], T.y[0], 40, 0, TAU); g.fill();
     const btn = document.createElement('button');
     btn.type = 'button'; btn.className = 'tcard';
@@ -14112,7 +14246,7 @@ function trackFromCode(text) {
   let hsh = 7; for (const ch of JSON.stringify(d.points) + name) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0;
   const def = { id: 'custom-' + (hsh >>> 0).toString(36), name, custom: true, seed: (hsh >>> 0) % 997 + 3, points: d.points };
   if (d.setting && SETTINGS[d.setting]) def.setting = d.setting;
-  for (const k of ['shortcuts', 'elevation', 'barricades', 'jumps', 'gaps', 'loops', 'landmarks']) if (Array.isArray(d[k]) && d[k].length) def[k] = d[k];   // (landmarks come without art: not drawn)
+  for (const k of ['shortcuts', 'elevation', 'barricades', 'jumps', 'gaps', 'holes', 'loops', 'landmarks']) if (Array.isArray(d[k]) && d[k].length) def[k] = d[k];   // (landmarks come without art: not drawn)
   const keep = TRACK;
   try { buildTrack(def); buildRocks(def.seed); } catch (e) { buildTrack(keep); throw new Error("That track couldn't be built: " + e.message); }
   buildTrack(keep);
@@ -14159,7 +14293,7 @@ function syncTrackCards() {
     const rows = [
       ['World', (SETTINGS[d.setting] || SETTINGS.space).name],
       ['Lap', (i.L / 1000).toFixed(1) + ' km'],
-      ['Track', pl(i.shortcuts, 'shortcut') + ', ' + pl(i.bars, 'barricade')],
+      ['Track', pl(i.shortcuts, 'shortcut') + ', ' + pl(i.bars, 'barricade') + (i.holes ? ', ' + pl(i.holes, 'hole') : '')],
       ['Height', elev + (i.over ? ', ' + pl(i.over, 'overpass').replace('passs', 'passes') : '')],
       ['Air', i.jumps || i.gaps || i.loops ? [i.loops && pl(i.loops, 'loop'), i.jumps && pl(i.jumps, 'jump'), i.gaps && pl(i.gaps, 'gap')].filter(Boolean).join(', ') : 'none'],
       PLAY === 'trial' ? ['Trial', (b.trial && b.trial[laps] ? fmt(b.trial[laps]) : '–') + (b.tlap ? ' · ' + fmt(b.tlap) + ' lap' : '')]

@@ -9,7 +9,7 @@ into the game:
 
 1. Add an entry to `const TRACKS = [...]` in `index.html` (follow the existing entries): an `id` (kebab-case of the
    name), `name`, `setting`, a `seed` (any small number not already used), and the code's `points`, `shortcuts`,
-   `elevation`, `barricades`, `jumps`, `gaps`, `loops` and `landmarks` as they are. The track format is documented in
+   `elevation`, `barricades`, `jumps`, `gaps`, `holes`, `loops` and `landmarks` as they are. The track format is documented in
    the comment above `const TRACKS` ("the circuits").
 2. **Landmarks**: every entry in `landmarks` (`{at: [x, y], r, desc}`) needs its art, or it is not drawn. Draw each one
    to match its `desc`: add an entry to `LANDMARK_ART` (see the "landmarks" section of `index.html` for the format:

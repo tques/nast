@@ -139,6 +139,7 @@ select { flex: 1; min-width: 0; padding: 7px 8px; }
         <button class="tool" type="button" data-tool="gap" aria-pressed="false"><i style="background: #0a0918; box-shadow: inset 0 0 0 2px #ffc24a"></i>Gap<kbd>8</kbd></button>
         <button class="tool" type="button" data-tool="loop" aria-pressed="false"><i style="background: #0a0918; border-radius: 50%; box-shadow: inset 0 0 0 3px #62d6cc"></i>Loop<kbd>9</kbd></button>
         <button class="tool" type="button" data-tool="fall" aria-pressed="false"><i style="background: linear-gradient(135deg, #ffc478 50%, #0a0918 50%); box-shadow: inset 0 0 0 2px #ffc24a"></i>Fall gap<kbd>0</kbd></button>
+        <button class="tool" type="button" data-tool="hole" aria-pressed="false"><i style="background: #0a0918; border-radius: 50%; box-shadow: inset 0 0 0 3px #ffd23a"></i>Hole<kbd>H</kbd></button>
         <button class="tool" type="button" data-tool="landmark" aria-pressed="false"><i style="background: #e88cff; border-radius: 50% 50% 50% 0"></i>Landmark<kbd>L</kbd></button>
       </div>
       <p class="hint" id="hint"></p>
@@ -204,6 +205,7 @@ select { flex: 1; min-width: 0; padding: 7px 8px; }
       <span><i style="background: #b6ff6a"></i>Jump</span>
       <span><i style="background: #0a0918; box-shadow: inset 0 0 0 2px #ffc24a"></i>Gap</span>
       <span><i style="background: #20476a; box-shadow: inset 0 0 0 2px #62d6cc"></i>Loop</span>
+      <span><i style="background: #07060b; box-shadow: inset 0 0 0 2px #ffd23a; border-radius: 50%"></i>Hole</span>
       <span><i style="background: rgba(232,140,255,0.25); box-shadow: inset 0 0 0 2px #e88cff; border-radius: 50%"></i>Landmark</span>
     </div>
     <div id="toast" role="status"></div>
@@ -230,6 +232,7 @@ function loopNeed(r) {
   return Math.sqrt(w);
 }
 const SPD = { cruise: 250, full: 300, boost: 440, slow: 200 };
+const PIT = { A: 1.45, EDGE: 5 };   // holes, as in the game: length along the lane for each metre of width; deck left at its sides
 const LM = { MIN: 30, MAX: 400 };   // a landmark's radius, metres   // m/s: comfortable, flat out, boosting, slowest flight shown
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -325,7 +328,7 @@ function blankDoc() {
   const pts = [];
   for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU - Math.PI / 2; pts.push([Math.round(Math.cos(a) * 1150), Math.round(Math.sin(a) * 620)]); }
   // start on the top straight, racing clockwise
-  return { name: 'New track', setting: 'space', points: pts, shortcuts: [], elevation: [], barricades: [], jumps: [], gaps: [], loops: [], landmarks: [] };
+  return { name: 'New track', setting: 'space', points: pts, shortcuts: [], elevation: [], barricades: [], jumps: [], gaps: [], holes: [], loops: [], landmarks: [] };
 }
 let doc = null, G = null;
 function rebuild() { G = buildGeom(doc.points); computeHeights(); runChecks(); refreshCode(); refreshSel(); save(); draw(); const st = document.getElementById('setting'); if (st && doc.setting && st.value !== doc.setting) st.value = doc.setting; }
@@ -364,6 +367,36 @@ function gapInfo(g) {
   } else if (hN <= hF + 0.05) why = 'nothing launches racers over it';
   else need = ((span + 0.5) * G.step + 8) / Math.sqrt((2 * (hN - hF)) / AIR.G);
   return { s0, span, n: span, a: s0, b: cyc(s0 + span - 1, N), jump: jb, need, why, drop: jb < 0 && hN > hF + 0.05 };
+}
+/* a hole: its size and samples (as the game works them out), and, across the whole lane, the jump that clears it */
+function holeInfo(q) {
+  const N = G.N, i = anchorIdx(G, q.a), side = q.side === 'left' || q.side === 'right' ? q.side : null;
+  const lo = side === 'right' ? 0 : -HW, hi = side === 'left' ? 0 : HW, w = (hi - lo) / 2 - PIT.EDGE * (side ? 1 : 1.6);
+  const A = (side ? w : HW / 2) * PIT.A, n = Math.ceil(A / G.step) + 1, c = (lo + hi) / 2;
+  const o = { i, side, c, w, A, n, s0: cyc(i - n, N), span: 2 * n + 1, jump: -1, need: 0, why: '' };
+  if (!side) {
+    const post = cyc(i + n + 1, N), hF = G.h[post];
+    let best = 1e9;
+    doc.jumps.forEach((j, k) => { const d = cyc(o.s0 - anchorIdx(G, j.a), N); if (d >= 1 && d <= 60 && d < best) { best = d; o.jump = k; } });
+    if (o.jump < 0) { o.need = Infinity; o.why = 'nothing launches racers over it'; }
+    else {
+      const ji = anchorIdx(G, doc.jumps[o.jump].a), top = G.h[ji] + AIR.H;
+      if (top <= hF + 0.02) { o.need = Infinity; o.why = 'the far side is higher than a jump reaches'; }
+      else o.need = (cyc(post - ji, N) * G.step + 8) / (AIR.H / AIR.RISE + AIR.HOLD + Math.sqrt((2 * (top - hF)) / AIR.G));
+    }
+  }
+  return o;
+}
+/* points round a hole's rim, in world space (an oval in the lane's frame, bending with it); d grows it */
+function holeRing(o, d, K) {
+  const N = G.N, out = [];
+  for (let k = 0; k < K; k++) {
+    const t = (k / K) * TAU, al = (o.A + d) * Math.cos(t), lat = o.c + (o.w + d) * Math.sin(t);
+    const u = al / G.step, k0 = Math.floor(u), f = u - k0, i0 = cyc(o.i + k0, N), i1 = cyc(i0 + 1, N);
+    const nx = G.nx[i0] + (G.nx[i1] - G.nx[i0]) * f, ny = G.ny[i0] + (G.ny[i1] - G.ny[i0]) * f, nl = Math.hypot(nx, ny) || 1;
+    out.push([G.x[i0] + (G.x[i1] - G.x[i0]) * f + (nx / nl) * lat, G.y[i0] + (G.y[i1] - G.y[i0]) * f + (ny / nl) * lat]);
+  }
+  return out;
 }
 /* the ramp going down nearest sample i (within 60 samples either way): its last sample at the top and its first at
    the bottom, or null. A fall gap covers the samples between. */
@@ -662,6 +695,7 @@ function runChecks() {
     }
     const inSpan = (e, pad) => cyc(e - li + back + pad, N) <= back + fwd + 2 * pad;
     for (const j of jIdx) if (inSpan(j, 0)) busy = true;
+    for (const q of doc.holes) if (inSpan(anchorIdx(G, q.a), 6)) busy = true;
     for (const b of bars) if (inSpan(b, 0) || inSpan(cyc(b - 18, N), 0)) busy = true;
     for (const c of infos) for (const e of [c.a, c.b, c.ti]) if (inSpan(e, 0)) busy = true;
     lIdx.forEach((o, j) => { if (j !== k && inSpan(o, back)) busy = true; });
@@ -672,10 +706,37 @@ function runChecks() {
     }
     if (!flat) issue('bad', name + ' needs flat ground for its run-up, its footprint and the way out.', [li]);
     if (!straight) issue('bad', name + ' needs the lane to run straight for ' + Math.round(reach * G.step) + ' m either side of it.', [li]);
-    if (busy) issue('bad', name + ' needs its run-up and way out clear of the start, gaps, jumps, barricades, shortcuts and other loops.', [li]);
+    if (busy) issue('bad', name + ' needs its run-up and way out clear of the start, gaps, jumps, holes, barricades, shortcuts and other loops.', [li]);
     if (clash >= 0) issue('bad', name + ' stands on another part of the track.', [clash]);
     issue('info', name + ' (radius ' + Math.round(q.r) + ' m, ' + Math.round(TAU * q.r) + ' m of track, comes out to the ' + (q.side === 'left' ? 'left' : 'right') + '): racers need about ' + Math.round(loopNeed(q.r)) + ' m/s going in, and a clean line round it to come out fast.', [li]);
   });
+  // holes: on level track (not a ramp), clear of the start, shortcuts, gaps, jumps, barricades and loops
+  const holes = doc.holes.map(holeInfo);
+  holes.forEach((o, k) => {
+    const name = 'Hole ' + (k + 1), i = o.i, near = (e, pad) => far(e, i) <= o.n + pad;
+    let level = true;
+    for (let q = -o.n - 3; q <= o.n + 3; q++) if (Math.abs(h[cyc(i + q, N)] - h[i]) > 0.001) level = false;
+    if (!level) issue('bad', name + ' must be on level track: the ground, or the flat top or floor of a raised or sunken stretch, not on a ramp.', [i]);
+    if (Math.min(i, N - i) < o.n + 20) issue('bad', 'Keep holes away from the start line and the grid behind it.', [i]);
+    for (let q = -o.n - 3; q <= o.n + 3; q++) if (G.gap[cyc(i + q, N)]) { issue('bad', name + ' is on a gap.', [i]); break; }
+    for (const c of infos) if (near(c.a, 12) || near(c.b, 12) || near(c.ti, 6)) issue('bad', name + ' is on a shortcut entrance, exit or target.', [i]);
+    for (const c of infos) { let on = false; for (const [x, y] of holeRing(o, 6, 24)) if (polyDist(c.P, x, y).d < CHW) on = true; if (on) issue('bad', name + ' is on a shortcut corridor.', [i]); }
+    bars.forEach((b, j) => { if (near(b, 14) || near(cyc(b - 18, N), 4)) issue('bad', name + ' is too close to barricade ' + (j + 1) + ': racers need room to line up for its gap.', [i]); });
+    jIdx.forEach((ji, j) => { if (near(ji, 3)) issue('bad', name + ' is on jump ' + (j + 1) + '.', [i]); });
+    lIdx.forEach((li) => { if (near(li, 40)) issue('bad', name + ' is in a loop\'s run-up or way out.', [i]); });
+    holes.forEach((o2, j) => { if (j > k && far(o2.i, i) <= o.n + o2.n + 3) issue('bad', 'Holes ' + (k + 1) + ' and ' + (j + 1) + ' overlap or touch.', [i]); });
+    if (!o.side) {
+      if (!isFinite(o.need)) issue('bad', name + " covers the whole lane and can't be cleared: " + o.why + '. Put a jump pad before it (within 720 m), or make it a half-lane hole.', [i]);
+      else if (o.need > SPD.boost) issue('bad', name + ' needs ' + Math.round(o.need) + ' m/s off jump ' + (o.jump + 1) + ', faster than a boost. Move the jump closer.', [i]);
+      else if (o.need > SPD.cruise) issue('warn', name + ' needs ' + Math.round(o.need) + ' m/s off jump ' + (o.jump + 1) + ': racers must be near full speed.', [i]);
+      if (o.jump >= 0 && doc.jumps[o.jump].side) issue('warn', name + "'s jump pad only covers the " + doc.jumps[o.jump].side + ' half of the lane; racers on the other side will fall in.', [jIdx[o.jump]]);
+    } else {
+      // on a bend, a hole on the outside is the harder one to keep off at speed
+      const a = cyc(i - 8, N), b = cyc(i + 8, N), bend = (G.tx[b] - G.tx[a]) * G.nx[i] + (G.ty[b] - G.ty[a]) * G.ny[i];
+      if (Math.abs(bend) > 0.35 && (bend > 0) === (o.side === 'left')) issue('info', name + ' is on the outside of a bend: racers carrying speed run wide into it.', [i]);
+    }
+  });
+  stats.holes = holes;
   // landmarks: decoration beside the track, described for Claude to draw
   stats.infos = infos;
   doc.landmarks.forEach((L, k) => {
@@ -733,9 +794,11 @@ function exportDoc() {
     barricades: doc.barricades.map((b) => r5(anchorFrac(G, b))),
     jumps: doc.jumps.map((j) => (j.side ? { at: r5(anchorFrac(G, j.a)), side: j.side } : { at: r5(anchorFrac(G, j.a)) })),
     gaps: doc.gaps.map((g) => ({ from: r5(anchorFrac(G, g.a)), to: r5(anchorFrac(G, g.b)) })),
+    holes: doc.holes.map((q) => (q.side ? { at: r5(anchorFrac(G, q.a)), side: q.side } : { at: r5(anchorFrac(G, q.a)) })),
     loops: doc.loops.map((q) => ({ at: r5(anchorFrac(G, q.a)), r: Math.round(q.r), side: q.side === 'left' ? 'left' : 'right' }))
   };
   if (!out.loops.length) delete out.loops;
+  if (!out.holes.length) delete out.holes;
   // landmarks: decoration, drawn by Claude from the description when it builds the track in (see the game's LANDMARK_ART)
   if (doc.landmarks.length) out.landmarks = doc.landmarks.map((L) => { const o = { at: [Math.round(L.x), Math.round(L.y)], r: Math.round(L.r), desc: L.desc.trim() }; if (L.art) o.art = L.art; return o; });
   return JSON.stringify(out);
@@ -757,6 +820,7 @@ function importCode(text) {
     barricades: (d.barricades || []).map((f) => fracToAnchor(g, +f)),
     jumps: (d.jumps || []).map((j) => ({ a: fracToAnchor(g, +(typeof j === 'number' ? j : j.at)), side: j.side === 'left' || j.side === 'right' ? j.side : null })),
     gaps: (d.gaps || []).map((q) => ({ a: fracToAnchor(g, +q.from), b: fracToAnchor(g, +q.to) })),
+    holes: (d.holes || []).map((q) => ({ a: fracToAnchor(g, +(typeof q === 'number' ? q : q.at)), side: q.side === 'left' || q.side === 'right' ? q.side : null })),
     loops: (d.loops || []).map((q) => ({ a: fracToAnchor(g, +(typeof q === 'number' ? q : q.at)), r: clamp(+q.r || LOOP.R, LOOP.MIN_R, LOOP.MAX_R), side: q.side === 'left' ? 'left' : 'right' })),
     landmarks: (d.landmarks || []).filter((L) => L && Array.isArray(L.at)).map((L) => {
       const o = { x: Math.round(+L.at[0]), y: Math.round(+L.at[1]), r: clamp(Math.round(+L.r || 90), LM.MIN, LM.MAX), desc: String(L.desc || '').slice(0, 400) };
@@ -781,6 +845,7 @@ function allAnchors() {
   for (const b of doc.barricades) out.push(b);
   for (const j of doc.jumps) out.push(j.a);
   for (const g of doc.gaps) out.push(g.a, g.b);
+  for (const q of doc.holes) out.push(q.a);
   for (const q of doc.loops) out.push(q.a);
   return out;
 }
@@ -831,6 +896,7 @@ function reverseDir() {
   for (const e of doc.elevation) [e.a, e.b] = [e.b, e.a];
   for (const g of doc.gaps) [g.a, g.b] = [g.b, g.a];
   for (const j of doc.jumps) if (j.side) j.side = j.side === 'left' ? 'right' : 'left';
+  for (const q of doc.holes) if (q.side) q.side = q.side === 'left' ? 'right' : 'left';
 }
 
 /* ================= view ================= */
@@ -1031,6 +1097,20 @@ function draw() {
     const m = (lo + hi) / 2, w = (hi - lo) / 2 - 10, ch = [c(m - w, -8), c(m, 8), c(m + w, -8)];
     ctx.strokeStyle = '#16402a'; ctx.lineWidth = Math.max(1.5, 4 * z); ctx.beginPath(); ch.forEach((P, q) => (q ? ctx.lineTo(P[0], P[1]) : ctx.moveTo(P[0], P[1]))); ctx.stroke();
   });
+  // holes: a dark pit ringed in yellow and black
+  (stats.holes || []).forEach((o, k) => {
+    const on = sel && sel.type === 'hole' && sel.i === k, hot = !on && tool === 'hole' && hover && hover.type === 'hole' && hover.i === k, K = 36;
+    const O = holeRing(o, 5, K).map((q) => toScreen(q[0], q[1])), I = holeRing(o, -4, K).map((q) => toScreen(q[0], q[1]));
+    const path = (P) => { ctx.beginPath(); P.forEach((q, j) => (j ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.closePath(); };
+    path(O); ctx.fillStyle = '#17130c'; ctx.fill();
+    ctx.fillStyle = on ? '#ffffff' : hot ? '#fff0a8' : '#ffd23a';
+    for (let j = 0; j < K; j += 4) { const a = O[j], b = O[(j + 2) % K], c = I[(j + 3) % K], d = I[(j + 1) % K]; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); ctx.fill(); }
+    path(I); ctx.fillStyle = '#07060b'; ctx.fill();
+    if (on || tool === 'hole') {
+      const P = toScreen(G.x[o.i] - G.nx[o.i] * (HW + 40), G.y[o.i] - G.ny[o.i] * (HW + 40));
+      label(o.side ? 'HOLE · ' + o.side.toUpperCase() + ' HALF' : 'HOLE · ' + (isFinite(o.need) ? 'JUMP IT AT ' + Math.round(o.need) + ' M/S' : 'NO WAY OVER'), P[0], P[1], !o.side && (!isFinite(o.need) || o.need > SPD.boost) ? '#ff6b81' : '#ffd23a');
+    }
+  });
   // loops: the ring's footprint on the map (a curl of lane), drawn over the line it is spliced into
   stats.lIdx.forEach((li, k) => {
     const q = doc.loops[k], n = 96, edge = (l) => { const P = []; for (let s2 = 0; s2 <= n; s2++) P.push(toScreen(...loopFoot(li, q, (s2 / n) * TAU, l))); return P; };
@@ -1155,6 +1235,7 @@ const HINTS = {
   start: 'Click the lane to move the start line there. Use Reverse direction to race the other way.',
   jump: 'Click the lane to place a jump pad. Racers who cross it fly up over the walls for about 1.7 s, then come down. The lime band shows where they land (slow to boosting); the thin line is a straight-ahead flight, for jumping across to another part of the track. Click a pad to select it: it can cover the whole lane or one half.',
   loop: 'Click the lane to put a loop-de-loop there: racers climb a full ring and come out beside where they went in. It needs a flat, fairly straight run-up and way out, clear of other features (Checks says what is wrong). Click a loop to select it: change its size, or which side it comes out on.',
+  hole: 'Click the lane to cut a hole in it, ringed in yellow and black: racers who run onto it drop in and are put back past it, a few seconds lost. It covers the left half of the lane, the right half or all of it (change it once placed; a whole-lane hole needs a jump pad before it). On the ground or on the flat part of a raised or sunken stretch, on a straight or a bend; not on a ramp or a shortcut.',
   landmark: 'Click anywhere off the track to place a landmark: a one-off piece of scenery (a crashed freighter, a lighthouse, a giant statue...). Describe it in the box that opens; when you send the track code to Claude, it draws the landmark to match. Drag one to move it; select it to change its size or description. Pasted straight into the game, landmarks are left out.',
   fall: 'Click near a ramp going down (the end of a raised stretch, or the start of a sunken one): a gap is fitted over it, so racers fly off the higher deck and drop onto the lower track beyond, no jump pad needed. Select one to make it shorter (easier: less speed needed) or longer.',
   gap: 'Click where a gap starts, then where it ends: on the ground, or inside a raised or sunken stretch. Clear it with a jump pad before it, or let racers drop across it onto lower track (over the ramp at the end of a raised stretch, say). Racers who fall in are put back just past it.'
@@ -1177,6 +1258,9 @@ function pick(sx, sy) {
   }
   if (tool === 'jump') {
     for (let k = 0; k < doc.jumps.length; k++) { const i = anchorIdx(G, doc.jumps[k].a); if (Math.hypot(G.x[i] - wx, G.y[i] - wy) < HW * 0.6) return { type: 'jump', i: k }; }
+  }
+  if (tool === 'hole') {
+    for (let k = 0; k < doc.holes.length; k++) { const o = holeInfo(doc.holes[k]), x = G.x[o.i] + G.nx[o.i] * o.c, y = G.y[o.i] + G.ny[o.i] * o.c; if (Math.hypot(x - wx, y - wy) < Math.max(o.A, o.w) + 6) return { type: 'hole', i: k }; }
   }
   if (tool === 'landmark') {
     for (let k = doc.landmarks.length - 1; k >= 0; k--) { const L = doc.landmarks[k]; if (Math.hypot(L.x - wx, L.y - wy) < Math.max(L.r, 10 / view.z)) return { type: 'landmark', i: k }; }
@@ -1213,7 +1297,7 @@ function pick(sx, sy) {
     const i = anchorIdx(G, a);
     for (let k = 0; k < doc.elevation.length; k++) { const sp = stretchSamples(doc.elevation[k]); if (cyc(i - sp.s0, G.N) <= sp.span) return { type: 'stretch', i: k }; }
   }
-  if (onLane) return { type: 'lane', a: { k: a.k, u: a.u } };
+  if (onLane) { const i = anchorIdx(G, a); return { type: 'lane', a: { k: a.k, u: a.u }, lat: (wx - G.x[i]) * G.nx[i] + (wy - G.y[i]) * G.ny[i] }; }
   return null;
 }
 function evPos(e) { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
@@ -1249,16 +1333,19 @@ cv.addEventListener('pointerdown', (e) => {
       const j = addBend(h.i, h.s, toWorld(sx, sy));
       sel = { type: 'via', i: h.i, j }; drag = { kind: 'via', i: h.i, j, moved: true }; rebuild(); return;
     }
-    if (h.type === 'shortcut' || h.type === 'stretch' || h.type === 'barricade' || h.type === 'jump' || h.type === 'gap' || h.type === 'loop') { sel = { type: h.type, i: h.i }; pending = null; refreshSel(); draw(); return; }
-    if (h.type === 'lane') { laneClick(h.a); return; }
+    if (h.type === 'shortcut' || h.type === 'stretch' || h.type === 'barricade' || h.type === 'jump' || h.type === 'gap' || h.type === 'loop' || h.type === 'hole') { sel = { type: h.type, i: h.i }; pending = null; refreshSel(); draw(); return; }
+    if (h.type === 'lane') { laneClick(h.a, h.lat); return; }
   }
   sel = null; refreshSel();
   drag = { kind: 'pan', sx, sy, vx: view.x, vy: view.y }; cv.classList.add('grab');
 });
-function laneClick(a) {
+function laneClick(a, lat) {
   if (tool === 'start') { remember(); setStart(a); sel = null; rebuild(); toast('Start line moved'); return; }
   if (tool === 'barricade') { remember(); doc.barricades.push(a); sel = { type: 'barricade', i: doc.barricades.length - 1 }; rebuild(); return; }
   if (tool === 'jump') { remember(); doc.jumps.push({ a, side: null }); sel = { type: 'jump', i: doc.jumps.length - 1 }; rebuild(); return; }
+  if (tool === 'hole') {   // (on the half of the lane clicked)
+    remember(); doc.holes.push({ a, side: lat > 0 ? 'right' : 'left' }); sel = { type: 'hole', i: doc.holes.length - 1 }; rebuild(); return;
+  }
   if (tool === 'loop') { remember(); doc.loops.push({ a, r: LOOP.R, side: 'right' }); sel = { type: 'loop', i: doc.loops.length - 1 }; rebuild(); return; }
   if (tool === 'fall') {
     const r = downRampNear(anchorIdx(G, a));
@@ -1341,6 +1428,7 @@ function deleteSel() {
   else if (sel.type === 'stretch') doc.elevation.splice(sel.i, 1);
   else if (sel.type === 'barricade') doc.barricades.splice(sel.i, 1);
   else if (sel.type === 'jump') doc.jumps.splice(sel.i, 1);
+  else if (sel.type === 'hole') doc.holes.splice(sel.i, 1);
   else if (sel.type === 'gap') doc.gaps.splice(sel.i, 1);
   else if (sel.type === 'loop') doc.loops.splice(sel.i, 1);
   else if (sel.type === 'landmark') doc.landmarks.splice(sel.i, 1);
@@ -1381,6 +1469,12 @@ function refreshSel() {
     t.textContent = 'Jump ' + (sel.i + 1) + ', across ' + (j.side ? 'the ' + j.side + ' half of the lane' : 'the whole lane') + '. Racers come down ' + Math.round(SPD.slow * ft) + '–' + Math.round(SPD.boost * ft) + ' m on, depending on speed.';
     const next = { none: 'left', left: 'right', right: 'none' };
     add('Covers: ' + (j.side ? j.side + ' half' : 'whole lane') + ' (change)', () => { remember(); const n = next[j.side || 'none']; j.side = n === 'none' ? null : n; rebuild(); });
+  } else if (sel.type === 'hole') {
+    const q = doc.holes[sel.i], o = holeInfo(q);
+    t.textContent = 'Hole ' + (sel.i + 1) + ', over ' + (q.side ? 'the ' + q.side + ' half of the lane' : 'the whole lane') + ', ' + Math.round(o.A * 2) + ' m long. Racers who run onto it drop in and are put back just past it.' +
+      (q.side ? '' : isFinite(o.need) ? ' Cleared off jump ' + (o.jump + 1) + ' at ' + Math.round(o.need) + ' m/s or more.' : " Can't be cleared: " + o.why + '.');
+    const next = { left: 'right', right: 'none', none: 'left' };
+    add('Covers: ' + (q.side ? q.side + ' half' : 'whole lane') + ' (change)', () => { remember(); const n = next[q.side || 'none']; q.side = n === 'none' ? null : n; rebuild(); });
   } else if (sel.type === 'gap') {
     const g = stats.gaps[sel.i];
     t.textContent = 'Gap ' + (sel.i + 1) + ', ' + Math.round(g.span * G.step) + ' m. ' + (!isFinite(g.need) ? "Can't be cleared: " + g.why + '.' :
@@ -1428,6 +1522,7 @@ function runPanel() {
     ['Overpasses', String(stats.crossings)],
     ['Barricades', String(doc.barricades.length)],
     ['Jumps / gaps', doc.jumps.length + ' / ' + doc.gaps.length],
+    ['Holes', String(doc.holes.length)],
     ['Loops', String(doc.loops.length)],
     ['Landmarks', String(doc.landmarks.length)]
   ];
@@ -1462,7 +1557,7 @@ function restore() {
   try {
     const s = localStorage.getItem(SAVE_KEY), d = s ? JSON.parse(s) : null;
     if (d && d.shortcuts) for (const c of d.shortcuts) { c.via = c.via || []; c.target = c.target || null; }
-    if (d) { d.jumps = d.jumps || []; d.gaps = d.gaps || []; d.loops = d.loops || []; d.landmarks = d.landmarks || []; d.setting = d.setting || 'space'; }
+    if (d) { d.jumps = d.jumps || []; d.gaps = d.gaps || []; d.holes = d.holes || []; d.loops = d.loops || []; d.landmarks = d.landmarks || []; d.setting = d.setting || 'space'; }
     return d;
   } catch (e) { return null; }
 }
@@ -1512,6 +1607,7 @@ window.addEventListener('keydown', (e) => {
   if (k >= '1' && k <= '9') setTool(tools[+k - 1]);
   if (k === '0') setTool('fall');
   if (k === 'l' || k === 'L') setTool('landmark');
+  if (k === 'h' || k === 'H') setTool('hole');
 });
 window.addEventListener('resize', resize);
 
