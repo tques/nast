@@ -722,7 +722,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       </div>
       <canvas class="howtoCv" id="howtoCv" width="200" height="112" aria-label="A short looping demo of each control in turn" role="img"></canvas>
       <h2 class="arenaHead">Test area</h2>
-      <canvas class="arenaCv" id="arenaCv" width="320" height="200" aria-label="A small walled arena with an Arrow in it to fly, with the race controls"></canvas>
+      <canvas class="arenaCv" id="arenaCv" width="320" height="200" aria-label="A lane to practise on, with an Arrow to fly with the race controls, targets to shoot and a dummy to sideswipe"></canvas>
       <p class="note" id="arenaHint">Point the mouse inside it and fly: the Arrow handles just as it does in a race.</p>
     </div>
     <div>
@@ -15242,18 +15242,45 @@ function howtoFrame(now) {
 }
 
 /* ================= how to play: the test area =================
-   A little round arena, walled, with an Arrow in it to fly with the race's own controls (mouse and keys while the
-   pointer is over it; a gamepad once its stick moves, until Start). It moves by the race's own motion (shipMotion:
-   thrust, top speed, grip and the cornering slide), turns as fast, boosts, lunges, shoots and drops mines as in a race.
-   Power comes back on its own here (it doesn't in a race), and a mine you run over slows you, as one would. */
-const ARENA = { W: 320, H: 200, R: 92, run: false, last: 0, acc: 0, s: null, parts: [], shots: [], mines: [], keys: {}, mouse: { x: 0, y: 0, in: false, d0: false }, pad: false, boostQ: false, swipeQ: 0, mineQ: false };
+   A lane to fly, endless both ways, with an Arrow (in your colour) on it and the race's own controls (the mouse and
+   keys while the pointer is over it; a gamepad once its stick moves, until Start). It starts straight, then winds,
+   its bends coming at random, gentle and tight (a new lane each time the screen opens). It moves by the race's own
+   motion (shipMotion: thrust, top speed, grip and the cornering slide) and turns, boosts, lunges, shoots and drops
+   mines as in a race. Cyan targets float in the lane to shoot, and a grey training dummy cruises along it to
+   sideswipe (or shoot): neither hits back. Power refills on its own here (it doesn't in a race); your own mine
+   slows you, as one would. */
+const ARENA = { W: 320, H: 200, HW: 70, run: false, last: 0, acc: 0, s: null, parts: [], shots: [], mines: [], targets: [], dummy: null, hits: 0,
+  keys: {}, mouse: { x: 0, y: 0, in: false, d0: false }, pad: false, boostQ: false, swipeQ: 0, mineQ: false, cam: { x: 0, y: 0 }, bends: [] };
+const ARENA_DUMMY_COL = '#9aa1b2';
 function arenaPart(x, y, vx, vy, life, col, size, glow) { if (ARENA.parts.length < 300) ARENA.parts.push({ x, y, vx, vy, life, max: life, col, size, glow }); }
+/* the lane's middle at x, and its slope there: straight for 500 m each way, then winding (each part of the wind
+   fading in, and the tight ones coming and going on a long swell of their own) */
+function arenaLaneY(x) {
+  const ax = Math.abs(x), ramp = clamp((ax - 500) / 700, 0, 1);
+  if (ramp <= 0) return 0;
+  let y = 0;
+  for (const [amp, len, ph, env] of ARENA.bends) y += amp * Math.sin(x / len + ph) * (env ? 0.5 + 0.5 * Math.sin(x / env + ph * 1.7) : 1);
+  return y * ramp * ramp * (3 - 2 * ramp);
+}
+function arenaLane(x) { const y = arenaLaneY(x), sl = (arenaLaneY(x + 2) - arenaLaneY(x - 2)) / 4, L = Math.hypot(1, sl); return { y, nx: -sl / L, ny: 1 / L, tx: 1 / L, ty: sl / L }; }
 function arenaReset() {
-  const st = hullStats('arrow');
-  ARENA.s = { x: 0, y: 40, vx: 0, vy: 0, ang: -Math.PI / 2, st, col: PLAYER_COL, energy: 100, boostT: 0, boostCd: 0, shotCd: 0, swipeCd: 0, swipeT: 0, swipeDir: 0, stun: 0, slowT: 0,
+  const st = hullStats('arrow'), R = Math.random;
+  ARENA.bends = [[140 + 60 * R(), 520 + 200 * R(), R() * TAU, 0], [55 + 30 * R(), 240 + 80 * R(), R() * TAU, 0], [45 + 25 * R(), 120 + 40 * R(), R() * TAU, 700 + 400 * R()]];
+  ARENA.s = { x: 0, y: 0, vx: 0, vy: 0, ang: 0, st, col: PLAYER_COL, energy: 100, boostT: 0, boostCd: 0, shotCd: 0, swipeCd: 0, swipeT: 0, swipeDir: 0, stun: 0, slowT: 0,
     speedMul: 1, boostMul: 1, mag: st.mag, align: 1, slide: 0, wallCd: 0, partFn: arenaPart,
-    input: { mx: 0, my: 0, aim: -Math.PI / 2, fire: false, boostPress: false, swipe: 0, mine: false } };
-  ARENA.parts.length = 0; ARENA.shots.length = 0; ARENA.mines.length = 0;
+    input: { mx: 0, my: 0, aim: 0, fire: false, boostPress: false, swipe: 0, mine: false } };
+  ARENA.parts.length = 0; ARENA.shots.length = 0; ARENA.mines.length = 0; ARENA.targets.length = 0; ARENA.hits = 0;
+  ARENA.dummy = { x: 260, y: 0, vx: 0, vy: 0, ang: 0, flash: 0, wobble: 0 };
+  ARENA.cam.x = 0; ARENA.cam.y = 0;
+}
+/* the walls: kept inside the lane (pushed back along its normal, bouncing off as off a lane's wall); returns how hard */
+function arenaWall(o, rad, e) {
+  const L = arenaLane(o.x), d = (o.y - L.y) * L.ny, lim = ARENA.HW - rad;
+  if (Math.abs(d) <= lim) return 0;
+  const sg = Math.sign(d), nx = L.nx * sg, ny = L.ny * sg, over = Math.abs(d) - lim, vn = o.vx * nx + o.vy * ny;
+  o.x -= nx * over; o.y -= ny * over;
+  if (vn > 0) { o.vx -= (1 + e) * vn * nx; o.vy -= (1 + e) * vn * ny; }
+  return Math.max(0, vn);
 }
 function arenaPad(st) {   // (true while the pad flies the test area)
   if (!ARENA.run || screens.help.hidden) { ARENA.pad = false; return false; }
@@ -15264,7 +15291,7 @@ function arenaPad(st) {   // (true while the pad flies the test area)
 function arenaLetGo() { ARENA.pad = false; const g = padState(); if (g) PAD.prevMenu = g.buttons.map((x) => !!(x && x.pressed)); arenaHint(); }
 function arenaHint() {
   const h = $('arenaHint'); if (!h) return;
-  h.textContent = ARENA.pad ? 'Flying with the gamepad: press Start to go back to the menu.' : 'Point the mouse inside it and fly (or move a gamepad stick): the Arrow handles just as it does in a race.';
+  h.textContent = ARENA.pad ? 'Flying with the gamepad: press Start to go back to the menu.' : 'Point the mouse inside it and fly (or move a gamepad stick): the Arrow handles just as it does in a race. Shoot the targets; sideswipe the grey dummy.';
 }
 function arenaInput() {
   const A = ARENA, s = A.s, i = s.input, sp = Math.hypot(s.vx, s.vy);
@@ -15276,7 +15303,7 @@ function arenaInput() {
     if (st.brake && sp > 20) { i.mx = -s.vx / sp; i.my = -s.vy / sp; } else if (st.mag > 0) { i.mx = Math.cos(s.ang) * st.mag; i.my = Math.sin(s.ang) * st.mag; }
     i.fire = st.fire;
   } else if (A.mouse.in) {   // (as in a race: the nose turns toward the pointer, left button thrusts, Space brakes)
-    i.aim = Math.atan2(A.mouse.y - s.y, A.mouse.x - s.x);
+    i.aim = Math.atan2(A.mouse.sy - A.H / 2 + A.cam.y - s.y, A.mouse.sx - A.W / 2 + A.cam.x - s.x);   // (the pointer, in the lane: the view moves)
     if (A.keys.Space && sp > 20) { i.mx = -s.vx / sp; i.my = -s.vy / sp; } else if (A.mouse.d0) { i.mx = Math.cos(s.ang); i.my = Math.sin(s.ang); }
     i.fire = !!(A.keys.KeyW || A.keys.ArrowUp);
   }
@@ -15288,12 +15315,10 @@ function arenaStep(dt) {
   const A = ARENA, s = A.s, i = s.input, CF = CFG;
   s.shotCd -= dt; s.boostCd -= dt; s.swipeCd -= dt; s.wallCd -= dt;
   if (s.boostT > 0) s.boostT -= dt;
-  if (s.swipeT > 0) s.swipeT -= dt;
   if (s.slowT > 0) s.slowT -= dt;
   if (s.mag < s.st.mag) s.mag = Math.min(s.st.mag, s.mag + dt / s.st.magRegen);
   s.energy = Math.min(CF.energyMax, s.energy + 6 * dt);   // (power comes back here, so you can keep practising)
-  // turning, as in a race
-  s.ang += clamp(angDiff(s.ang, i.aim), -CF.turn * s.st.turn * dt, CF.turn * s.st.turn * dt);
+  s.ang += clamp(angDiff(s.ang, i.aim), -CF.turn * s.st.turn * dt, CF.turn * s.st.turn * dt);   // (turning, as in a race)
   noseThrust(s);
   const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
   if (i.boostPress) {   // a boost (as tryBoost): the way the nose points, at least to boost speed
@@ -15304,92 +15329,159 @@ function arenaStep(dt) {
       s.vx = fx * ns; s.vy = fy * ns; SFX.boost();
     }
   }
-  if (i.swipe) {   // a sideswipe: the lunge to that side (nobody here to hit)
-    if (s.swipeCd <= 0) { const lx = -fy * i.swipe, ly = fx * i.swipe; s.vx += lx * CF.swipeKick * 0.75; s.vy += ly * CF.swipeKick * 0.75; s.swipeCd = CF.swipeCd; s.swipeT = CF.swipeDur; s.swipeDir = i.swipe; SFX.swipe(); }
+  if (i.swipe) {   // a sideswipe: the lunge to that side, and the dummy thrown aside if it's there
+    if (s.swipeCd <= 0) {
+      const lx = -fy * i.swipe, ly = fx * i.swipe;
+      s.vx += lx * CF.swipeKick * 0.75; s.vy += ly * CF.swipeKick * 0.75; s.swipeCd = CF.swipeCd; s.swipeT = CF.swipeDur; s.swipeDir = i.swipe; SFX.swipe();
+    }
     i.swipe = 0;
   }
+  if (s.swipeT > 0) {
+    s.swipeT -= dt;
+    const D = A.dummy, lx = -fy * s.swipeDir, ly = fx * s.swipeDir, dx = D.x - s.x, dy = D.y - s.y, side = dx * lx + dy * ly, along = dx * fx + dy * fy;
+    if (!s.swipeHit && side > 2 && side < CF.shipR * 2 + 14 && Math.abs(along) < 16) {
+      s.swipeHit = true; D.vx += lx * CF.swipeKick * 1.1; D.vy += ly * CF.swipeKick * 1.1; D.flash = 0.4; D.wobble = 1; A.hits++;
+      for (let q = 0; q < 16; q++) arenaPart((s.x + D.x) / 2, (s.y + D.y) / 2, (Math.random() - 0.5) * 150, (Math.random() - 0.5) * 150, 0.35, '#fff1c4', 2, true);
+      SFX.thud();
+    }
+  } else s.swipeHit = false;
   if (i.mine) { i.mine = false; if (A.mines.length < CF.mineMax) { A.mines.push({ x: s.x - fx * 13, y: s.y - fy * 13, arm: CF.mineArm, life: CF.mineLife, t: 0 }); SFX.mineDrop(); } }
   if (i.fire && s.shotCd <= 0 && s.slowT <= 0 && s.mag >= 1) {
     s.shotCd = CF.fireCd; s.mag -= 1;
     A.shots.push({ x: s.x + fx * 9, y: s.y + fy * 9, vx: fx * CF.bulletV + s.vx * 0.5, vy: fy * CF.bulletV + s.vy * 0.5, life: CF.bulletLife }); SFX.shot(false);
   }
   const ml = shipMotion(s, dt, true, 0), boosting = s.boostT > 0;
-  // the wall: a ring all round (pushed back in, bounced off it as off a lane's wall)
   for (let q = 0; q < 2; q++) {
     s.x += s.vx * dt * 0.5; s.y += s.vy * dt * 0.5;
-    const d = Math.hypot(s.x, s.y), lim = A.R - CF.shipR;
-    if (d > lim) {
-      const nx = s.x / d, ny = s.y / d, vn = s.vx * nx + s.vy * ny;
-      s.x = nx * lim; s.y = ny * lim;
-      if (vn > 0) { const e = clamp(0.4 / s.st.mass, 0.2, 0.6); s.vx -= (1 + e) * vn * nx; s.vy -= (1 + e) * vn * ny; s.vx *= Math.exp(-1.6 * dt); s.vy *= Math.exp(-1.6 * dt); }
-      if (vn > 40 && s.wallCd <= 0) { s.wallCd = 0.18; s.vx *= 0.88; s.vy *= 0.88; for (let k = 0; k < 6; k++) arenaPart(s.x, s.y, (Math.random() - 0.5) * 110, (Math.random() - 0.5) * 110, 0.3, '#ffd9a0', 2, true); SFX.wall(vn); }
-    }
+    const vn = arenaWall(s, CF.shipR, clamp(0.4 / s.st.mass, 0.2, 0.6));
+    if (vn > 0) { s.vx *= Math.exp(-1.6 * dt); s.vy *= Math.exp(-1.6 * dt); }
+    if (vn > 40 && s.wallCd <= 0) { s.wallCd = 0.18; s.vx *= 0.88; s.vy *= 0.88; for (let k = 0; k < 6; k++) arenaPart(s.x, s.y, (Math.random() - 0.5) * 110, (Math.random() - 0.5) * 110, 0.3, '#ffd9a0', 2, true); SFX.wall(vn); }
   }
   if (ml > 0.01 || boosting) if (Math.random() < (boosting ? 1 : 0.75))
     arenaPart(s.x - fx * 7, s.y - fy * 7, -fx * 55 + s.vx * 0.15 + (Math.random() - 0.5) * 22, -fy * 55 + s.vy * 0.15 + (Math.random() - 0.5) * 22, boosting ? 0.34 : 0.22, trailCol(s.col, boosting), boosting ? 3 : 2, !plumeCols(s.col).smoke);
+  // the training dummy: cruises along the lane at an easy pace, drifts back to its middle; never fights back
+  const D = A.dummy;
+  if (Math.abs(D.x - s.x) > 900) { D.x = s.x + 380 * (Math.sign(s.vx) || 1); D.y = arenaLaneY(D.x); D.vx = 0; D.vy = 0; }
+  {
+    const L = arenaLane(D.x), dir = 1, want = 110, off = (D.y - L.y) * L.ny;
+    D.vx += (L.tx * want * dir - D.vx) * 0.8 * dt - L.nx * off * 1.2 * dt; D.vy += (L.ty * want * dir - D.vy) * 0.8 * dt - L.ny * off * 1.2 * dt;
+    D.x += D.vx * dt; D.y += D.vy * dt; arenaWall(D, CF.shipR, 0.3);
+    D.ang += angDiff(D.ang, Math.atan2(D.vy, D.vx)) * Math.min(1, 4 * dt);
+    if (D.flash > 0) D.flash -= dt; if (D.wobble > 0) D.wobble -= dt;
+    const dx = D.x - s.x, dy = D.y - s.y, dd = Math.hypot(dx, dy), m = CF.shipR * 2 - 2;
+    if (dd < m && dd > 0.01) {   // (bumping it, as two racers do)
+      const nx = dx / dd, ny = dy / dd, rel = (s.vx - D.vx) * nx + (s.vy - D.vy) * ny;
+      D.x = s.x + nx * m; D.y = s.y + ny * m;
+      if (rel > 0) { D.vx += nx * rel * 0.9; D.vy += ny * rel * 0.9; s.vx -= nx * rel * 0.4; s.vy -= ny * rel * 0.4; }
+    }
+  }
+  // targets: always a few floating in the lane around you; shoot one and another turns up further on
+  for (let k = A.targets.length - 1; k >= 0; k--) if (Math.abs(A.targets[k].x - s.x) > 1100) A.targets.splice(k, 1);
+  while (A.targets.length < 4) {
+    const side = Math.random() < 0.5 ? -1 : 1, x = s.x + side * (300 + Math.random() * 700), L = arenaLane(x), lat = (Math.random() - 0.5) * A.HW * 1.2;
+    A.targets.push({ x: x + L.nx * lat, y: L.y + L.ny * lat, t: Math.random() * 10, pop: 0 });
+  }
   for (let k = A.shots.length - 1; k >= 0; k--) {
     const b = A.shots[k]; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
-    if (Math.hypot(b.x, b.y) > A.R - 2 || b.life <= 0) { if (b.life > 0) for (let q = 0; q < 4; q++) arenaPart(b.x, b.y, (Math.random() - 0.5) * 80, (Math.random() - 0.5) * 80, 0.2, '#bff8ff', 1, true); A.shots.splice(k, 1); }
+    let dead = b.life <= 0;
+    const L = arenaLane(b.x);
+    if (!dead && Math.abs((b.y - L.y) * L.ny) > A.HW - 1) { dead = true; for (let q = 0; q < 4; q++) arenaPart(b.x, b.y, (Math.random() - 0.5) * 80, (Math.random() - 0.5) * 80, 0.2, '#bff8ff', 1, true); }
+    if (!dead) for (let j = 0; j < A.targets.length; j++) {
+      const t = A.targets[j];
+      if (Math.hypot(b.x - t.x, b.y - t.y) < CF.targetR + 2) {
+        dead = true; A.hits++; SFX.target();
+        for (let q = 0; q < 18; q++) arenaPart(t.x, t.y, (Math.random() - 0.5) * 160, (Math.random() - 0.5) * 160, 0.45, q % 2 ? '#8ff3ff' : '#ffffff', 2, true);
+        A.targets.splice(j, 1); break;
+      }
+    }
+    if (!dead && Math.hypot(b.x - D.x, b.y - D.y) < CF.shipR + 2) { dead = true; D.flash = 0.25; D.vx += b.vx * 0.05; D.vy += b.vy * 0.05; A.hits++; for (let q = 0; q < 6; q++) arenaPart(b.x, b.y, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100, 0.25, '#bff8ff', 2, true); }
+    if (dead) A.shots.splice(k, 1);
   }
+  for (const t of A.targets) t.t += dt;
   for (let k = A.mines.length - 1; k >= 0; k--) {
     const m = A.mines[k]; m.t += dt; m.arm -= dt; m.life -= dt;
-    if (m.life <= 0) { A.mines.splice(k, 1); continue; }
-    if (m.arm <= 0 && Math.hypot(s.x - m.x, s.y - m.y) < CF.shipR + CF.mineR) {   // (your own mine: it slows you, as one would)
-      A.mines.splice(k, 1); s.slowT = s.st.slowTime; s.boostT = 0; s.vx *= 0.6; s.vy *= 0.6; SFX.blast();
+    if (m.life <= 0 || Math.abs(m.x - s.x) > 1200) { A.mines.splice(k, 1); continue; }
+    for (const o of [s, D]) if (m.arm <= 0 && Math.hypot(o.x - m.x, o.y - m.y) < CF.shipR + CF.mineR) {
+      A.mines.splice(k, 1); SFX.blast();
+      if (o === s) { s.slowT = s.st.slowTime; s.boostT = 0; } else { D.flash = 0.5; A.hits++; }
+      o.vx *= 0.6; o.vy *= 0.6;
       for (let q = 0; q < 20; q++) arenaPart(m.x, m.y, (Math.random() - 0.5) * 170, (Math.random() - 0.5) * 170, 0.5, q % 2 ? '#ff9a4a' : '#fff1c4', 2, true);
+      break;
     }
   }
   for (let k = A.parts.length - 1; k >= 0; k--) { const p = A.parts[k]; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; if (p.life <= 0) A.parts.splice(k, 1); }
+  // the view follows the Arrow, a little ahead of it
+  const cx = s.x + s.vx * 0.18, cy = s.y + s.vy * 0.18;
+  A.cam.x += (cx - A.cam.x) * Math.min(1, 6 * dt); A.cam.y += (cy - A.cam.y) * Math.min(1, 6 * dt);
 }
 function arenaDraw() {
-  const A = ARENA, g = A.g, s = A.s, ox = A.W / 2, oy = A.H / 2, X = (x) => Math.round(ox + x), Y = (y) => Math.round(oy + y);
+  const A = ARENA, g = A.g, s = A.s, D = A.dummy, ox = Math.round(A.W / 2 - A.cam.x), oy = Math.round(A.H / 2 - A.cam.y), X = (x) => Math.round(ox + x), Y = (y) => Math.round(oy + y);
   g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
   g.fillStyle = '#07060f'; g.fillRect(0, 0, A.W, A.H);
-  // the floor: a deck of dots, as a space lane's; the wall round it, glowing
-  g.fillStyle = '#141a3c'; g.beginPath(); g.arc(ox, oy, A.R, 0, TAU); g.fill();
+  // far stars, drifting slower than the lane
+  g.fillStyle = '#4b4690';
+  for (let k = 0; k < 40; k++) { const x = ((k * 97.3 - A.cam.x * 0.15) % A.W + A.W) % A.W, y = ((k * 53.7 - A.cam.y * 0.15) % A.H + A.H) % A.H; g.fillRect(Math.round(x), Math.round(y), 1, 1); }
+  // the lane: a deck of dots between two glowing edges, chevrons down its middle
+  const x0 = A.cam.x - A.W / 2 - 40, x1 = A.cam.x + A.W / 2 + 40, top = [], bot = [], mid = [];
+  for (let x = x0; x <= x1; x += 6) { const L = arenaLane(x); top.push([x - L.nx * A.HW, L.y - L.ny * A.HW]); bot.push([x + L.nx * A.HW, L.y + L.ny * A.HW]); mid.push([x, L.y]); }
+  g.fillStyle = '#141a3c'; g.beginPath();
+  top.forEach(([x, y], k) => (k ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y)))); for (let k = bot.length - 1; k >= 0; k--) g.lineTo(X(bot[k][0]), Y(bot[k][1])); g.closePath(); g.fill();
+  g.save(); g.clip();
   g.fillStyle = 'rgba(143,166,255,0.22)';
-  for (let y = -A.R; y <= A.R; y += 6) for (let x = -A.R; x <= A.R; x += 6) if (x * x + y * y < (A.R - 4) ** 2) g.fillRect(X(x), Y(y), 1, 1);
-  g.strokeStyle = '#0a0b1c'; g.lineWidth = 6; g.beginPath(); g.arc(ox, oy, A.R + 3, 0, TAU); g.stroke();
-  g.strokeStyle = '#62d6cc'; g.lineWidth = 2; g.beginPath(); g.arc(ox, oy, A.R, 0, TAU); g.stroke();
-  g.globalCompositeOperation = 'lighter';
-  g.drawImage(glowSprite('#62d6cc', 8), ox - A.R - 8, oy - 8, 16, 16);   // (a little life on the rim)
+  const gx0 = Math.floor((A.cam.x - A.W / 2) / 6) * 6, gy0 = Math.floor((A.cam.y - A.H / 2) / 6) * 6;
+  for (let y = gy0; y < gy0 + A.H + 12; y += 6) for (let x = gx0; x < gx0 + A.W + 12; x += 6) g.fillRect(X(x), Y(y), 1, 1);
+  g.restore();
+  g.strokeStyle = 'rgba(183,155,255,0.28)'; g.lineWidth = 1; g.setLineDash([6, 34]); g.lineDashOffset = 0;
+  g.beginPath(); mid.forEach(([x, y], k) => (k ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y)))); g.stroke(); g.setLineDash([]);
+  for (const E of [top, bot]) {
+    g.strokeStyle = '#0a0b1c'; g.lineWidth = 5; g.beginPath(); E.forEach(([x, y], k) => (k ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y)))); g.stroke();
+    g.strokeStyle = '#62d6cc'; g.lineWidth = 2; g.beginPath(); E.forEach(([x, y], k) => (k ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y)))); g.stroke();
+  }
   // mines
-  g.globalCompositeOperation = 'source-over';
   for (const m of A.mines) { const on = Math.floor(m.t * 6) % 2 === 0; g.fillStyle = '#2a1e40'; g.fillRect(X(m.x) - 3, Y(m.y) - 3, 6, 6); g.fillStyle = m.arm > 0 ? '#7a2018' : on ? '#ff4a3a' : '#7a2018'; g.fillRect(X(m.x) - 1, Y(m.y) - 1, 2, 2); }
-  // trail and sparks
+  // targets: cyan orbs, bobbing and glowing, as on a race track
+  for (const t of A.targets) {
+    const bob = Math.round(Math.sin(t.t * 2.4) * 1.6), x = X(t.x), y = Y(t.y) + bob;
+    g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.35; g.drawImage(glowSprite('#8ff3ff', 14), x - 14, y - 14); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    g.fillStyle = '#0d2a3a'; g.beginPath(); g.arc(x, y, 6, 0, TAU); g.fill();
+    g.fillStyle = '#8ff3ff'; g.beginPath(); g.arc(x, y, 4.5, 0, TAU); g.fill();
+    g.fillStyle = '#ffffff'; g.fillRect(x - 2, y - 2, 2, 2);
+  }
   for (const p of A.parts) { g.globalAlpha = clamp(p.life / p.max, 0, 1); g.fillStyle = p.col; g.fillRect(X(p.x), Y(p.y), p.size, p.size); }
   g.globalAlpha = 1;
-  // the boost plume (in your complement), then the Arrow itself
-  const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
-  if (s.boostT > 0) {
-    const P = plumeCols(s.col);
-    g.globalCompositeOperation = P.smoke ? 'source-over' : 'lighter';
-    for (const [d, r, c, a] of [[10, 10, 0, 1], [16, 12, 1, 0.95], [23, 12, 2, 0.8], [31, 11, 2, 0.6], [40, 9, 3, 0.4]]) {
-      g.globalAlpha = a * 0.7; const gs = glowSprite(P[c], r); g.drawImage(gs, X(s.x - fx * d) - r, Y(s.y - fy * d) - r);
-    }
-    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
-  } else {
-    g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.35; const gs = glowSprite(plumeCols(s.col).smoke ? '#9a97a6' : plumeCols(s.col)[2], 12);
-    g.drawImage(gs, X(s.x - fx * 9) - 12, Y(s.y - fy * 9) - 12); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  const S = SHIP_SZ;
+  // the training dummy: grey, unarmed, flashing white when hit
+  {
+    const spr = shipSprites(ARENA_DUMMY_COL, 'hammer'), fi = shipFrameIndex(D.ang + (D.wobble > 0 ? Math.sin(D.wobble * 30) * 0.4 : 0));
+    g.globalAlpha = 0.35; g.drawImage(spr.shadows[fi] || spr.frameAt(fi), X(D.x) - S / 2 + 3, Y(D.y) - S / 2 + 4); g.globalAlpha = 1;
+    g.drawImage(spr.frameAt(fi), X(D.x) - S / 2, Y(D.y) - S / 2);
+    if (D.flash > 0) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = Math.min(1, D.flash * 3); g.drawImage(glowSprite('#ffffff', 12), X(D.x) - 12, Y(D.y) - 12); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
   }
-  const spr = shipSprites(s.col, 'arrow'), S = SHIP_SZ;
-  g.globalAlpha = 0.35; g.drawImage(spr.shadows ? spr.shadows[shipFrameIndex(s.ang)] || spr.frameAt(shipFrameIndex(s.ang)) : spr.frameAt(shipFrameIndex(s.ang)), X(s.x) - S / 2 + 3, Y(s.y) - S / 2 + 4); g.globalAlpha = 1;
-  g.drawImage(spr.frameAt(shipFrameIndex(s.ang)), X(s.x) - S / 2, Y(s.y) - S / 2);
-  // shots
+  // the boost plume (in your complement), or the engine's own glow, then the Arrow itself
+  const fx = Math.cos(s.ang), fy = Math.sin(s.ang), P = plumeCols(s.col);
+  if (s.boostT > 0) {
+    g.globalCompositeOperation = P.smoke ? 'source-over' : 'lighter';
+    for (const [d, r, c, a] of [[10, 10, 0, 1], [16, 12, 1, 0.95], [23, 12, 2, 0.8], [31, 11, 2, 0.6], [40, 9, 3, 0.4]]) { g.globalAlpha = a * 0.7; g.drawImage(glowSprite(P[c], r), X(s.x - fx * d) - r, Y(s.y - fy * d) - r); }
+  } else { g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.35; g.drawImage(glowSprite(P.smoke ? '#9a97a6' : P[2], 12), X(s.x - fx * 9) - 12, Y(s.y - fy * 9) - 12); }
+  g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  const spr = shipSprites(s.col, 'arrow'), fi = shipFrameIndex(s.ang);
+  g.globalAlpha = 0.35; g.drawImage(spr.shadows[fi] || spr.frameAt(fi), X(s.x) - S / 2 + 3, Y(s.y) - S / 2 + 4); g.globalAlpha = 1;
+  g.drawImage(spr.frameAt(fi), X(s.x) - S / 2, Y(s.y) - S / 2);
   g.strokeStyle = '#bff8ff'; g.lineWidth = 2;
   for (const b of A.shots) { g.beginPath(); g.moveTo(X(b.x), Y(b.y)); g.lineTo(X(b.x - b.vx * 0.02), Y(b.y - b.vy * 0.02)); g.stroke(); }
-  // power and speed, small, in the corner
+  // speed, power, the magazine and hits, in the corner
+  g.fillStyle = 'rgba(8,6,22,0.72)'; g.fillRect(2, A.H - 30, 108, 28);
   g.fillStyle = 'rgba(8,6,22,0.8)'; g.fillRect(6, A.H - 12, 62, 6);
   g.fillStyle = s.energy < s.st.boostCost ? '#f0629f' : '#ffb04a'; g.fillRect(7, A.H - 11, Math.round(60 * s.energy / CFG.energyMax), 4);
   g.font = '700 10px "Saira Condensed", sans-serif'; g.fillStyle = '#e8e2ff'; g.textAlign = 'left';
   g.fillText(Math.round(Math.hypot(s.vx, s.vy)) + ' M/S', 6, A.H - 16);
-  // the magazine, as the race's pips: one per shot, the next filling as it reloads
+  g.textAlign = 'right'; g.fillStyle = '#8ff3ff'; g.fillText('HITS ' + A.hits, 106, A.H - 16);
   for (let k = 0; k < s.st.mag; k++) {
     const x = 74 + k * 6, full = clamp(s.mag - k, 0, 1);
     g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(x, A.H - 13, 4, 8);
     if (full > 0) { const h = Math.max(1, Math.round(8 * full)); g.fillStyle = full >= 1 ? '#4fd1c5' : 'rgba(79,209,197,0.55)'; g.fillRect(x, A.H - 5 - h, 4, h); }
   }
-  if (!A.mouse.in && !A.pad) { g.textAlign = 'center'; g.fillStyle = 'rgba(232,226,255,0.8)'; g.fillText('POINT HERE TO FLY', ox, oy + A.R * 0.55); }
+  if (!A.mouse.in && !A.pad) { g.textAlign = 'center'; g.fillStyle = 'rgba(232,226,255,0.85)'; g.fillText('POINT HERE TO FLY', A.W / 2, 22); }
 }
 function arenaFrame(now) {
   const A = ARENA;
@@ -15406,7 +15498,7 @@ function arenaStart() {
   if (!cv) return;
   if (!A.g) {
     A.g = cv.getContext('2d'); A.g.imageSmoothingEnabled = false;
-    const at = (e) => { const r = cv.getBoundingClientRect(); A.mouse.x = (e.clientX - r.left) / r.width * A.W - A.W / 2; A.mouse.y = (e.clientY - r.top) / r.height * A.H - A.H / 2; };
+    const at = (e) => { const r = cv.getBoundingClientRect(); A.mouse.sx = (e.clientX - r.left) / r.width * A.W; A.mouse.sy = (e.clientY - r.top) / r.height * A.H; };
     cv.addEventListener('mousemove', (e) => { at(e); A.mouse.in = true; if (A.pad) { A.pad = false; arenaHint(); } });
     cv.addEventListener('mouseleave', () => { A.mouse.in = false; A.mouse.d0 = false; A.keys = {}; });
     cv.addEventListener('mousedown', (e) => { at(e); A.mouse.in = true; if (e.button === 0) A.mouse.d0 = true; if (e.button === 2) A.boostQ = true; e.preventDefault(); });
