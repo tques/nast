@@ -2543,7 +2543,7 @@ function stepShip(s, dt, locked) {
   if (live && (ml > 0.01 || boosting) && Math.random() < (boosting ? 1 : 0.75)) {
     part(s.x - fx * 7 + (Math.random() - 0.5) * 3, s.y - fy * 7 + (Math.random() - 0.5) * 3,
       -fx * 55 + s.vx * 0.15 + (Math.random() - 0.5) * 22, -fy * 55 + s.vy * 0.15 + (Math.random() - 0.5) * 22,
-      boosting ? 0.34 : 0.22, boosting ? '#ffe9b0' : s.col, boosting ? 3 : 2, true);
+      boosting ? 0.34 : 0.22, trailCol(s.col, boosting), boosting ? 3 : 2, !plumeCols(s.col).smoke);   // (in the racer's complement; Rook's are smoke)
   }
 }
 
@@ -8952,6 +8952,8 @@ function drawBlast(bl, f) {
 }
 /* a boost plume's colours, from the nozzle out: white-hot, then the racer's complementary colour (its hue turned half
    way round the colour wheel, made vivid), deepening as it trails off */
+/* the dots an engine leaves behind: the racer's complement (lighter while boosting); Rook's, grey smoke */
+function trailCol(col, boosting) { const P = plumeCols(col); return P.smoke ? (boosting ? '#2b2933' : '#55525e') : P[boosting ? 1 : 2]; }
 const PLUME_COLS = {};
 const PLUME_SMOKE = { '#d8dde8': ['#ffffff', '#16141c', '#0c0b10', '#000000'] };   // (Rook's silver: a black plume)
 function plumeCols(col) {
@@ -8993,9 +8995,10 @@ function drawShip(s, time, f) {
     lc.globalCompositeOperation = 'source-over';
     }
   } else {
-    glow(ec, s.col, 22, s.x - fx * 8, s.y - fy * 8, 0.28 + thrust * 0.22);
+    const P = plumeCols(s.col), ecol = P.smoke ? '#9a97a6' : P[2];   // (the engine's own colour: the racer's complement)
+    glow(ec, ecol, 22, s.x - fx * 8, s.y - fy * 8, 0.28 + thrust * 0.22);
     lc.globalCompositeOperation = 'lighter';
-    glow(lc, s.col, 28, s.x, s.y + 3, 0.09);
+    glow(lc, ecol, 28, s.x, s.y + 3, 0.09);
     lc.globalCompositeOperation = 'source-over';
   }
   // the higher the ship, the further its shadow falls away from it
