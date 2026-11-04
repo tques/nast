@@ -600,7 +600,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
         <button class="chip" type="button" data-quality="low" aria-pressed="false" title="A softer picture without bloom or tilt-shift blur: the fastest">Low</button>
       </span>
     </div>
-    <div class="optRow">
+    <div class="optRow" id="optSoundtrack">
       <h2>Soundtrack</h2>
       <span class="chips" role="group" aria-label="Music style">
         <button class="chip" type="button" data-musicstyle="recorded" aria-pressed="true" title="Recorded tracks: Electric Pulse by DavidKBD">Recorded</button>
@@ -661,7 +661,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       </span>
     </div>
     <p class="note optNote menuOnly">Shadows are those the hills cast on ground tracks. Laps, your favorite speeder and your default color are what you start with each time; you can still change them before a race.</p>
-    <p class="note optNote menuOnly">Recorded soundtrack: “Electric Pulse” by DavidKBD (Electric Pulse, Digital Horizon, Cyber Lights, Retrochrome Nights, Neon Arcadia Awakening, Time Warp, Electric Dreams of Infinity and Quantum Ripples of Sound).</p>
+    <p class="note optNote menuOnly" id="recCredit">Recorded soundtrack: “Electric Pulse” by DavidKBD (Electric Pulse, Digital Horizon, Cyber Lights, Retrochrome Nights, Neon Arcadia Awakening, Time Warp, Electric Dreams of Infinity and Quantum Ripples of Sound).</p>
     <div class="optRow menuOnly">
       <h2>Save data</h2>
       <button class="btn alt danger" type="button" id="clearSaveBtn">Clear save data</button>
@@ -12299,6 +12299,7 @@ function recDecode(id) {
   if (REC_BUF[k] !== undefined) return Promise.resolve(REC_BUF[k] || null);
   if (recDecode.pending[k]) return recDecode.pending[k];
   for (const o in REC_BUF) if (REC_BUF[o] && o !== RECORDINGS.menu.rec) delete REC_BUF[o];   // (let the last race's go)
+  if (!REC_DATA[k]) { REC_BUF[k] = false; return Promise.resolve(null); }   // (a copy built without the recordings: the synth plays)
   const d = REC_DATA[k], b = atob(d.slice(d.indexOf(',') + 1)), u = new Uint8Array(b.length);
   for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
   return (recDecode.pending[k] = new Promise((res) => AUD.ctx.decodeAudioData(u.buffer,
@@ -12362,6 +12363,8 @@ function setMusicStyle(v) {
   if (was !== v && MUSIC.id) { const id = MUSIC.id; musicPlay(id, mode === 'race' || mode === 'pause' ? 4 : 0); if (mode === 'pause') musicDuck(true); }   // (switch what's playing now)
 }
 document.querySelectorAll('.chip[data-musicstyle]').forEach((b) => b.addEventListener('click', () => setMusicStyle(b.dataset.musicstyle)));
+// (a copy built without the recordings, like the claude.ai one: the synthesized themes only, and no choice to make)
+if (!Object.keys(REC_DATA).length) { MUSIC_STYLE = 'synth'; document.getElementById('optSoundtrack').hidden = true; document.getElementById('recCredit').hidden = true; }
 setMusicStyle(MUSIC_STYLE);
 /* while paused the music drops low and keeps its place */
 function musicDuck(low) { if (MUSIC.bus && AUD.ctx) { const t = AUD.ctx.currentTime; MUSIC.bus.gain.cancelScheduledValues(t); MUSIC.bus.gain.setTargetAtTime(musicVol() * (low ? 0.3 : 1), t, 0.08); } }

@@ -19,8 +19,10 @@ into the game:
    in a screenshot on its track before finishing.
 3. Refresh the editor's list of game tracks: `LIBRARY` in `editor.html` (between the `/*LIB*/` markers) is every game
    track in track-code form, `km` included; regenerate it from the game's `TRACKS` rather than editing it by hand.
-4. Republish the editor artifact if it changed. (The game itself, at about 48 MB with its embedded music, is past
-   the artifact size limit and is played from the file, so it is no longer republished.)
+4. Republish the artifacts: the editor if it changed, and the game. The game is published without its recorded music
+   (with it, it is about 48 MB, past the artifact size limit): build that copy with
+   `python3 tools/build-artifact.py <scratchpad>/nast-artifact.html` and publish that file to the game's artifact
+   (https://claude.ai/artifact/6Ys7bjkutpbCGF79s4Rie3). It plays the synthesized themes instead.
 
 A track pasted into the game itself (Tracks > Paste track code) races the same, but its landmarks have no art and are
 left out.
