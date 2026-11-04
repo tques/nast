@@ -15267,7 +15267,7 @@ function arenaReset() {
   const st = hullStats('arrow'), R = Math.random;
   ARENA.bends = [[140 + 60 * R(), 520 + 200 * R(), R() * TAU, 0], [55 + 30 * R(), 240 + 80 * R(), R() * TAU, 0], [45 + 25 * R(), 120 + 40 * R(), R() * TAU, 700 + 400 * R()]];
   ARENA.s = { x: 0, y: 0, vx: 0, vy: 0, ang: 0, st, col: PLAYER_COL, energy: 100, boostT: 0, boostCd: 0, shotCd: 0, swipeCd: 0, swipeT: 0, swipeDir: 0, stun: 0, slowT: 0,
-    speedMul: 1, boostMul: 1, mag: st.mag, align: 1, slide: 0, wallCd: 0, partFn: arenaPart,
+    speedMul: 1, boostMul: 1, mag: st.mag, align: 1, slide: 0, wallCd: 0, partFn: arenaPart, shield: CFG.shieldMax, shieldT: 0, shieldFlash: 0,
     input: { mx: 0, my: 0, aim: 0, fire: false, boostPress: false, swipe: 0, mine: false } };
   ARENA.parts.length = 0; ARENA.shots.length = 0; ARENA.mines.length = 0; ARENA.targets.length = 0; ARENA.hits = 0;
   ARENA.dummy = { x: 260, y: 0, vx: 0, vy: 0, ang: 0, flash: 0, wobble: 0 };
@@ -15318,6 +15318,9 @@ function arenaStep(dt) {
   if (s.slowT > 0) s.slowT -= dt;
   if (s.mag < s.st.mag) s.mag = Math.min(s.st.mag, s.mag + dt / s.st.magRegen);
   s.energy = Math.min(CF.energyMax, s.energy + 6 * dt);   // (power comes back here, so you can keep practising)
+  // the shield, as in a race: two hits' worth, back whole after a while without one
+  s.shieldT += dt; if (s.shieldFlash > 0) s.shieldFlash -= dt;
+  if (s.shield < CF.shieldMax && s.shieldT >= s.st.shieldReset) { s.shield = CF.shieldMax; SFX.shieldUp ? SFX.shieldUp() : 0; }
   s.ang += clamp(angDiff(s.ang, i.aim), -CF.turn * s.st.turn * dt, CF.turn * s.st.turn * dt);   // (turning, as in a race)
   noseThrust(s);
   const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
@@ -15340,7 +15343,8 @@ function arenaStep(dt) {
     s.swipeT -= dt;
     const D = A.dummy, lx = -fy * s.swipeDir, ly = fx * s.swipeDir, dx = D.x - s.x, dy = D.y - s.y, side = dx * lx + dy * ly, along = dx * fx + dy * fy;
     if (!s.swipeHit && side > 2 && side < CF.shipR * 2 + 14 && Math.abs(along) < 16) {
-      s.swipeHit = true; D.vx += lx * CF.swipeKick * 1.1; D.vy += ly * CF.swipeKick * 1.1; D.flash = 0.4; D.wobble = 1; A.hits++;
+      s.swipeHit = true; s.shieldT = 0; if (s.shield > 0) { s.shield--; s.shieldFlash = 0.3; } else s.energy = Math.max(0, s.energy - CF.swipeSelf);   // (the swiper pays for the contact, as in a race)
+      D.vx += lx * CF.swipeKick * 1.1; D.vy += ly * CF.swipeKick * 1.1; D.flash = 0.4; D.wobble = 1; A.hits++;
       for (let q = 0; q < 16; q++) arenaPart((s.x + D.x) / 2, (s.y + D.y) / 2, (Math.random() - 0.5) * 150, (Math.random() - 0.5) * 150, 0.35, '#fff1c4', 2, true);
       SFX.thud();
     }
@@ -15355,7 +15359,10 @@ function arenaStep(dt) {
     s.x += s.vx * dt * 0.5; s.y += s.vy * dt * 0.5;
     const vn = arenaWall(s, CF.shipR, clamp(0.4 / s.st.mass, 0.2, 0.6));
     if (vn > 0) { s.vx *= Math.exp(-1.6 * dt); s.vy *= Math.exp(-1.6 * dt); }
-    if (vn > 40 && s.wallCd <= 0) { s.wallCd = 0.18; s.vx *= 0.88; s.vy *= 0.88; for (let k = 0; k < 6; k++) arenaPart(s.x, s.y, (Math.random() - 0.5) * 110, (Math.random() - 0.5) * 110, 0.3, '#ffd9a0', 2, true); SFX.wall(vn); }
+    if (vn > 40 && s.wallCd <= 0) {
+      s.wallCd = 0.18; s.vx *= 0.88; s.vy *= 0.88; s.energy = Math.max(0, s.energy - clamp((vn - 40) * 0.035, 1, 9) * bareWall(s));   // (as in a race: more with the shield down)
+      for (let k = 0; k < 6; k++) arenaPart(s.x, s.y, (Math.random() - 0.5) * 110, (Math.random() - 0.5) * 110, 0.3, '#ffd9a0', 2, true); SFX.wall(vn);
+    }
   }
   if (ml > 0.01 || boosting) if (Math.random() < (boosting ? 1 : 0.75))
     arenaPart(s.x - fx * 7, s.y - fy * 7, -fx * 55 + s.vx * 0.15 + (Math.random() - 0.5) * 22, -fy * 55 + s.vy * 0.15 + (Math.random() - 0.5) * 22, boosting ? 0.34 : 0.22, trailCol(s.col, boosting), boosting ? 3 : 2, !plumeCols(s.col).smoke);
@@ -15403,7 +15410,8 @@ function arenaStep(dt) {
     if (m.life <= 0 || Math.abs(m.x - s.x) > 1200) { A.mines.splice(k, 1); continue; }
     for (const o of [s, D]) if (m.arm <= 0 && Math.hypot(o.x - m.x, o.y - m.y) < CF.shipR + CF.mineR) {
       A.mines.splice(k, 1); SFX.blast();
-      if (o === s) { s.slowT = s.st.slowTime; s.boostT = 0; } else { D.flash = 0.5; A.hits++; }
+      if (o === s) { s.shieldT = 0; if (s.shield > 0) { s.shield--; s.shieldFlash = 0.3; } else { s.slowT = s.st.slowTime; s.boostT = 0; } }   // (the shield takes it, if it can)
+      else { D.flash = 0.5; A.hits++; }
       o.vx *= 0.6; o.vy *= 0.6;
       for (let q = 0; q < 20; q++) arenaPart(m.x, m.y, (Math.random() - 0.5) * 170, (Math.random() - 0.5) * 170, 0.5, q % 2 ? '#ff9a4a' : '#fff1c4', 2, true);
       break;
@@ -15467,15 +15475,27 @@ function arenaDraw() {
   const spr = shipSprites(s.col, 'arrow'), fi = shipFrameIndex(s.ang);
   g.globalAlpha = 0.35; g.drawImage(spr.shadows[fi] || spr.frameAt(fi), X(s.x) - S / 2 + 3, Y(s.y) - S / 2 + 4); g.globalAlpha = 1;
   g.drawImage(spr.frameAt(fi), X(s.x) - S / 2, Y(s.y) - S / 2);
+  if (s.shield > 0 || s.shieldFlash > 0) {   // (its shield: a ring of two arcs, one per hit it can still take, as in a race)
+    const time = performance.now() / 1000, hit = s.shieldFlash > 0;
+    g.lineWidth = hit ? 2 : 1;
+    for (let k = 0; k < CFG.shieldMax; k++) {
+      if (k >= s.shield && !hit) continue;
+      const a0 = time * 0.8 + k * Math.PI + 0.25;
+      g.strokeStyle = hit ? '#ffffff' : s.shield === 1 ? '#ffd28a' : '#9ef0ff'; g.globalAlpha = hit ? 0.9 : 0.5 + 0.15 * Math.sin(time * 3 + k);
+      g.beginPath(); g.arc(X(s.x), Y(s.y) - 2, 12, a0, a0 + Math.PI - 0.5); g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
   g.strokeStyle = '#bff8ff'; g.lineWidth = 2;
   for (const b of A.shots) { g.beginPath(); g.moveTo(X(b.x), Y(b.y)); g.lineTo(X(b.x - b.vx * 0.02), Y(b.y - b.vy * 0.02)); g.stroke(); }
   // speed, power, the magazine and hits, in the corner
-  g.fillStyle = 'rgba(8,6,22,0.72)'; g.fillRect(2, A.H - 30, 108, 28);
+  g.fillStyle = 'rgba(8,6,22,0.72)'; g.fillRect(2, A.H - 30, 124, 28);
+  for (let k = 0; k < CFG.shieldMax; k++) { g.fillStyle = k < s.shield ? '#bff4ff' : 'rgba(255,255,255,0.14)'; g.beginPath(); g.arc(110 + k * 7, A.H - 9, 3, 0, TAU); g.fill(); }   // (shield pips)
   g.fillStyle = 'rgba(8,6,22,0.8)'; g.fillRect(6, A.H - 12, 62, 6);
   g.fillStyle = s.energy < s.st.boostCost ? '#f0629f' : '#ffb04a'; g.fillRect(7, A.H - 11, Math.round(60 * s.energy / CFG.energyMax), 4);
   g.font = '700 10px "Saira Condensed", sans-serif'; g.fillStyle = '#e8e2ff'; g.textAlign = 'left';
   g.fillText(Math.round(Math.hypot(s.vx, s.vy)) + ' M/S', 6, A.H - 16);
-  g.textAlign = 'right'; g.fillStyle = '#8ff3ff'; g.fillText('HITS ' + A.hits, 106, A.H - 16);
+  g.textAlign = 'right'; g.fillStyle = '#8ff3ff'; g.fillText('HITS ' + A.hits, 122, A.H - 16);
   for (let k = 0; k < s.st.mag; k++) {
     const x = 74 + k * 6, full = clamp(s.mag - k, 0, 1);
     g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(x, A.H - 13, 4, 8);
