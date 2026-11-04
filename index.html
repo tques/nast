@@ -2800,6 +2800,16 @@ function stepRocks(dt) {
     if (T.gap[r.idx] && Math.hypot(r.x - T.x[r.idx], r.y - T.y[r.idx]) < T.hw) { dropRock(r); continue; }
     if (T.loopOf[r.idx] >= 0) { dropRock(r); continue; }   // none ever drifts onto a loop
     if (wallPush(r, r.r * 0.7, 0.9) > 0) { r.idx = _sdIdx; }
+    // (and never out through a shortcut's mouth, where the lane has no wall: the lane's edge holds a drifting rock
+    //  there all the same, so none drifts into an entrance or an exit)
+    {
+      const i = r.idx, ex = r.x - T.x[i], ey = r.y - T.y[i], lat = ex * T.nx[i] + ey * T.ny[i], lim = T.hw - r.r * 0.7;
+      if (Math.abs(lat) > lim && Math.abs(lat) < T.hw + 90) {
+        const sg = Math.sign(lat), k = (Math.abs(lat) - lim) * sg, vn = r.vx * T.nx[i] + r.vy * T.ny[i];
+        r.x -= T.nx[i] * k; r.y -= T.ny[i] * k;
+        if (vn * sg > 0) { r.vx -= 1.6 * vn * T.nx[i]; r.vy -= 1.6 * vn * T.ny[i]; }
+      }
+    }
     for (const g of W.gates) {
       if (Math.abs(g.h - r.h) > CFG.levelTol || (g.kind === 'shift' && !stingersOut())) continue;
       const segs = gateSegs(g);
@@ -8933,6 +8943,22 @@ function drawBlast(bl, f) {
   lc.beginPath(); lc.arc(bl.x + bx * 8, bl.y + by * 8, 6 + u * 30, 0, TAU); lc.stroke();
   lc.globalAlpha = 1;
 }
+/* a boost plume's colours, from the nozzle out: white-hot, then the racer's complementary colour (its hue turned half
+   way round the colour wheel, made vivid), deepening as it trails off */
+const PLUME_COLS = {};
+function plumeCols(col) {
+  if (PLUME_COLS[col]) return PLUME_COLS[col];
+  const [r, g, b] = hexA(col).map((v) => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if (d > 0.02) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = ((h * 60 + 180) % 360 + 360) % 360;
+  const sat = d > 0.02 ? 0.95 : 0;   // (a grey racer gets a white plume)
+  const hsl = (l) => {   // (as hex: the glow sprites take hex)
+    const a = sat * Math.min(l, 1 - l), f = (n) => { const k = (n + h / 30) % 12; return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+    return '#' + [f(0), f(8), f(4)].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+  };
+  return (PLUME_COLS[col] = ['#ffffff', hsl(0.82), hsl(0.62), hsl(0.45)]);
+}
 function drawShip(s, time, f) {
   if (s.wreck > 0 || offscreen(s.x, s.y, f, 30)) return;
   const spr = shipSprites(s.col, s.hull), fi = shipFrameIndex(s.ang);
@@ -8944,11 +8970,13 @@ function drawShip(s, time, f) {
   if (boosting) {
     // boosting: a plume out of the back, white-hot at the nozzle, cooling to orange as it trails off (flickering),
     // rather than the whole machine lighting up
-    const fl = 0.85 + 0.15 * Math.sin(time * 47 + s.id * 2.1);
-    const PLUME = [[11, 9, '#fff1c4', 0.85], [17, 10, '#ffd27a', 0.7], [24, 10, '#ffb45a', 0.5], [32, 9, '#ff7a30', 0.32]];
-    for (const [d, r, col, a] of PLUME) glow(ec, col, r * fl, s.x - fx * d * fl, s.y - fy * d * fl, a);
+    // (in the colour opposite the racer's own on the colour wheel: see plumeCols)
+    const fl = 0.85 + 0.15 * Math.sin(time * 47 + s.id * 2.1), P = plumeCols(s.col);
+    const PLUME = [[10, 10, 0, 1], [16, 12, 1, 0.95], [23, 12, 2, 0.8], [31, 11, 2, 0.6], [40, 9, 3, 0.4]];
+    for (const [d, r, c, a] of PLUME) glow(ec, P[c], Math.round(r * fl), s.x - fx * d * fl, s.y - fy * d * fl, a);   // (whole-pixel sizes: each size is a cached sprite)
     lc.globalCompositeOperation = 'lighter';
-    glow(lc, '#ffb45a', 18, s.x - fx * 16, s.y - fy * 16 + 3, 0.16);   // (its light on the deck, behind the ship)
+    for (const [d, r, c, a] of PLUME) glow(lc, P[c], Math.round(r * 0.55 * fl), s.x - fx * d * fl, s.y - fy * d * fl, a * 0.45);   // (its hot core)
+    glow(lc, P[2], 22, s.x - fx * 18, s.y - fy * 18 + 3, 0.2);   // (its light on the deck, behind the ship)
     lc.globalCompositeOperation = 'source-over';
   } else {
     glow(ec, s.col, 22, s.x - fx * 8, s.y - fy * 8, 0.28 + thrust * 0.22);
