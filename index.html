@@ -198,6 +198,8 @@ h2 { margin: 0 0 8px; font: 700 13px/1 var(--body); letter-spacing: 0.16em; text
 .padCols .ctl { grid-template-columns: 96px 1fr; }
 .padGrid { gap: 4px; }
 .padGrid kbd { font-size: 11px; padding: 2px 6px; }
+.arenaHead { margin-top: 16px; }
+.arenaCv { display: block; width: 100%; max-width: 480px; height: auto; aspect-ratio: 320 / 200; margin-top: 8px; image-rendering: pixelated; border: 1px solid var(--edge); border-radius: 3px; cursor: crosshair; background: #07060f; }
 .howtoCv { display: block; width: 100%; max-width: 360px; height: auto; aspect-ratio: 200 / 112; margin-top: 12px; image-rendering: pixelated; border: 1px solid var(--edge); background: #0a0918; }
 kbd { display: inline-block; min-width: 24px; padding: 3px 7px; margin-right: 4px; text-align: center; font: 700 13px/1.2 var(--body); color: var(--ink); background: #1c1840; border: 1px solid #4b4690; border-bottom-width: 3px; border-radius: 4px; }
 .rules { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -719,6 +721,9 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
         <div class="ctl" data-demo="mine"><span><kbd>S</kbd></span><span>Drop a mine</span></div>
       </div>
       <canvas class="howtoCv" id="howtoCv" width="200" height="112" aria-label="A short looping demo of each control in turn" role="img"></canvas>
+      <h2 class="arenaHead">Test area</h2>
+      <canvas class="arenaCv" id="arenaCv" width="320" height="200" aria-label="A small walled arena with an Arrow in it to fly, with the race controls"></canvas>
+      <p class="note" id="arenaHint">Point the mouse inside it and fly: the Arrow handles just as it does in a race.</p>
     </div>
     <div>
     <div>
@@ -2328,6 +2333,61 @@ function fireShot(s) {
   emit('shot', s, hostile);
 }
 
+/* A speeder's own motion for one step: turning has been done; this is thrust (along the nose), the top speed its
+   heading allows (and the slope, boosting, a slowed engine), drift pulled into the nose, and the cornering limit (ask
+   for more and it slides wide). Shared by the race (stepShip) and the How to play test area, so both handle alike.
+   Returns how hard it is thrusting. */
+function shipMotion(s, dt, live, slope) {
+  const inp = s.input, CF = CFG;
+  const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
+  const sp = Math.hypot(s.vx, s.vy);
+  const align = sp > 8 ? (s.vx * fx + s.vy * fy) / sp : 1;
+  s.align = align;
+  const k = clamp(align, 0, 1), boosting = s.boostT > 0;
+  const top = CF.top * s.st.top * s.speedMul * (0.38 + 0.62 * k) * (boosting ? (1 + 0.55 * s.st.boost) * (s.boostMul || 1) : 1) * (1 - CF.slopeK * slope) * (s.slowT > 0 ? CF.slowMul : 1);
+  s.top = top;
+  const v0x = s.vx, v0y = s.vy;   // (for the cornering limit, below)
+  let ml = 0;
+  if (live) {
+    ml = Math.hypot(inp.mx, inp.my);
+    if (ml > 0.01) {
+      const a = CF.acc * s.st.acc * (0.6 + 0.4 * k) * (boosting ? 1.25 : 1) * (s.slowT > 0 ? CF.slowMul : 1) / Math.max(1, ml);
+      s.vx += inp.mx * a * dt; s.vy += inp.my * a * dt;
+      // thrust can steer and speed you up, but never past what this heading allows
+      const ns = Math.hypot(s.vx, s.vy), lim = Math.max(top, sp);
+      if (ns > lim) { const f = lim / ns; s.vx *= f; s.vy *= f; }
+    } else { const f = Math.exp(-0.8 * dt); s.vx *= f; s.vy *= f; }
+  }
+  // speed above what the current heading allows bleeds away
+  let sp2 = Math.hypot(s.vx, s.vy);
+  if (sp2 > top) { const ns = sp2 - (sp2 - top) * (1 - Math.exp(-2.6 * dt)); const f = ns / sp2; s.vx *= f; s.vy *= f; sp2 = ns; }
+  // sideways drift is pulled into the nose direction (and loses some speed doing it)
+  const gr = 1 - Math.exp(-(boosting ? 0.3 : 1.1) * s.st.grip * dt), px = -fy, py = fx, vp = s.vx * px + s.vy * py;
+  s.vx -= px * vp * gr; s.vy -= py * vp * gr;
+  s.vx += fx * Math.abs(vp) * gr * 0.55; s.vy += fy * Math.abs(vp) * gr * 0.55;
+  // cornering: the path can only bend so fast (grip, and a quick nose, raise the limit; boosting lowers it). Ask for
+  // more and the racer slides wide, scrubbing speed: take a tight bend too fast and it runs out toward the wall.
+  {
+    const sp0 = Math.hypot(v0x, v0y);
+    s.slide = 0;
+    if (sp0 > 60 && s.stun <= 0) {
+      const ux = v0x / sp0, uy = v0y / sp0, lx = -uy, ly = ux;
+      const lat = (s.vx - v0x) * lx + (s.vy - v0y) * ly;
+      const capA = cornerLimit(s, boosting), cap = capA * dt;
+      if (Math.abs(lat) > cap) {
+        const ex = lat - Math.sign(lat) * cap;
+        s.vx -= lx * ex; s.vy -= ly * ex;
+        s.slide = clamp(Math.abs(ex) / (capA * dt), 0, 1);
+        const f = Math.exp(-0.7 * s.slide * dt); s.vx *= f; s.vy *= f;
+        if (live && sp0 > 170) for (let q = 0; q < 2; q++) if (Math.random() < s.slide * 1.6) {   // skid: dust off the outside edge
+          const side = Math.sign(lat) || 1, ox = -lx * side * 5, oy = -ly * side * 5;
+          (s.partFn || part)(s.x + ox - fx * 4, s.y + oy - fy * 4, -fx * 20 + (Math.random() - 0.5) * 20 + ox * 6, -fy * 20 + (Math.random() - 0.5) * 20 + oy * 6, 0.5, Math.random() < 0.5 ? '#e6defa' : '#a89fc4', 2, false);
+        }
+      }
+    }
+  }
+  return ml;
+}
 function stepShip(s, dt, locked) {
   const inp = s.input, CF = CFG;
   CURH = s.h;
@@ -2383,57 +2443,11 @@ function stepShip(s, dt, locked) {
   } else { inp.boostPress = false; inp.swipe = 0; inp.mine = false; }
   if (s.loop) { stepLoop(s, dt, live); return; }
 
-  const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
-  const sp = Math.hypot(s.vx, s.vy);
-  const align = sp > 8 ? (s.vx * fx + s.vy * fy) / sp : 1;
-  s.align = align;
-  const k = clamp(align, 0, 1), boosting = s.boostT > 0;
   // hills: uphill costs speed, downhill gives some back (relative to the way you are travelling along the lane)
   const along = s.vx * T.tx[s.idx] + s.vy * T.ty[s.idx];
   const slope = s.air ? 0 : clamp(T.sl[s.idx] / 0.1, -1.3, 1.3) * (along >= 0 ? 1 : -1);
   s.slope = slope;
-  const top = CF.top * s.st.top * s.speedMul * (0.38 + 0.62 * k) * (boosting ? (1 + 0.55 * s.st.boost) * (s.boostMul || 1) : 1) * (1 - CF.slopeK * slope) * (s.slowT > 0 ? CF.slowMul : 1);
-  s.top = top;
-  const v0x = s.vx, v0y = s.vy;   // (for the cornering limit, below)
-  let ml = 0;
-  if (live) {
-    ml = Math.hypot(inp.mx, inp.my);
-    if (ml > 0.01) {
-      const a = CF.acc * s.st.acc * (0.6 + 0.4 * k) * (boosting ? 1.25 : 1) * (s.slowT > 0 ? CF.slowMul : 1) / Math.max(1, ml);
-      s.vx += inp.mx * a * dt; s.vy += inp.my * a * dt;
-      // thrust can steer and speed you up, but never past what this heading allows
-      const ns = Math.hypot(s.vx, s.vy), lim = Math.max(top, sp);
-      if (ns > lim) { const f = lim / ns; s.vx *= f; s.vy *= f; }
-    } else { const f = Math.exp(-0.8 * dt); s.vx *= f; s.vy *= f; }
-  }
-  // speed above what the current heading allows bleeds away
-  let sp2 = Math.hypot(s.vx, s.vy);
-  if (sp2 > top) { const ns = sp2 - (sp2 - top) * (1 - Math.exp(-2.6 * dt)); const f = ns / sp2; s.vx *= f; s.vy *= f; sp2 = ns; }
-  // sideways drift is pulled into the nose direction (and loses some speed doing it)
-  const gr = 1 - Math.exp(-(boosting ? 0.3 : 1.1) * s.st.grip * dt), px = -fy, py = fx, vp = s.vx * px + s.vy * py;
-  s.vx -= px * vp * gr; s.vy -= py * vp * gr;
-  s.vx += fx * Math.abs(vp) * gr * 0.55; s.vy += fy * Math.abs(vp) * gr * 0.55;
-  // cornering: the path can only bend so fast (grip, and a quick nose, raise the limit; boosting lowers it). Ask for
-  // more and the racer slides wide, scrubbing speed: take a tight bend too fast and it runs out toward the wall.
-  {
-    const sp0 = Math.hypot(v0x, v0y);
-    s.slide = 0;
-    if (sp0 > 60 && s.stun <= 0) {
-      const ux = v0x / sp0, uy = v0y / sp0, lx = -uy, ly = ux;
-      const lat = (s.vx - v0x) * lx + (s.vy - v0y) * ly;
-      const capA = cornerLimit(s, boosting), cap = capA * dt;
-      if (Math.abs(lat) > cap) {
-        const ex = lat - Math.sign(lat) * cap;
-        s.vx -= lx * ex; s.vy -= ly * ex;
-        s.slide = clamp(Math.abs(ex) / (capA * dt), 0, 1);
-        const f = Math.exp(-0.7 * s.slide * dt); s.vx *= f; s.vy *= f;
-        if (live && sp0 > 170) for (let q = 0; q < 2; q++) if (Math.random() < s.slide * 1.6) {   // skid: dust off the outside edge
-          const side = Math.sign(lat) || 1, ox = -lx * side * 5, oy = -ly * side * 5;
-          part(s.x + ox - fx * 4, s.y + oy - fy * 4, -fx * 20 + (Math.random() - 0.5) * 20 + ox * 6, -fy * 20 + (Math.random() - 0.5) * 20 + oy * 6, 0.5, Math.random() < 0.5 ? '#e6defa' : '#a89fc4', 2, false);
-        }
-      }
-    }
-  }
+  const ml = shipMotion(s, dt, live, slope), fx = Math.cos(s.ang), fy = Math.sin(s.ang), boosting = s.boostT > 0;
 
   // in the air, a ship clears the lane walls once it is a little above them (or below the deck, falling)
   // (in the air, only near the lane it is over: coming down just beside it, the wall catches it and turns it back in;
@@ -13470,8 +13484,9 @@ function padFrame() {
   const st = padPoll();
   if (!st) return;
   const was = mode;
-  if (st.start) { if (mode === 'race') pauseGame(); else if (mode === 'pause' && screens.pause.hidden === false) resumeGame(); }
-  else if (mode !== 'race') padMenu(padState());
+  if (st.start && ARENA.pad) arenaLetGo();   // (Start: done flying in the test area, back to the menu)
+  else if (st.start) { if (mode === 'race') pauseGame(); else if (mode === 'pause' && screens.pause.hidden === false) resumeGame(); }
+  else if (mode !== 'race' && !arenaPad(st)) padMenu(padState());
   if (st.start || was === 'race') { const g = padState(); PAD.prevMenu = g.buttons.map((x) => !!(x && x.pressed)); PADNAV.held = null; }   // (so a button held in the race isn't a menu press)
   // (presses are kept until the race takes them, so one landing on a frame with no race step isn't lost;
   //  presses made on a menu are the menu's, never a mine or a boost waiting at the start line)
@@ -15225,7 +15240,189 @@ function howtoFrame(now) {
   howtoDraw();
   requestAnimationFrame(howtoFrame);
 }
+
+/* ================= how to play: the test area =================
+   A little round arena, walled, with an Arrow in it to fly with the race's own controls (mouse and keys while the
+   pointer is over it; a gamepad once its stick moves, until Start). It moves by the race's own motion (shipMotion:
+   thrust, top speed, grip and the cornering slide), turns as fast, boosts, lunges, shoots and drops mines as in a race.
+   Power comes back on its own here (it doesn't in a race), and a mine you run over slows you, as one would. */
+const ARENA = { W: 320, H: 200, R: 92, run: false, last: 0, acc: 0, s: null, parts: [], shots: [], mines: [], keys: {}, mouse: { x: 0, y: 0, in: false, d0: false }, pad: false, boostQ: false, swipeQ: 0, mineQ: false };
+function arenaPart(x, y, vx, vy, life, col, size, glow) { if (ARENA.parts.length < 300) ARENA.parts.push({ x, y, vx, vy, life, max: life, col, size, glow }); }
+function arenaReset() {
+  const st = hullStats('arrow');
+  ARENA.s = { x: 0, y: 40, vx: 0, vy: 0, ang: -Math.PI / 2, st, col: PLAYER_COL, energy: 100, boostT: 0, boostCd: 0, shotCd: 0, swipeCd: 0, swipeT: 0, swipeDir: 0, stun: 0, slowT: 0,
+    speedMul: 1, boostMul: 1, mag: st.mag, align: 1, slide: 0, wallCd: 0, partFn: arenaPart,
+    input: { mx: 0, my: 0, aim: -Math.PI / 2, fire: false, boostPress: false, swipe: 0, mine: false } };
+  ARENA.parts.length = 0; ARENA.shots.length = 0; ARENA.mines.length = 0;
+}
+function arenaPad(st) {   // (true while the pad flies the test area)
+  if (!ARENA.run || screens.help.hidden) { ARENA.pad = false; return false; }
+  if (!ARENA.pad && st && (st.mag > 0.3 || st.fire || st.brake)) { ARENA.pad = true; arenaHint(); }
+  if (ARENA.pad && st) { if (st.boost) ARENA.boostQ = true; if (st.swipeL) ARENA.swipeQ = -1; if (st.swipeR) ARENA.swipeQ = 1; if (st.mine) ARENA.mineQ = true; }
+  return ARENA.pad;
+}
+function arenaLetGo() { ARENA.pad = false; const g = padState(); if (g) PAD.prevMenu = g.buttons.map((x) => !!(x && x.pressed)); arenaHint(); }
+function arenaHint() {
+  const h = $('arenaHint'); if (!h) return;
+  h.textContent = ARENA.pad ? 'Flying with the gamepad: press Start to go back to the menu.' : 'Point the mouse inside it and fly (or move a gamepad stick): the Arrow handles just as it does in a race.';
+}
+function arenaInput() {
+  const A = ARENA, s = A.s, i = s.input, sp = Math.hypot(s.vx, s.vy);
+  i.mx = 0; i.my = 0; i.fire = false;
+  const st = A.pad && PAD.st;
+  if (st) {   // (as in a race: the stick points the nose and thrusts, the brake trigger brakes)
+    if (st.mag > 0) PAD.aim = Math.atan2(st.ly, st.lx);
+    i.aim = PAD.aim != null ? PAD.aim : s.ang;
+    if (st.brake && sp > 20) { i.mx = -s.vx / sp; i.my = -s.vy / sp; } else if (st.mag > 0) { i.mx = Math.cos(s.ang) * st.mag; i.my = Math.sin(s.ang) * st.mag; }
+    i.fire = st.fire;
+  } else if (A.mouse.in) {   // (as in a race: the nose turns toward the pointer, left button thrusts, Space brakes)
+    i.aim = Math.atan2(A.mouse.y - s.y, A.mouse.x - s.x);
+    if (A.keys.Space && sp > 20) { i.mx = -s.vx / sp; i.my = -s.vy / sp; } else if (A.mouse.d0) { i.mx = Math.cos(s.ang); i.my = Math.sin(s.ang); }
+    i.fire = !!(A.keys.KeyW || A.keys.ArrowUp);
+  }
+  if (A.boostQ) { i.boostPress = true; A.boostQ = false; }
+  if (A.swipeQ) { i.swipe = A.swipeQ; A.swipeQ = 0; }
+  if (A.mineQ) { i.mine = true; A.mineQ = false; }
+}
+function arenaStep(dt) {
+  const A = ARENA, s = A.s, i = s.input, CF = CFG;
+  s.shotCd -= dt; s.boostCd -= dt; s.swipeCd -= dt; s.wallCd -= dt;
+  if (s.boostT > 0) s.boostT -= dt;
+  if (s.swipeT > 0) s.swipeT -= dt;
+  if (s.slowT > 0) s.slowT -= dt;
+  if (s.mag < s.st.mag) s.mag = Math.min(s.st.mag, s.mag + dt / s.st.magRegen);
+  s.energy = Math.min(CF.energyMax, s.energy + 6 * dt);   // (power comes back here, so you can keep practising)
+  // turning, as in a race
+  s.ang += clamp(angDiff(s.ang, i.aim), -CF.turn * s.st.turn * dt, CF.turn * s.st.turn * dt);
+  noseThrust(s);
+  const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
+  if (i.boostPress) {   // a boost (as tryBoost): the way the nose points, at least to boost speed
+    i.boostPress = false;
+    if (s.energy >= s.st.boostCost && s.boostCd <= 0 && s.slowT <= 0) {
+      s.energy -= s.st.boostCost; s.boostCd = 0.6; s.boostT = CF.boostTime;
+      const sp = Math.hypot(s.vx, s.vy), ns = clamp(Math.max(sp, 280) + 110 * s.st.boost, 340, 480 * (0.5 + 0.5 * s.st.boost));
+      s.vx = fx * ns; s.vy = fy * ns; SFX.boost();
+    }
+  }
+  if (i.swipe) {   // a sideswipe: the lunge to that side (nobody here to hit)
+    if (s.swipeCd <= 0) { const lx = -fy * i.swipe, ly = fx * i.swipe; s.vx += lx * CF.swipeKick * 0.75; s.vy += ly * CF.swipeKick * 0.75; s.swipeCd = CF.swipeCd; s.swipeT = CF.swipeDur; s.swipeDir = i.swipe; SFX.swipe(); }
+    i.swipe = 0;
+  }
+  if (i.mine) { i.mine = false; if (A.mines.length < CF.mineMax) { A.mines.push({ x: s.x - fx * 13, y: s.y - fy * 13, arm: CF.mineArm, life: CF.mineLife, t: 0 }); SFX.mineDrop(); } }
+  if (i.fire && s.shotCd <= 0 && s.slowT <= 0 && s.mag >= 1) {
+    s.shotCd = CF.fireCd; s.mag -= 1;
+    A.shots.push({ x: s.x + fx * 9, y: s.y + fy * 9, vx: fx * CF.bulletV + s.vx * 0.5, vy: fy * CF.bulletV + s.vy * 0.5, life: CF.bulletLife }); SFX.shot(false);
+  }
+  const ml = shipMotion(s, dt, true, 0), boosting = s.boostT > 0;
+  // the wall: a ring all round (pushed back in, bounced off it as off a lane's wall)
+  for (let q = 0; q < 2; q++) {
+    s.x += s.vx * dt * 0.5; s.y += s.vy * dt * 0.5;
+    const d = Math.hypot(s.x, s.y), lim = A.R - CF.shipR;
+    if (d > lim) {
+      const nx = s.x / d, ny = s.y / d, vn = s.vx * nx + s.vy * ny;
+      s.x = nx * lim; s.y = ny * lim;
+      if (vn > 0) { const e = clamp(0.4 / s.st.mass, 0.2, 0.6); s.vx -= (1 + e) * vn * nx; s.vy -= (1 + e) * vn * ny; s.vx *= Math.exp(-1.6 * dt); s.vy *= Math.exp(-1.6 * dt); }
+      if (vn > 40 && s.wallCd <= 0) { s.wallCd = 0.18; s.vx *= 0.88; s.vy *= 0.88; for (let k = 0; k < 6; k++) arenaPart(s.x, s.y, (Math.random() - 0.5) * 110, (Math.random() - 0.5) * 110, 0.3, '#ffd9a0', 2, true); SFX.wall(vn); }
+    }
+  }
+  if (ml > 0.01 || boosting) if (Math.random() < (boosting ? 1 : 0.75))
+    arenaPart(s.x - fx * 7, s.y - fy * 7, -fx * 55 + s.vx * 0.15 + (Math.random() - 0.5) * 22, -fy * 55 + s.vy * 0.15 + (Math.random() - 0.5) * 22, boosting ? 0.34 : 0.22, trailCol(s.col, boosting), boosting ? 3 : 2, !plumeCols(s.col).smoke);
+  for (let k = A.shots.length - 1; k >= 0; k--) {
+    const b = A.shots[k]; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+    if (Math.hypot(b.x, b.y) > A.R - 2 || b.life <= 0) { if (b.life > 0) for (let q = 0; q < 4; q++) arenaPart(b.x, b.y, (Math.random() - 0.5) * 80, (Math.random() - 0.5) * 80, 0.2, '#bff8ff', 1, true); A.shots.splice(k, 1); }
+  }
+  for (let k = A.mines.length - 1; k >= 0; k--) {
+    const m = A.mines[k]; m.t += dt; m.arm -= dt; m.life -= dt;
+    if (m.life <= 0) { A.mines.splice(k, 1); continue; }
+    if (m.arm <= 0 && Math.hypot(s.x - m.x, s.y - m.y) < CF.shipR + CF.mineR) {   // (your own mine: it slows you, as one would)
+      A.mines.splice(k, 1); s.slowT = s.st.slowTime; s.boostT = 0; s.vx *= 0.6; s.vy *= 0.6; SFX.blast();
+      for (let q = 0; q < 20; q++) arenaPart(m.x, m.y, (Math.random() - 0.5) * 170, (Math.random() - 0.5) * 170, 0.5, q % 2 ? '#ff9a4a' : '#fff1c4', 2, true);
+    }
+  }
+  for (let k = A.parts.length - 1; k >= 0; k--) { const p = A.parts[k]; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; if (p.life <= 0) A.parts.splice(k, 1); }
+}
+function arenaDraw() {
+  const A = ARENA, g = A.g, s = A.s, ox = A.W / 2, oy = A.H / 2, X = (x) => Math.round(ox + x), Y = (y) => Math.round(oy + y);
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  g.fillStyle = '#07060f'; g.fillRect(0, 0, A.W, A.H);
+  // the floor: a deck of dots, as a space lane's; the wall round it, glowing
+  g.fillStyle = '#141a3c'; g.beginPath(); g.arc(ox, oy, A.R, 0, TAU); g.fill();
+  g.fillStyle = 'rgba(143,166,255,0.22)';
+  for (let y = -A.R; y <= A.R; y += 6) for (let x = -A.R; x <= A.R; x += 6) if (x * x + y * y < (A.R - 4) ** 2) g.fillRect(X(x), Y(y), 1, 1);
+  g.strokeStyle = '#0a0b1c'; g.lineWidth = 6; g.beginPath(); g.arc(ox, oy, A.R + 3, 0, TAU); g.stroke();
+  g.strokeStyle = '#62d6cc'; g.lineWidth = 2; g.beginPath(); g.arc(ox, oy, A.R, 0, TAU); g.stroke();
+  g.globalCompositeOperation = 'lighter';
+  g.drawImage(glowSprite('#62d6cc', 8), ox - A.R - 8, oy - 8, 16, 16);   // (a little life on the rim)
+  // mines
+  g.globalCompositeOperation = 'source-over';
+  for (const m of A.mines) { const on = Math.floor(m.t * 6) % 2 === 0; g.fillStyle = '#2a1e40'; g.fillRect(X(m.x) - 3, Y(m.y) - 3, 6, 6); g.fillStyle = m.arm > 0 ? '#7a2018' : on ? '#ff4a3a' : '#7a2018'; g.fillRect(X(m.x) - 1, Y(m.y) - 1, 2, 2); }
+  // trail and sparks
+  for (const p of A.parts) { g.globalAlpha = clamp(p.life / p.max, 0, 1); g.fillStyle = p.col; g.fillRect(X(p.x), Y(p.y), p.size, p.size); }
+  g.globalAlpha = 1;
+  // the boost plume (in your complement), then the Arrow itself
+  const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
+  if (s.boostT > 0) {
+    const P = plumeCols(s.col);
+    g.globalCompositeOperation = P.smoke ? 'source-over' : 'lighter';
+    for (const [d, r, c, a] of [[10, 10, 0, 1], [16, 12, 1, 0.95], [23, 12, 2, 0.8], [31, 11, 2, 0.6], [40, 9, 3, 0.4]]) {
+      g.globalAlpha = a * 0.7; const gs = glowSprite(P[c], r); g.drawImage(gs, X(s.x - fx * d) - r, Y(s.y - fy * d) - r);
+    }
+    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  } else {
+    g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.35; const gs = glowSprite(plumeCols(s.col).smoke ? '#9a97a6' : plumeCols(s.col)[2], 12);
+    g.drawImage(gs, X(s.x - fx * 9) - 12, Y(s.y - fy * 9) - 12); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  }
+  const spr = shipSprites(s.col, 'arrow'), S = SHIP_SZ;
+  g.globalAlpha = 0.35; g.drawImage(spr.shadows ? spr.shadows[shipFrameIndex(s.ang)] || spr.frameAt(shipFrameIndex(s.ang)) : spr.frameAt(shipFrameIndex(s.ang)), X(s.x) - S / 2 + 3, Y(s.y) - S / 2 + 4); g.globalAlpha = 1;
+  g.drawImage(spr.frameAt(shipFrameIndex(s.ang)), X(s.x) - S / 2, Y(s.y) - S / 2);
+  // shots
+  g.strokeStyle = '#bff8ff'; g.lineWidth = 2;
+  for (const b of A.shots) { g.beginPath(); g.moveTo(X(b.x), Y(b.y)); g.lineTo(X(b.x - b.vx * 0.02), Y(b.y - b.vy * 0.02)); g.stroke(); }
+  // power and speed, small, in the corner
+  g.fillStyle = 'rgba(8,6,22,0.8)'; g.fillRect(6, A.H - 12, 62, 6);
+  g.fillStyle = s.energy < s.st.boostCost ? '#f0629f' : '#ffb04a'; g.fillRect(7, A.H - 11, Math.round(60 * s.energy / CFG.energyMax), 4);
+  g.font = '700 10px "Saira Condensed", sans-serif'; g.fillStyle = '#e8e2ff'; g.textAlign = 'left';
+  g.fillText(Math.round(Math.hypot(s.vx, s.vy)) + ' M/S', 6, A.H - 16);
+  if (!A.mouse.in && !A.pad) { g.textAlign = 'center'; g.fillStyle = 'rgba(232,226,255,0.8)'; g.fillText('POINT HERE TO FLY', ox, oy + A.R * 0.55); }
+}
+function arenaFrame(now) {
+  const A = ARENA;
+  if (!A.run) return;
+  if (screens.help.hidden) { A.run = false; A.pad = false; return; }
+  const dt = Math.min(0.05, (now - (A.last || now)) / 1000); A.last = now;
+  A.acc += dt;
+  while (A.acc >= 1 / 120) { arenaInput(); arenaStep(1 / 120); A.acc -= 1 / 120; }
+  arenaDraw();
+  requestAnimationFrame(arenaFrame);
+}
+function arenaStart() {
+  const A = ARENA, cv = $('arenaCv');
+  if (!cv) return;
+  if (!A.g) {
+    A.g = cv.getContext('2d'); A.g.imageSmoothingEnabled = false;
+    const at = (e) => { const r = cv.getBoundingClientRect(); A.mouse.x = (e.clientX - r.left) / r.width * A.W - A.W / 2; A.mouse.y = (e.clientY - r.top) / r.height * A.H - A.H / 2; };
+    cv.addEventListener('mousemove', (e) => { at(e); A.mouse.in = true; if (A.pad) { A.pad = false; arenaHint(); } });
+    cv.addEventListener('mouseleave', () => { A.mouse.in = false; A.mouse.d0 = false; A.keys = {}; });
+    cv.addEventListener('mousedown', (e) => { at(e); A.mouse.in = true; if (e.button === 0) A.mouse.d0 = true; if (e.button === 2) A.boostQ = true; e.preventDefault(); });
+    window.addEventListener('mouseup', (e) => { if (e.button === 0) A.mouse.d0 = false; });
+    cv.addEventListener('contextmenu', (e) => e.preventDefault());
+    // the keys, while the pointer is over the arena (Space would otherwise scroll the page)
+    window.addEventListener('keydown', (e) => {
+      if (!A.run || !A.mouse.in) return;
+      if (['Space', 'KeyW', 'KeyA', 'KeyD', 'KeyS', 'ArrowUp'].includes(e.code)) e.preventDefault();
+      if (e.repeat) return;
+      A.keys[e.code] = true;
+      if (e.code === 'KeyA') A.swipeQ = -1; else if (e.code === 'KeyD') A.swipeQ = 1; else if (e.code === 'KeyS') A.mineQ = true;
+    });
+    window.addEventListener('keyup', (e) => { A.keys[e.code] = false; });
+  }
+  if (A.run) return;
+  arenaReset(); arenaHint();
+  A.run = true; A.last = 0; A.acc = 0;
+  requestAnimationFrame(arenaFrame);
+}
 function howtoStart() {
+  arenaStart();
   const H = HOWTO;
   H.cv = $('howtoCv'); if (!H.cv) return;
   H.g = H.cv.getContext('2d');
