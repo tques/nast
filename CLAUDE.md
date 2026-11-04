@@ -26,3 +26,12 @@ into the game:
 
 A track pasted into the game itself (Tracks > Paste track code) races the same, but its landmarks have no art and are
 left out.
+
+## Pilot lines from the editor's code
+
+The editor's **Edit pilot lines** panel exports **pilot lines code** (JSON, `"format": "nast-pilot-lines"`): only what
+was changed, as `pilots: {Name: {event: [lines]}}`. To build it into the game, replace those entries in `const CHAT`
+in `index.html` (each event's lines joined with `|`; the events are listed above it, in "pilot chatter"), then
+regenerate the editor's copy of the game's lines, `PILOT_LINES` in `editor.html` (between the `/*CHAT*/` markers),
+from the game's `CHAT` and `ROSTER` rather than by hand. Republish both artifacts. Pasted into the game itself
+(Options > Pilot lines > Paste code), the lines are used in that browser only.

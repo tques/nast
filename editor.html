@@ -28,6 +28,25 @@
   --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 }
 * { box-sizing: border-box; }
+#pilots { position: absolute; inset: 0; z-index: 30; display: grid; grid-template-rows: auto 1fr auto auto; gap: 10px; padding: 16px; background: rgba(10, 9, 24, 0.97); }
+#pilots .pl-head, #pilots .pl-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+#pilots .pl-head b { font: 700 22px/1 var(--display); color: var(--amber); }
+#pilots .pl-head .btn { margin-left: auto; }
+#pilots .pl-body { min-height: 0; display: grid; grid-template-columns: 170px 1fr; gap: 14px; }
+#plList { display: grid; align-content: start; gap: 4px; overflow-y: auto; }
+#plList button { display: flex; align-items: center; gap: 8px; padding: 7px 9px; font: 600 15px/1 var(--body); color: var(--ink); background: var(--well); border: 1px solid var(--edge); border-radius: 4px; cursor: pointer; text-align: left; }
+#plList button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
+#plList button i { width: 12px; height: 12px; border-radius: 2px; flex: none; }
+#plList button em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--warn); }
+#plEvents { overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; align-content: start; }
+#plEvents label { display: grid; gap: 4px; padding: 8px; background: var(--well); border: 1px solid var(--edge); border-radius: 4px; }
+#plEvents label b { font: 700 13px/1 var(--display); letter-spacing: 0.04em; color: var(--cyan); }
+#plEvents label span { font-size: 12px; color: var(--mute); }
+#plEvents label.changed { border-color: rgba(255, 209, 102, 0.6); }
+#plEvents textarea { width: 100%; min-height: 66px; resize: vertical; font: 500 14px/1.35 var(--body); color: var(--ink); background: var(--void); border: 1px solid var(--edge); border-radius: 3px; padding: 6px; }
+#plLoadCode { flex: 1 1 200px; min-width: 160px; height: 38px; resize: none; }
+#pilots .pl-note { margin: 0; }
+@media (max-width: 720px) { #pilots .pl-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } #plList { grid-auto-flow: column; overflow-x: auto; } }
 [hidden] { display: none !important; }
 html, body { height: 100%; }
 body { margin: 0; background: var(--void); color: var(--ink); font: 500 15px/1.4 var(--body); overflow: hidden; }
@@ -176,6 +195,11 @@ select { flex: 1; min-width: 0; padding: 7px 8px; }
     </section>
 
     <section>
+      <h2>Pilots</h2>
+      <div class="row"><button class="btn" type="button" id="pilotsOpen">Edit pilot lines</button></div>
+      <p class="small">What each rival says in a race: lead, hits, crashes, passes, the finish.</p>
+    </section>
+    <section>
       <h2>Track code</h2>
       <div class="row"><button class="btn go" type="button" id="copy">Copy track code</button></div>
       <p class="small">Paste this to Claude to have the track built into the game: Claude draws any landmarks from their descriptions. Pickups and asteroids are placed automatically. Pasted straight into the game (Paste track code), the track races the same but its landmarks are left out.</p>
@@ -209,6 +233,22 @@ select { flex: 1; min-width: 0; padding: 7px 8px; }
       <span><i style="background: rgba(232,140,255,0.25); box-shadow: inset 0 0 0 2px #e88cff; border-radius: 50%"></i>Landmark</span>
     </div>
     <div id="toast" role="status"></div>
+    <div id="pilots" hidden role="dialog" aria-label="Pilot lines">
+      <div class="pl-head"><b>Pilot lines</b><span class="small">One line per row: a racer says one of them at random. Your edits are kept in this browser.</span><button class="btn" type="button" id="pilotsClose">Close</button></div>
+      <div class="pl-body">
+        <nav id="plList" aria-label="Pilots"></nav>
+        <div id="plEvents"></div>
+      </div>
+      <div class="pl-foot">
+        <button class="btn go" type="button" id="plCopy">Copy pilot lines code</button>
+        <button class="btn" type="button" id="plReset">Reset this pilot</button>
+        <button class="btn danger" type="button" id="plResetAll">Reset all</button>
+        <textarea id="plLoadCode" rows="1" placeholder="Paste pilot lines code to load it" aria-label="Pilot lines code to load"></textarea>
+        <button class="btn" type="button" id="plLoad">Load</button>
+        <span class="small" id="plMsg" role="status"></span>
+      </div>
+      <p class="small pl-note">Paste the code to Claude to build the lines into the game, or into the game itself (Options, Pilot lines) to try them there.</p>
+    </div>
   </main>
 </div>
 
@@ -1598,6 +1638,7 @@ $('zout').addEventListener('click', () => zoomAt(W / 2, H / 2, 0.8));
 window.addEventListener('keydown', (e) => {
   if (e.target.closest('input, textarea')) return;
   const k = e.key;
+  if (!$('pilots').hidden) { if (k === 'Escape') $('pilots').hidden = true; return; }   // (the pilot lines panel is up: no track shortcuts)
   if ((e.ctrlKey || e.metaKey) && (k === 'z' || k === 'Z')) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
   if ((e.ctrlKey || e.metaKey) && (k === 'y' || k === 'Y')) { e.preventDefault(); redo(); return; }
   if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); deleteSel(); return; }
@@ -1610,6 +1651,81 @@ window.addEventListener('keydown', (e) => {
   if (k === 'h' || k === 'H') setTool('hole');
 });
 window.addEventListener('resize', resize);
+
+
+/* ================= pilot lines: what each rival says in a race =================
+   PILOT_LINES is the game's own (regenerate it from the game's CHAT and ROSTER, between the markers, as LIBRARY is);
+   the draft (only what differs from it) is kept in this browser; the code carries just the changes. */
+const PILOT_LINES = /*CHAT*/{"Vesper":{"col":"#4fd1c5","hull":"needle","lines":{"grid":["Try to keep up. Or don't. It's all the same to me.","Cameras ready? Good. They'll want my left side.","Another race, another trophy for the cabinet."],"lead":["As it should be.","Front of the field. The light is better here.","Admire the view. It's mostly me."],"stingYou":["Stay down, darling.","Spin for me. Gracefully, if you can manage it.","That's what reaching for me gets you."],"stung":["You'll pay for that paintwork.","How dare you.","Cheap. Utterly cheap."],"shieldDown":["My shield? You'll regret that.","Do you know what that finish cost?","Bold. And stupid."],"swipeYou":["Out of my light.","Move.","Don't take it personally. Do take it."],"crash":["That did not happen.","Nobody saw that.","Ugh. The cameras saw that."],"passYou":["Excuse me. Actually, don't.","Mind the exhaust.","You were in my way."],"passed":["Enjoy it. It won't last.","Savour the moment. It's the only one you'll get.","I'm letting you have this one."],"mineYou":["Watch where you fly.","I left that one for you. You're welcome.","Predictable."],"mineThem":["Mines? How common.","You'll answer for that.","Disgusting little toy."],"win":["Naturally.","Hold the applause. No, keep it going.","Was there ever any doubt?"],"lose":["The judges must be blind.","An off day. One.","Enjoy your little moment."]}},"Kestrel":{"col":"#f0629f","hull":"raptor","lines":{"grid":["Kssss. Hungry.","Many prey. Good hunting.","Krrk. Smell fear."],"lead":["Front of flock. Kssss.","Kestrel leads. Others follow.","Open sky. Mine."],"stingYou":["Krraa! Caught!","Prey spins. Ha!","Bite! Got you."],"stung":["Ssss! Prey bites back!","Krrk! Kestrel remembers you.","Hurts. Now I hunt you."],"shieldDown":["Scales cracked! Krrk!","Hssss. Angry now.","You wound. I hunt."],"swipeYou":["Claw!","Out of hunt path!","Kssss. Shove."],"crash":["Krrk... wing hurts.","Ground bit Kestrel.","Ssss. Not again."],"passYou":["Prey slow. Kssss.","Swooping by.","Passing. Still hungry."],"passed":["Prey runs? Prey tires.","Kestrel follows. Always.","Krrk. I see your tail."],"mineYou":["Nest-trap! Kssss!","Egg go boom. Ha!","Step in trap. Clever Kestrel."],"mineThem":["Krraa! Trap-maker!","Sneaky prey. Hsss.","Burns! Tracking you."],"win":["KRRAAAAH! Feast!","Best hunter. Kssss.","Kestrel eats first."],"lose":["Prey escapes... this time.","Hssss. Next hunt.","Krrk. Kestrel remembers your scent."]}},"Moth":{"col":"#a493ff","hull":"moth","lines":{"grid":["Is everyone excited? I'm excited! Is that right?","Hello! Are we friends or are we racing? Both?","Why are the lights counting down? Oh! It's a game!"],"lead":["Everyone is behind me! Is this a parade?","I'm first! Do I get a lamp?","Hello from the front! It's so bright here!"],"stingYou":["Oh! Was that the wrong button?","Sorry! Is spinning fun for humans?","I think I stung you. Is that a greeting?"],"stung":["Ow! Is that how humans say hello?","Why do humans sting? I thought only we did that.","Ow! My wings are dizzy!"],"shieldDown":["My shiny shield! It was so pretty!","Ow! Was that rude? Or a compliment?","Hey! That was my nice glow!"],"swipeYou":["Oops! I bumped you! Is this a hug?","Sorry! I wanted to see your lights!","Bonk! Humans like that, yes?"],"crash":["I flew into the shiny thing again.","Everything is upside down! Wheee!","Ow. Not like the lamp at home."],"passYou":["Your engine is so pretty! I'm going past it!","Bye! Your lights are lovely!","Excuse me! Is that the polite word?"],"passed":["Ooh, your engine is so bright! May I follow it?","Wait! I want to look at your lights!","You're shiny AND fast!"],"mineYou":["Did you like my present?","Oh no! I left that there by accident! I think!","Boom! Pretty! Sorry!"],"mineThem":["You left me a present! It exploded!","Was that for me? Thank you?","Ow! Human gifts are confusing!"],"win":["I won? Do I get to keep the shiny thing?","Everyone clap! Is that what you do?","Yay! Can we do it again?"],"lose":["That was fun! Did I lose? Is that bad?","You're very fast. Do humans have secret wings?","You won! I'm happy for you! I think?"]}},"Orrery":{"col":"#e9dd6a","hull":"twin","lines":{"grid":["Clean run. No questions. No inspections.","Cargo's secure. Don't ask what cargo.","Nobody touches my hold. Nobody."],"lead":["Nobody catches the Orrery.","Out front with a full hold. Professional.","Smooth. Like a dead-of-night drop."],"stingYou":["Nothing personal. Business.","You saw nothing.","That's the toll on this route."],"stung":["You're on my list now. My very scary list.","Hey! That's coming out of your cut!","Ow! Do you know who I fly for?"],"shieldDown":["Don't look at me like that. I'm DANGEROUS.","My shield! I stole that fair and square!","You'll be hearing from my associates."],"swipeYou":["Out of my shipping lane.","Move it. I've got a schedule.","Customs check. You failed."],"crash":["Lost some cargo. Nobody saw anything.","That's... fine. All insured. Probably.","Ugh, my fur's going to smell of smoke for days."],"passYou":["Smuggler's line. Learn it.","Passing through. Don't scan me.","Fast hold, faster pilot."],"passed":["Lucky. Very lucky.","Enjoy the lead. It's on loan.","Take a head start. You'll need it."],"mineYou":["Contraband. Don't touch.","That's what happens to snitches.","Rigged it myself."],"mineThem":["Hey! That's MY trick!","A mine? On my route? Rude.","Who sold you that? I want names."],"win":["Delivered. On time. No questions.","Payday. Don't pet me.","Another clean job."],"lose":["The deal's not done yet.","Stop calling me cute. I lost. It's not cute.","I'll get you on the next drop."]}},"Slate":{"col":"#79a6ff","hull":"hammer","lines":{"grid":["Regulations loaded. Begin.","Race with honour. Or be judged.","All systems lawful."],"lead":["Lead acquired. Lawfully.","Position one. As earned.","Order is restored."],"stingYou":["Penalty administered.","Lawful countermeasure.","Justice. Swift."],"stung":["Violation logged.","Unsporting. Noted.","Your record grows."],"shieldDown":["Shield lost. A fair hit. Respect.","Clean strike. Acknowledged.","Damage within regulations."],"swipeYou":["Contact. Within regulations.","Yield.","Lane enforcement."],"crash":["Error. Rebooting dignity.","Malfunction. Embarrassing.","Hull integrity compromised."],"passYou":["Overtaking. Signalled.","Passing. Legally.","Move aside. By order."],"passed":["Clean pass. Respect.","Well executed.","Logged. I will respond."],"mineYou":["Hazard deployed. Lawfully.","You failed to observe the hazard.","The warning was implicit."],"mineThem":["Mine deployment noted. Dishonourable.","Cowardly ordnance.","That is not honourable racing."],"win":["Victory. By the book.","Justice is served.","Result: lawful."],"lose":["A fair defeat. Respect.","You raced with honour.","Acknowledged. Victory is yours."]}},"Bitsy":{"col":"#9be35a","hull":"wasp","lines":{"grid":["Speedrun timer started!","Loading prank.exe... ready!","Hiii! Let's break this track!"],"lead":["First place! New personal best!","Leaderboard updated: me!","Hehe, top of the chart!"],"stingYou":["Gotcha! Hehe!","Spin cycle activated!","Lol. Recorded that one."],"stung":["Ow! Rude! Logging that.","Hey! Bug report filed!","Error 404: manners not found."],"shieldDown":["My shield! I'm telling the admin!","Rude! Reverting to my last save!","Ow! That's a bannable offence!"],"swipeYou":["Boop!","Collision test passed!","Shove! Physics is fun!"],"crash":["Clipped through the floor. Oops!","That's a glitch, not a crash!","Respawning... teehee."],"passYou":["Byeee!","Skip! Hehe!","Found an exploit! Byeee!"],"passed":["Hey! I was gonna speedrun that!","Cheater! ...Oh, you're just good.","Not fair, I lagged!"],"mineYou":["Surprise!","Trap card!","booby_trap.exe! Hehe!"],"mineThem":["Ow! Who put that there!","Exploit used against me! Rude!","Hey, that's my kind of trick!"],"win":["GG! World record!","Speedrun complete! Hehe!","Leaderboard: me, me and me!"],"lose":["Rematch! I wasn't buffering!","Aw. Reloading save...","Okay okay, GG. Rematch?"]}},"Pyre":{"col":"#ff5a5f","hull":"flare","lines":{"grid":["Ok I'm an ADULT racer btw.","Get ready to get destroyed.","I've been racing for like 30 years. Ok, 30 days."],"lead":["Number one! Ez!","Who's the best? ME.","You guys are SO bad lol."],"stingYou":["GET REKT!","Ez! Get spun!","Lol noob."],"stung":["THAT WAS LAG!","Hacker! You're HACKING!","That doesn't count!!"],"shieldDown":["Mom said I could- I mean, NO FAIR!","My shield! Reported!","Ok you're just camping."],"swipeYou":["Outta my way, noob!","BONK lol.","Get shoved, scrub!"],"crash":["Controller disconnected!","That was ON PURPOSE.","My thumb slipped!!"],"passYou":["Bye noob!","Too slow lol!","See ya, grandpa!"],"passed":["You're SO lucky.","Whatever. I'm letting you.","Ok I wasn't even trying."],"mineYou":["Get mined lol!","Ha! Free kill!","Ez trap ez win."],"mineThem":["WHO DID THAT?!","Cheap mines! Cheap!","That's so unfair!!"],"win":["GG EZ!","Clip it! CLIP IT!","I'm literally the best ever."],"lose":["Rematch. NOW.","You're hacking. I'm telling.","...I have to go to bed soon anyway."]}},"Marlowe":{"col":"#9fe8ff","hull":"manta","lines":{"grid":["Good luck, everyone! Do race kindly.","My, what a lovely field today.","Hooves crossed for all of you!"],"lead":["Oh! I'm in front? How thrilling!","Leading, darlings! Do keep up.","How delightful. A front-row view."],"stingYou":["Oh dear, I am sorry!","Pardon me! Truly!","Forgive me, it slipped."],"stung":["Oh! How could you?","That was terribly unkind.","My poor ship! You brute!"],"shieldDown":["You've scuffed my finish! How dreadful.","My shield! I'd only just polished it!","Ohh, really now."],"swipeYou":["Oh! Excuse me!","Terribly sorry about that!","Pardon the nudge, dear."],"crash":["Oh, my hooves! How embarrassing.","I've ruined my trim.","Oh dear, oh dear."],"passYou":["Pardon me, darling, coming through!","Excuse me! Mind the hooves!","Just slipping by, thank you!"],"passed":["Oh, well done you!","Ever so quick! Bravo!","How gallant. Do carry on."],"mineYou":["Oh no! I didn't mean for you to find that!","Sorry! That one wasn't for you. Well, it was.","Oh dear, was that mine?"],"mineThem":["Oh! How rude!","A mine? Honestly!","That was beneath you, truly."],"win":["Oh my! I won? How lovely!","Thank you, thank you! You were all wonderful.","What a splendid day!"],"lose":["Beautifully raced. Bravo, truly.","Congratulations, darling.","You won fair and square. Well done!"]}},"Sabre":{"col":"#d65cff","hull":"lancer","lines":{"grid":["Contracts on all of you.","Bounty board's full today.","Targets acquired. All of them."],"lead":["Clear of the pack. Hunting forward.","Point position. Tracking.","Nobody gets behind a hunter."],"stingYou":["Bounty collected.","Tagged and bagged.","That's one."],"stung":["Cybernetics took that. Not me.","Your bounty just went up.","Mistake."],"shieldDown":["Shield's spent. I'm not.","You'll want to run.","That doubled your price."],"swipeYou":["Out of my line.","Collateral.","Hold still."],"crash":["Systems rebooting. Still hunting.","A scratch. Merely a scratch.","Just a flesh wound. Half-flesh."],"passYou":["Target overtaken.","Closing the contract.","Passing. You're still marked."],"passed":["Enjoy the lead. I'm right behind.","Your price just went up.","Run. It makes it fun."],"mineYou":["Trap sprung.","Snared.","Bounty secured."],"mineThem":["Cheap trick. Noted.","You're worth more now.","That'll cost you."],"win":["Contract closed.","Payday.","Hunt's over."],"lose":["Contract extended.","You got lucky. Next time, I collect.","This isn't over."]}},"Rook":{"col":"#d8dde8","hull":"bastion","lines":{"grid":["ROOK IS READY. ROOK IS ROCK.","SMALL SHIPS. BIG ROOK.","ROOK WILL CRUSH."],"lead":["ROOK IS MOUNTAIN. MOUNTAIN IS FIRST.","NOTHING PASSES ROOK.","LANDSLIDE."],"stingYou":["ROOK HITS. YOU FALL.","HA. PEBBLE SPINS.","CRUMBLE."],"stung":["THAT TICKLED.","ROOK FEELS NOTHING. ...MOSTLY.","HM. MY TURN."],"shieldDown":["HM. CHIPPED.","EROSION. SLOW. ROOK WAITS.","STILL ROCK."],"swipeYou":["ROCKSLIDE!","SMASH!","MOVE, PEBBLE."],"crash":["ROOK IS... GRAVEL.","AVALANCHE. OOPS.","ROOK FELL. ROOK GETS UP."],"passYou":["ROOK ROLLS ON.","BOULDER COMING THROUGH.","OUT OF WAY."],"passed":["SMALL THINGS ARE FAST. HMPH.","ROOK WILL CATCH YOU. ROOK IS PATIENT.","RUN, PEBBLE."],"mineYou":["BOOM. HA.","ROOK LEAVES GIFTS.","STONE TRAP."],"mineThem":["HM. DUST.","ROOK STEPPED IN SOMETHING.","THAT WAS A GOOD BOOM."],"win":["ROOK IS VICTORY. ROOK IS ROCK.","THE MOUNTAIN STANDS.","ALL PEBBLES BOW."],"lose":["ROOK WILL REMEMBER. ROCKS REMEMBER LONG.","ERODED. THIS TIME.","HMPH. GOOD RACE, PEBBLE."]}},"Nyx":{"col":"#c9935a","hull":"wraith","lines":{"grid":["My third eye has seen the finish.","I know how this ends.","The omens favour me tonight."],"lead":["As foretold.","The eye saw this hour.","Behind me, all of you. As it was written."],"stingYou":["I saw that coming. You didn't.","Fate spins you.","The eye never misses."],"stung":["I foresaw that. I let it happen.","Curious. The eye did not show me that.","You'll pay, in a future you can't see."],"shieldDown":["A bad omen. For you.","My feathers are ruffled. Yours will burn.","You think you've hurt me?"],"swipeYou":["Talons.","Feel the wing.","Did you see that? I did."],"crash":["The eye blinked.","A minor prophecy. Ignore it.","Feathers... everywhere."],"passYou":["I was behind you the whole time.","Shadows pass quietly.","You never saw me."],"passed":["Go on. I've seen where you end.","Enjoy it. Briefly.","This was written."],"mineYou":["The eye placed that for you.","Your path always led there.","Fated."],"mineThem":["I chose to fly there. Clearly.","The eye was looking elsewhere.","You'll regret that. In three laps."],"win":["Exactly as I saw it.","The prophecy is fulfilled.","Did you think it would end any other way?"],"lose":["The eye... was mistaken.","An omen I misread. Once.","Enjoy it. The eye remembers."]}},"Corin":{"col":"#d4ff4a","hull":"arrow","lines":{"grid":["Usually I'm filming this bit!","Never thought I'd be on this side of the lens.","Okay. Deep breath. Rolling."],"lead":["I'm leading? Somebody get this shot!","Wide shot of me, in front! Beautiful.","I've never had this angle before!"],"stingYou":["Sorry! Great shot though.","Ooh, that's a highlight-reel moment.","Cut! ...Sorry."],"stung":["Ow! I've filmed that hit a hundred times. Hurts more in person.","Nice one. I'd have used that in the replay.","Oof. That's going in the highlights."],"shieldDown":["Shield's gone! Good camera angle though.","You're getting great footage of me losing.","Oof. Okay, close-up on my shame."],"swipeYou":["Sorry! Gotta get my shot!","Excuse me! Old habit, jostling for position!","Bump! Just like the camera pit!"],"crash":["Great angle on that crash. Sorry, old habit.","Did anyone get that? Please say no.","That's the blooper reel sorted."],"passYou":["Tracking shot!","Pan left! Passing!","And Corin moves up! Sorry, I narrate."],"passed":["Lovely line. Wish I had a camera.","You'd look great on the broadcast.","Good move! I'll catch you."],"mineYou":["Sorry! I saw a pro do that once.","Boom! Great shot!","That'll look great in slow-mo."],"mineThem":["Should've zoomed in on that one.","Didn't see that in frame!","Ow! Nice one."],"win":["Somebody's filming this, right?!","I won! Mom's watching! Hi Mom!","From the camera pit to the podium!"],"lose":["Great race! I've seen worse from the pros.","Fair play. You looked great out there.","That's a wrap. Good race."]}}}/*CHAT*/;
+const PL_EVENTS = [
+  ['grid', 'On the grid', 'As the countdown starts'], ['lead', 'Takes the lead', ''], ['passYou', 'Passes you', ''], ['passed', 'You pass them', ''],
+  ['stingYou', 'Stings you', 'Hits you with a stinger'], ['stung', 'You sting them', ''], ['shieldDown', 'You drop their shield', ''],
+  ['swipeYou', 'Sideswipes you', ''], ['mineYou', 'You hit their mine', ''], ['mineThem', 'They hit your mine', ''],
+  ['crash', 'Crashes', 'Wrecks, falls off, into a hole, into the drink'], ['win', 'Wins the race', ''], ['lose', 'Second, when you win', '']
+];
+const PL_KEY = 'gatebreaker.pilotLines.draft';
+let plDraft = {}, plSel = Object.keys(PILOT_LINES)[0];
+try { plDraft = JSON.parse(localStorage.getItem(PL_KEY)) || {}; } catch (e) { plDraft = {}; }
+const plLines = (n, ev) => (plDraft[n] && plDraft[n][ev]) || PILOT_LINES[n].lines[ev] || [];
+const plChanged = (n, ev) => !!(plDraft[n] && plDraft[n][ev]);
+function plSave() { try { localStorage.setItem(PL_KEY, JSON.stringify(plDraft)); } catch (e) { /* kept for this visit */ } }
+function plSet(n, ev, lines) {
+  const base = PILOT_LINES[n].lines[ev] || [];
+  plDraft[n] = plDraft[n] || {};
+  if (JSON.stringify(lines) === JSON.stringify(base)) delete plDraft[n][ev]; else plDraft[n][ev] = lines;
+  if (!Object.keys(plDraft[n]).length) delete plDraft[n];
+  plSave();
+}
+function plRenderList() {
+  const nav = $('plList'); nav.textContent = '';
+  for (const n of Object.keys(PILOT_LINES)) {
+    const b = document.createElement('button'), i = document.createElement('i'), t = document.createElement('span'), em = document.createElement('em');
+    b.type = 'button'; b.setAttribute('aria-pressed', n === plSel ? 'true' : 'false');
+    i.style.background = PILOT_LINES[n].col; t.textContent = n; em.textContent = plDraft[n] ? 'edited' : '';
+    b.append(i, t, em); b.addEventListener('click', () => { plSel = n; plRender(); });
+    nav.append(b);
+  }
+}
+function plRender() {
+  plRenderList();
+  const box = $('plEvents'); box.textContent = '';
+  for (const [ev, name, help] of PL_EVENTS) {
+    const L = document.createElement('label'), b = document.createElement('b'), sp = document.createElement('span'), ta = document.createElement('textarea');
+    b.textContent = name; sp.textContent = help;
+    ta.value = plLines(plSel, ev).join('\n'); ta.rows = 3; ta.spellcheck = true;
+    if (plChanged(plSel, ev)) L.classList.add('changed');
+    ta.addEventListener('input', () => {
+      // (one line per row; a '|' would split a line in the game, so it becomes a '/')
+      const lines = ta.value.split('\n').map((l) => l.replace(/\|/g, '/').trim()).filter(Boolean);
+      plSet(plSel, ev, lines.length ? lines : PILOT_LINES[plSel].lines[ev]);
+      L.classList.toggle('changed', plChanged(plSel, ev)); plRenderList();
+    });
+    L.append(b); if (help) L.append(sp); L.append(ta); box.append(L);
+  }
+}
+function plCode() { return JSON.stringify({ format: 'nast-pilot-lines', version: 1, pilots: plDraft }); }
+$('pilotsOpen').addEventListener('click', () => { $('pilots').hidden = false; $('plMsg').textContent = ''; plRender(); });
+$('pilotsClose').addEventListener('click', () => { $('pilots').hidden = true; });
+$('plReset').addEventListener('click', () => { delete plDraft[plSel]; plSave(); plRender(); $('plMsg').textContent = plSel + ' is back to the game\'s lines.'; });
+$('plResetAll').addEventListener('click', () => { if (!confirm('Put every pilot back to the game\'s lines?')) return; plDraft = {}; plSave(); plRender(); $('plMsg').textContent = 'All pilots are back to the game\'s lines.'; });
+$('plCopy').addEventListener('click', async () => {
+  const n = Object.keys(plDraft).length;
+  if (!n) { $('plMsg').textContent = 'Nothing edited yet: the code would be empty.'; return; }
+  try { await navigator.clipboard.writeText(plCode()); $('plMsg').textContent = 'Copied: changes for ' + n + ' pilot' + (n > 1 ? 's' : '') + '.'; }
+  catch (e) { $('plLoadCode').value = plCode(); $('plMsg').textContent = 'Could not reach the clipboard: the code is in the box, copy it from there.'; }
+});
+$('plLoad').addEventListener('click', () => {
+  try {
+    const d = JSON.parse($('plLoadCode').value);
+    if (!d || d.format !== 'nast-pilot-lines' || typeof d.pilots !== 'object') throw new Error();
+    let k = 0;
+    for (const [n, evs] of Object.entries(d.pilots)) {
+      if (!PILOT_LINES[n] || typeof evs !== 'object') continue;
+      for (const [ev, lines] of Object.entries(evs)) if (Array.isArray(lines) && PL_EVENTS.some((e) => e[0] === ev)) { plSet(n, ev, lines.map(String).filter(Boolean)); k++; }
+    }
+    $('plLoadCode').value = ''; plRender(); $('plMsg').textContent = 'Loaded ' + k + ' set' + (k === 1 ? '' : 's') + ' of lines.';
+  } catch (e) { $('plMsg').textContent = 'That isn\'t pilot lines code.'; }
+});
 
 /* start: the saved draft if there is one, otherwise the game's own track as a worked example */
 doc = restore();
