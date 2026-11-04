@@ -8946,8 +8946,10 @@ function drawBlast(bl, f) {
 /* a boost plume's colours, from the nozzle out: white-hot, then the racer's complementary colour (its hue turned half
    way round the colour wheel, made vivid), deepening as it trails off */
 const PLUME_COLS = {};
+const PLUME_SMOKE = { '#d8dde8': ['#ffffff', '#16141c', '#0c0b10', '#000000'] };   // (Rook's silver: a black plume)
 function plumeCols(col) {
   if (PLUME_COLS[col]) return PLUME_COLS[col];
+  if (PLUME_SMOKE[col]) { const c = PLUME_SMOKE[col].slice(); c.smoke = true; return (PLUME_COLS[col] = c); }
   const [r, g, b] = hexA(col).map((v) => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
   let h = 0;
   if (d > 0.02) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
@@ -8973,11 +8975,16 @@ function drawShip(s, time, f) {
     // (in the colour opposite the racer's own on the colour wheel: see plumeCols)
     const fl = 0.85 + 0.15 * Math.sin(time * 47 + s.id * 2.1), P = plumeCols(s.col);
     const PLUME = [[10, 10, 0, 1], [16, 12, 1, 0.95], [23, 12, 2, 0.8], [31, 11, 2, 0.6], [40, 9, 3, 0.4]];
+    if (P.smoke) {   // (black: smoke laid over the deck, not light, with just a white-hot flash at the nozzle)
+      glow(ec, '#ffffff', 8, s.x - fx * 9, s.y - fy * 9, 0.8);
+      for (const [d, r, c, a] of PLUME) if (c) for (let k = 0; k < 2; k++) glow(lc, P[c], Math.round(r * 1.25 * fl), s.x - fx * d * fl, s.y - fy * d * fl, Math.min(1, a + 0.15));   // (twice over: thick)
+    } else {
     for (const [d, r, c, a] of PLUME) glow(ec, P[c], Math.round(r * fl), s.x - fx * d * fl, s.y - fy * d * fl, a);   // (whole-pixel sizes: each size is a cached sprite)
     lc.globalCompositeOperation = 'lighter';
     for (const [d, r, c, a] of PLUME) glow(lc, P[c], Math.round(r * 0.55 * fl), s.x - fx * d * fl, s.y - fy * d * fl, a * 0.45);   // (its hot core)
     glow(lc, P[2], 22, s.x - fx * 18, s.y - fy * 18 + 3, 0.2);   // (its light on the deck, behind the ship)
     lc.globalCompositeOperation = 'source-over';
+    }
   } else {
     glow(ec, s.col, 22, s.x - fx * 8, s.y - fy * 8, 0.28 + thrust * 0.22);
     lc.globalCompositeOperation = 'lighter';
