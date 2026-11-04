@@ -8941,10 +8941,21 @@ function drawShip(s, time, f) {
   const boosting = s.boostT > 0;
   // engine light on the lane beneath
   const thrust = clamp(s.spd / 220, 0, 1);
-  glow(ec, boosting ? '#ffe2a0' : s.col, boosting ? 34 : 22, s.x - fx * 8, s.y - fy * 8, (boosting ? 0.8 : 0.28) + thrust * 0.22);
-  lc.globalCompositeOperation = 'lighter';
-  glow(lc, boosting ? '#ffb45a' : s.col, boosting ? 42 : 28, s.x, s.y + 3, boosting ? 0.2 : 0.09);
-  lc.globalCompositeOperation = 'source-over';
+  if (boosting) {
+    // boosting: a plume out of the back, white-hot at the nozzle, cooling to orange as it trails off (flickering),
+    // rather than the whole machine lighting up
+    const fl = 0.85 + 0.15 * Math.sin(time * 47 + s.id * 2.1);
+    const PLUME = [[11, 9, '#fff1c4', 0.85], [17, 10, '#ffd27a', 0.7], [24, 10, '#ffb45a', 0.5], [32, 9, '#ff7a30', 0.32]];
+    for (const [d, r, col, a] of PLUME) glow(ec, col, r * fl, s.x - fx * d * fl, s.y - fy * d * fl, a);
+    lc.globalCompositeOperation = 'lighter';
+    glow(lc, '#ffb45a', 18, s.x - fx * 16, s.y - fy * 16 + 3, 0.16);   // (its light on the deck, behind the ship)
+    lc.globalCompositeOperation = 'source-over';
+  } else {
+    glow(ec, s.col, 22, s.x - fx * 8, s.y - fy * 8, 0.28 + thrust * 0.22);
+    lc.globalCompositeOperation = 'lighter';
+    glow(lc, s.col, 28, s.x, s.y + 3, 0.09);
+    lc.globalCompositeOperation = 'source-over';
+  }
   // the higher the ship, the further its shadow falls away from it
   const S = Math.round(24 * f), o = S >> 1;
   // in the air the shadow falls further off, on whatever deck is below (none over open space)
