@@ -15383,6 +15383,12 @@ function arenaDraw() {
   g.fillStyle = s.energy < s.st.boostCost ? '#f0629f' : '#ffb04a'; g.fillRect(7, A.H - 11, Math.round(60 * s.energy / CFG.energyMax), 4);
   g.font = '700 10px "Saira Condensed", sans-serif'; g.fillStyle = '#e8e2ff'; g.textAlign = 'left';
   g.fillText(Math.round(Math.hypot(s.vx, s.vy)) + ' M/S', 6, A.H - 16);
+  // the magazine, as the race's pips: one per shot, the next filling as it reloads
+  for (let k = 0; k < s.st.mag; k++) {
+    const x = 74 + k * 6, full = clamp(s.mag - k, 0, 1);
+    g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(x, A.H - 13, 4, 8);
+    if (full > 0) { const h = Math.max(1, Math.round(8 * full)); g.fillStyle = full >= 1 ? '#4fd1c5' : 'rgba(79,209,197,0.55)'; g.fillRect(x, A.H - 5 - h, 4, h); }
+  }
   if (!A.mouse.in && !A.pad) { g.textAlign = 'center'; g.fillStyle = 'rgba(232,226,255,0.8)'; g.fillText('POINT HERE TO FLY', ox, oy + A.R * 0.55); }
 }
 function arenaFrame(now) {
