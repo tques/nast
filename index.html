@@ -714,7 +714,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       <ul class="rules">
         <li><i class="sw gold"></i><span><b>Yellow cells</b>: fly through for +30 power. Each one recharges for you after 12 seconds.</span></li>
         <li><i class="sw cyan"></i><span><b>Cyan targets</b>: shoot to slide a blockade's gap and get +10 power.</span></li>
-        <li><i class="sw amber"></i><span><b>Shortcuts</b> (from lap 2): shoot a gate open (the door in, the gate at the far end out) and it opens for everyone, shutting half a second after the first racer is through. For a second after, it's glass: smash through and lose your shield. Ram a shut gate and you crash. Nothing can hurt you inside a shortcut.</span></li>
+        <li><i class="sw amber"></i><span><b>Shortcuts</b> (from lap 2): shoot a gate open (the door in, the gate at the far end out) and it opens for everyone, shutting half a second after the first racer is through. For a second after, it's glass: smash through with a full shield (losing it and some speed); with less, you crash. Ram a shut gate and you crash. Walls hit harder with your shield down. Nothing can hurt you inside a shortcut.</span></li>
         <li><i class="sw lime"></i><span><b>Jump pads</b>: clear gaps, or cut across with enough speed.</span></li>
         <li><i class="sw rose"></i><span><b>Pink pickups</b>: Stingers that spin a rival speeder out.</span></li>
       </ul>
@@ -1686,6 +1686,7 @@ const CFG = {
   shipR: 6, targetR: 10, shiftDur: 8, targetCd: 5,
   softDur: 1.5, shatterSlow: 0.72, shatterDmg: 4,   // a barricade that has just moved is glass for a moment: smash through it at a cost
   slopeK: 0.17, levelTol: 0.6,   // climbing costs speed, descending gains it; things interact within this height gap
+  bareWall: 2,   // walls and gates hit this much harder with no shield up
   gateOpen: 3, gateClose: 0.5, gateSoft: 1,   // shortcut gates: open for everyone this long if nobody goes through; shut this
                                                // long after the first racer through; then soft (smash through, losing your shield) this long
   passDur: 6, passCd: 5, catchBuf: 6, catchMin: 50,  // shortcut passes; catch-up rule (samples)
@@ -2097,12 +2098,13 @@ function rankShips() {
 /* ---------- ship physics ---------- */
 /* Shortcut gates (a corridor's door and its exit gate) are shared: shot open, a gate is open for everyone (st 1) until
    half a second after the first racer goes through it (or 3 s if nobody does); then it shuts soft for a second (st 2:
-   smash through it and lose your shield, or crash with none left), then hard (st 0: ram it and you crash). Soft or
+   smash through it with a full shield, losing it and some speed; with less, a crash), then hard (st 0: ram it and you
+   crash). Soft or
    hard, it can be shot open again. A catch-up corridor's gates stay personal: a pass for the shooter alone. */
 function gateShared(g) { return (g.kind === 'door' || g.kind === 'exit') && !g.chord.catchup; }
 function gateOpenFor(s, g) { return s.passT[g.id] > 0 || (gateShared(g) && g.st === 1); }
 function openGate(g, by) {
-  g.st = 1; g.openT = CFG.gateOpen; g.closeT = -1; g.soft = 0; g.broke = {}; g.flash = 0.5;
+  g.st = 1; g.openT = CFG.gateOpen; g.closeT = -1; g.soft = 0; g.broke = {}; g.flash = 0.5; g.openBy = by ? by.id : -1; g.openN = (g.openN || 0) + 1;
   emit(g.kind === 'door' ? 'pass' : 'exitopen', g, by);
 }
 function gateEntered(g) { if (gateShared(g) && g.st === 1 && g.closeT < 0) g.closeT = CFG.gateClose; }
@@ -2112,7 +2114,7 @@ function gateRam(s, g, inward) {
   const sg = g.seg;
   if (segDist(s.x, s.y, sg.x1, sg.y1, sg.x2, sg.y2) >= CFG.shipR + 2) return;
   if (g.kind === 'door' && inward < 60) { segPush(s, CFG.shipR, sg.x1, sg.y1, sg.x2, sg.y2, 3, 0.35); return; }
-  if (gateShared(g) && g.st === 2 && s.shield > 0) {
+  if (gateShared(g) && g.st === 2 && s.shield >= CFG.shieldMax) {   // (a full shield only: anything less and it crashes)
     s.shield = 0; s.shieldT = 0; s.shieldFlash = 0.4; g.broke[s.id] = true; s.passT[g.id] = 1;   // (through: on its way)
     s.vx *= CFG.shatterSlow; s.vy *= CFG.shatterSlow;
     CURH = g.h; burst(s.x, s.y, 24, 170, '#d8ffff', 0.55, true);
@@ -2126,6 +2128,8 @@ function gateSegs(g) {
   if (g.kind === 'door' || g.kind === 'exit') return gateShared(g) && g.st === 1 ? null : [g.seg];   // (open: shots fly through)
   return [g.segs[g.side]];
 }
+/* a knock against a wall or a gate costs more with the shield down (CFG.bareWall times as much) */
+function bareWall(s) { return s.shield > 0 ? 1 : CFG.bareWall; }
 /* Knocks cost power. With none left, the next knock wrecks the ship: it is out for a moment, then put back on the lane. */
 function hurt(s, amount) {
   if (s.wreck > 0 || s.safe > 0 || s.finished || W.race.state === 'countdown') return;
@@ -2428,7 +2432,7 @@ function stepShip(s, dt, locked) {
         s.wallCd = 0.18; s.vx *= 0.88; s.vy *= 0.88;
         burst(s.x, s.y, 6, 110, '#ffd9a0', 0.3, true);
         emit('wall', s, im);
-        hurt(s, clamp((im - 40) * 0.035, 1, 9));
+        hurt(s, clamp((im - 40) * 0.035, 1, 9) * bareWall(s));
       }
     }
     for (const g of W.gates) {
@@ -2469,7 +2473,7 @@ function stepShip(s, dt, locked) {
       if (!segs) continue;
       for (const sg of segs) {
         const gi = segPush(s, CF.shipR, sg.x1, sg.y1, sg.x2, sg.y2, 3, 0.35);
-        if (gi > 40 && s.wallCd <= 0) { s.wallCd = 0.18; burst(s.x, s.y, 5, 90, g.kind === 'door' ? '#ff9a5a' : '#8ff', 0.3, true); emit('gate', s, gi); hurt(s, clamp((gi - 40) * 0.035, 1, 9)); }
+        if (gi > 40 && s.wallCd <= 0) { s.wallCd = 0.18; burst(s.x, s.y, 5, 90, g.kind === 'door' ? '#ff9a5a' : '#8ff', 0.3, true); emit('gate', s, gi); hurt(s, clamp((gi - 40) * 0.035, 1, 9) * bareWall(s)); }
       }
     }
   }
@@ -2757,7 +2761,7 @@ function stepGates(dt) {
     if (g.kind === 'shift' && g.soft > 0) { g.soft -= dt; if (g.soft <= 0) { g.soft = 0; g.flash = 0.35; emit('harden', g); } }
     if (gateShared(g)) {
       if (g.st === 1) {   // open: shuts half a second after the first racer through, or after 3 s with nobody
-        if (g.closeT >= 0 ? (g.closeT -= dt) <= 0 : (g.openT -= dt) <= 0) { g.st = 2; g.soft = CFG.gateSoft; g.broke = {}; g.flash = 0.4; emit('gateshut', g); }
+        if (g.closeT >= 0 ? (g.closeT -= dt) <= 0 : (g.openT -= dt) <= 0) { g.st = 2; g.soft = CFG.gateSoft; g.broke = {}; g.flash = 0.4; g.shutN = (g.shutN || 0) + 1; emit('gateshut', g); }
       } else if (g.st === 2 && (g.soft -= dt) <= 0) { g.st = 0; g.soft = 0; g.flash = 0.35; emit('gatehard', g); }
     }
   }
@@ -2998,7 +3002,7 @@ function stepLoop(s, dt, live) {
   if (Math.abs(lp.l) > lim) {   // the wall: scraping along it costs a little exit speed; a real knock costs more
     const im = Math.abs(lp.vl);
     lp.l = Math.sign(lp.l) * lim; lp.vl = -lp.vl * 0.3; lp.keep *= Math.exp(-0.12 * dt);
-    if (im > 60 && !lp.onWall && s.wallCd <= 0) { s.wallCd = 0.18; lp.keep *= 0.95; emit('wall', s, im); hurt(s, clamp((im - 40) * 0.035, 1, 9)); }
+    if (im > 60 && !lp.onWall && s.wallCd <= 0) { s.wallCd = 0.18; lp.keep *= 0.95; emit('wall', s, im); hurt(s, clamp((im - 40) * 0.035, 1, 9) * bareWall(s)); }
     lp.onWall = true;
   } else if (Math.abs(lp.l) < lim - 4) lp.onWall = false;
   const top = CFG.top * s.st.top * s.speedMul * (0.38 + 0.62 * k) * (boosting ? (1 + 0.55 * s.st.boost) * (s.boostMul || 1) : 1);
@@ -3182,6 +3186,27 @@ function shotAffordable(s, plan, worth, shots) {
   const left = Math.min(s.st.mag, s.mag - (shots || 1) + t / s.st.magRegen) + s.ammo;
   return left >= CFG.doorShots + 2;   // (the door's shots, the exit gate's, and one spare in case a shot at the door misses)
 }
+/* Shared shortcut gates, as the drivers see them (by temperament: see ROSTER):
+   tail  someone else has a gate open: follow them in? Keener on shortcuts (smart) the likelier, and only if it can get
+         there before it shuts (with a full shield, a gambler counts the glass second too). Decided once per opening.
+   gamble the gate has shut soft on it: smash through, a full shield for the price? The more aggressive (agg) the
+         likelier; never with less than a full shield (that's a crash). Decided once per shutting. */
+function aiTail(s, a, g) {
+  const memo = a.tail || (a.tail = {});
+  if (memo[g.id] && memo[g.id].n === g.openN) return memo[g.id].yes;
+  const c = g.chord, to = -((s.x - c.doorX) * c.dx + (s.y - c.doorY) * c.dy), sp = Math.max(60, Math.hypot(s.vx, s.vy));
+  const left = (g.closeT >= 0 ? g.closeT : g.openT) + (s.shield >= CFG.shieldMax && gambleChance(a) > 0.3 ? CFG.gateSoft : 0);
+  const yes = to / sp < left && Math.random() < clamp(0.25 + 0.55 * ((a.keen || a.smart) - 0.5), 0.1, 0.95);
+  memo[g.id] = { n: g.openN, yes };
+  return yes;
+}
+function gambleChance(a) { return clamp((a.agg - 0.75) * 1.3, 0.05, 0.85); }
+function aiGamble(s, a, g) {
+  if (!gateShared(g) || g.st !== 2 || s.shield < CFG.shieldMax) return false;
+  const memo = a.gamble || (a.gamble = {});
+  if (!memo[g.id] || memo[g.id].n !== g.shutN) memo[g.id] = { n: g.shutN, yes: Math.random() < gambleChance(a) };
+  return memo[g.id].yes;
+}
 function aiThink(s, dt) {
   const a = s.ai, inp = s.input, N = T.N;
   const sty = a.style || (a.style = aiStyle(s.st));
@@ -3311,6 +3336,7 @@ function aiThink(s, dt) {
   if (!a.sc && !cruise) {
     for (const g of W.gates) {
       if (g.kind !== 'door' || !gateOpenFor(s, g)) continue;
+      if (gateShared(g) && g.openBy !== s.id && !aiTail(s, a, g)) continue;   // (someone else's: tail them in, or not)
       // (still short of the door itself, and close to it: a gently curving corridor can run alongside the lane a fair
       //  way before its door, so this goes by the door, not by where the corridor leaves the lane)
       const c0 = g.chord, toDoor = (s.x - c0.doorX) * c0.dx + (s.y - c0.doorY) * c0.dy;
@@ -3355,7 +3381,7 @@ function aiThink(s, dt) {
       if (a.sc.back > 0) { a.sc.back -= dt; tx = c.doorX - c.dx * 90; ty = c.doorY - c.dy * 90; }   // (backing out to line up)
       const side = (s.x - c.doorX) * c.dx + (s.y - c.doorY) * c.dy;
       if (s.inCorr === c) a.sc.phase = 1;                         // through the door
-      else if (side > 30 || !gateOpenFor(s, g)) a.sc = null;   // missed it, or the pass ran out
+      else if (side > 30 || !(gateOpenFor(s, g) || aiGamble(s, a, g))) a.sc = null;   // (shut on it: gamble on the glass, or give up)   // missed it, or the pass ran out
     }
     if (a.sc && a.sc.phase === 1) {
       // follow the corridor, aiming a little way ahead along it (it may curve)
@@ -3440,7 +3466,7 @@ function aiThink(s, dt) {
   const plan = armed && !a.sc ? doorPlan(s, a, lap) : null;
   // (in a corridor with its exit gate still shut, every shot is the exit's: nothing else gets one)
   const exitGate = s.inCorr && W.gates.find((q) => q.kind === 'exit' && q.chord === s.inCorr);
-  const holdForExit = !!exitGate && !gateOpenFor(s, exitGate);
+  const holdForExit = !!exitGate && !gateOpenFor(s, exitGate) && !aiGamble(s, a, exitGate);
   if (a.shotWait > 0) a.shotWait -= dt;
 
   // shoot a target now and then (once the guns are live, and with a shot to spare)
@@ -3512,7 +3538,7 @@ function aiThink(s, dt) {
     // (still short of the gate along the corridor itself: past it, where a corridor curves on into the lane, the gate's
     //  plane can come round 'in front' again, and aiming back at it, easing off, would spin the racer round)
     const before = ex && (s.x - ex.chord.exitX) * ex.chord.ex + (s.y - ex.chord.exitY) * ex.chord.ey < -4 && (chordDist(ex.chord, s.x, s.y), _cs < ex.chord.exitS - 4);
-    if (ex && before && !gateOpenFor(s, ex)) {
+    if (ex && before && !gateOpenFor(s, ex) && !aiGamble(s, a, ex)) {
       const c = ex.chord, dx = c.exitX - s.x, dy = c.exitY - s.y, d = Math.hypot(dx, dy), dir = Math.atan2(dy, dx);
       // (only once the gate is in sight down the corridor, and roughly where it is heading: aiming round a bend turns
       //  the nose into the wall, and a shot fired round one only hits the wall)
@@ -12943,7 +12969,7 @@ function applyDifficulty() {
     Object.assign(s.ai, { skill: s.ai.skill * D.pace, smart: D.smart, agg: D.agg, cu: D.cu, ease: D.ease });
     // (and the pilot's own temperament)
     const P = ROSTER.find((r) => r.name === s.name);
-    if (P) { s.ai.agg *= P.agg || 1; s.ai.smart = Math.min(1, s.ai.smart * (P.smart || 1)); }
+    if (P) { s.ai.agg *= P.agg || 1; s.ai.keen = s.ai.smart * (P.smart || 1); s.ai.smart = Math.min(1, s.ai.keen); }
   }
 }
 let PLAY = 'race';   // 'race' (against the field) or 'trial' (a time trial: alone, against the clock)
