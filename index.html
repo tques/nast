@@ -9147,19 +9147,25 @@ function drawShip(s, time, f) {
    the guns are down; the side just used flashes. (Toggled in the pause menu.) */
 let SWIPE_HINTS = true;
 try { if (localStorage.getItem('gatebreaker.swipeHints') === 'off') SWIPE_HINTS = false; } catch (e) { /* default */ }
-const GLYPH = { A: ['010', '101', '111', '101', '101'], D: ['110', '101', '101', '101', '110'] };
+const GLYPH = { A: ['010', '101', '111', '101', '101'], D: ['110', '101', '101', '101', '110'],
+  X: ['101', '101', '010', '101', '101'], B: ['110', '101', '110', '101', '110'], sq: ['111', '101', '101', '101', '111'], ci: ['010', '101', '101', '101', '010'] };
+/* the swipe buttons, as the player's controls show them: keys, or a gamepad's face buttons in their own colours */
+function swipeKeys() {
+  if (!PAD.on) return [['A', -1, '#e8f4ff'], ['D', 1, '#e8f4ff']];
+  return PAD.ps ? [['sq', -1, '#f08ad0'], ['ci', 1, '#ff6a6a']] : [['X', -1, '#5aa9ff'], ['B', 1, '#ff5a5a']];
+}
 function drawSwipeHints(s, x, y, time) {
   const fx = Math.cos(s.ang), fy = Math.sin(s.ang), ready = s.swipeCd <= 0 && gunsUp(s);
-  for (const [ch, dir] of [['A', -1], ['D', 1]]) {
+  for (const [ch, dir, col] of swipeKeys()) {
     const lx = -fy * dir, ly = fx * dir;   // (the way a swipe that side goes: as trySwipe)
     const gx = Math.round(x + lx * 19) - 1, gy = Math.round(y + ly * 17) - 2;
     const used = s.swipeT > 0 && s.swipeDir === dir;
     const al = used ? 1 : ready ? 0.8 : 0.28;
     lc.globalAlpha = al * 0.75; lc.fillStyle = '#120a1e';   // (a dark edge, so they read on any ground)
     for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++) if (GLYPH[ch][r][c] === '1') lc.fillRect(gx + c - 1, gy + r - 1, 3, 3);
-    lc.globalAlpha = al; lc.fillStyle = used ? '#ffffff' : '#e8f4ff';
+    lc.globalAlpha = al; lc.fillStyle = used ? '#ffffff' : col;
     for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++) if (GLYPH[ch][r][c] === '1') lc.fillRect(gx + c, gy + r, 1, 1);
-    if (used) glow(ec, '#e8f4ff', 10, gx + 1, gy + 2, 0.5);
+    if (used) glow(ec, col, 10, gx + 1, gy + 2, 0.5);
   }
   lc.globalAlpha = 1;
 }
@@ -13444,6 +13450,7 @@ function padState() {
 function padPoll() {
   const g = padState();
   if (!g) { PAD.on = false; return null; }
+  PAD.ps = /playstation|dualshock|dualsense|054c/i.test(g.id || '');   // (a PlayStation pad: its buttons are shapes, not letters)
   const b = (k) => !!(g.buttons[k] && (g.buttons[k].pressed || g.buttons[k].value > 0.5));
   const val = (k) => (g.buttons[k] ? g.buttons[k].value || (g.buttons[k].pressed ? 1 : 0) : 0);
   const now = g.buttons.map((_, k) => b(k));
