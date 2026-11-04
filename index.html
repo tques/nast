@@ -3903,13 +3903,20 @@ function glowSprite(col, rad) {
    frames (a top-down view at the sprite's 25 pixels, many headings, level and banked) and live in the hangar bay.
    (Models page: speeder-models.html; without WebGL the game falls back to the pixel sprites in HULLS, "pixel-art sprites".) */
 const mix3 = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
+/* a speeder's trim (its stripes): the same complementary colour as its boost plume, toned down a little toward its own
+   paint so it sets the paint off rather than fighting it; Rook's black-plumed silver gets charcoal */
+function accentCol(paint) {
+  const col = typeof paint === 'string' ? paint : '#' + new THREE.Color(paint).getHexString(), P = plumeCols(col);
+  return P.smoke ? '#2b2933' : mixHex(mixHex(P[2], col, 0.12), '#1a1430', 0.08);
+}
 /* ---------- the parts every speeder is built from (nose along +x, up +y, right +z) ---------- */
 function kit(paint) {
   const M = {
     hull: new THREE.MeshStandardMaterial({ color: paint, flatShading: true, roughness: 0.55, metalness: 0.15 }),
     light: new THREE.MeshStandardMaterial({ color: mix3(paint, '#ffffff', 0.38), flatShading: true, roughness: 0.5, metalness: 0.1 }),
     shade: new THREE.MeshStandardMaterial({ color: mix3(paint, '#150f2c', 0.5), flatShading: true, roughness: 0.7, metalness: 0.2 }),
-    trim: new THREE.MeshStandardMaterial({ color: '#241c3e', flatShading: true, roughness: 0.6, metalness: 0.4 }),
+    trim: new THREE.MeshStandardMaterial({ color: mixHex(accentCol(paint), '#241c3e', 0.3), flatShading: true, roughness: 0.6, metalness: 0.4 }),   // (dark parts: nozzles, tails, turrets, tinted with the trim colour)
+    accent: new THREE.MeshStandardMaterial({ color: accentCol(paint), flatShading: true, roughness: 0.45, metalness: 0.2 }),
     glass: new THREE.MeshStandardMaterial({ color: '#6fe3ff', emissive: '#1d6f88', flatShading: true, roughness: 0.1, metalness: 0.3 }),
     glow: new THREE.MeshBasicMaterial({ color: '#ffd48a' }),
     white: new THREE.MeshBasicMaterial({ color: '#ffffff' })
@@ -3964,7 +3971,7 @@ function kit(paint) {
     noseLight(x, y, z, r = 0.06) { const m = add(new THREE.OctahedronGeometry(r), M.white, false); m.position.set(x, y, z); },
     // a light stripe along the spine (the sprite's highlight)
     stripe(x0, x1, w0, w1, t0, t1, dz = 0) {
-      return K.loft([{ x: x0, w: w0, t: t0 }, { x: x1, w: w1, t: t1 }], (s) => [[0, s.t + 0.012], [s.w, s.t - 0.01], [-s.w, s.t - 0.01]], M.light, dz);
+      return K.loft([{ x: x0, w: w0, t: t0 }, { x: x1, w: w1, t: t1 }], (s) => [[0, s.t + 0.012], [s.w, s.t - 0.01], [-s.w, s.t - 0.01]], M.accent, dz);   // (in the trim colour)
     },
     done() {
       const lineMat = new THREE.LineBasicMaterial({ color: '#120d24' });
