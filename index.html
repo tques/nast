@@ -852,6 +852,27 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
 </script>
 <script>
 'use strict';
+/* NAST · Nebular Armed Speeder Tournament: the whole game in one script. Its parts, in order (each starts with a
+   "/* ===== name =====" header; search for the name):
+     core: math, track, walkable region ......... helpers, the circuits (TRACKS, documented above it), building a track
+     more circuits .............................. the tracks made with the editor
+     simulation ................................. the world, ships, shots, gates, holes, falls, jumps
+     machines ................................... HULL_STATS and the hangar's HULL_INFO
+     loop-de-loops: riding the ring
+     racers driven by the computer .............. aiStyle, aiThink: lines, shortcuts, jumps, holes, shooting
+     race flow .................................. one fixed step of the world (stepWorld)
+     pixel-art sprites / the speeders as 3D models
+     settings, then one per world ............... space, dunes, arctic, forest, volcano, gale, neon strip
+     renderer ................................... the pixel scene: track, hazards, ships, effects (renderFrame)
+     landmarks, shortcut corridors, loops ........ drawing them
+     ... in real 3D (WebGL) ..................... loops, hills, sunken stretches, towers
+     rivers and lakes, overpasses
+     sound, music ............................... the synth, SFX, the synthesized themes, RECORDINGS
+     game shell ................................. input, gamepad menus, screens, HUD, pilot chatter, cups, ghosts,
+                                                  custom tracks, options, the main loop
+     cup badges, how to play
+   Big embedded data (kept as data: URIs, so the game stays one file): fonts (in the CSS), REC_DATA (the recorded
+   music), REELS (the cup cards' preview videos), PILOT_FACES (the chat portraits). */
 /* ================= core: math, track, walkable region ================= */
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -915,7 +936,7 @@ function segDist(px, py, ax, ay, bx, by) {
      loops       loop-de-loops, {at: fraction, r?: radius in metres (LOOP.R if left out), side?: 'left' | 'right'}.
                  The loop is spliced into the lap at that point of a straight: the lane edges over, climbs a full ring
                  of track, comes back down beside where it went up (on the given side) and edges back onto its line.
-     setting     the world around the track (js/05b-settings.js): 'space' if left out. A sunken stretch's canopy
+     setting     the world around the track (see "settings: the world around the track"): 'space' if left out. A sunken stretch's canopy
                  names one of that setting's overhead types.
      landmarks   one-off pieces of scenery beside the track, from the editor's Landmark tool: {at: [x, y], r, desc,
                  art?}. Drawn only when art names an entry in LANDMARK_ART (see the landmarks section): the
@@ -1500,8 +1521,7 @@ function buildRocks(seed) {
 
 buildTrack(TRACKS[0]);
 
-'use strict';
-/* ================= more circuits, designed with the track editor (same format; see 01-core.js) ================= */
+/* ================= more circuits, designed with the track editor (same format: see "the circuits" above) ================= */
 TRACKS.push(
   {
     id: 'ion-foundry', name: 'Ion Foundry', setting: 'dunes', seed: 31,
@@ -1610,7 +1630,6 @@ TRACKS.push(
   }
 );
 
-'use strict';
 /* ================= simulation: world, ships, shots, gates ================= */
 const CFG = {
   top: 300, acc: 780, turn: 5,   // turn: how fast the nose comes round (rad/s); you thrust along the nose, so this is steering
@@ -2766,7 +2785,6 @@ function stepParts(dt) {
   }
 }
 
-'use strict';
 /* ================= machines: what each hull is good at, and what it pays for it =================
    Every machine spends the same budget in different places: a strength always comes with a matching cost, and
    the numbers stay small (within about 15% of the baseline). Driving stats are multipliers on CFG; combat stats are
@@ -2820,7 +2838,6 @@ const HULL_INFO = [
 let PLAYER_HULL = 'arrow';   // (the all-rounder to start with; Options can make another the favorite)
 function hullStats(hull) { return Object.assign({}, HULL_BASE, HULL_STATS[hull] || {}); }
 
-'use strict';
 /* ================= loop-de-loops: riding the ring =================
    A loop is a full ring of track in the lap (see spliceLoops). On it a racer has a place p round the ring, a speed v
    along it and a place l across the deck. A racer that reaches the loop fast enough (L.need), or gets up to that
@@ -2936,7 +2953,6 @@ function loopBoost(s) {
   if (lp.commit) lp.v = Math.min(lp.v, 480 * bm);
 }
 
-'use strict';
 /* ================= racers driven by the computer ================= */
 function makeAI(skill) {
   return { lane: (Math.random() - 0.5) * 56, skill, smart: 1, agg: 1, cu: 1, ease: 0, sc: null, scLap: {}, tgt: null, tgtT: 0, tgtDone: {}, door: null, doorT: 0, doorDone: {}, scPlan: {} };
@@ -3064,12 +3080,6 @@ function doorPlan(s, a, lap) {
     if (!best || before < best.before) best = { g, before, worth };
   }
   return best;
-}
-/* which way to point so a shot goes along (ux, uy): a shot carries half the shooter's own velocity, so a racer sliding
-   sideways has to aim a little against its slide */
-function leadAim(s, ux, uy) {
-  const along = s.vx * ux + s.vy * uy, px = (s.vx - ux * along) * 0.5, py = (s.vy - uy * along) * 0.5;
-  return Math.atan2(uy * CFG.bulletV - py, ux * CFG.bulletV - px);
 }
 /* the exit gate in a straight line from here, inside the corridor all the way (a shot at it would not hit a wall) */
 function exitInSight(c, s) {
@@ -3525,7 +3535,6 @@ function inPlayerView(s) {
   return Math.abs((s.x - CAM.x) * f) < VW / 2 - m && Math.abs((s.y - CAM.y) * f) < VH / 2 - m;
 }
 
-'use strict';
 /* ================= race flow: one fixed step of the world ================= */
 function stepWorld(dt) {
   const R = W.race;
@@ -3581,7 +3590,6 @@ function stepWorld(dt) {
   W.shake *= Math.exp(-7 * dt);
 }
 
-'use strict';
 /* ================= pixel-art sprites, generated at start-up ================= */
 function mkCanvas(w, h) {
   const c = document.createElement('canvas');
@@ -3768,12 +3776,11 @@ function glowSprite(col, rad) {
   return (GLOWS[key] = c);
 }
 
-'use strict';
 /* ================= the speeders as 3D models =================
    Six low-poly machines (three.js, bundled in the page), built from their parts nose along +x, up +y, right +z:
    flat-shaded, dark-edged, drawn part for part from the old pixel sprites. They are rendered into the race's sprite
    frames (a top-down view at the sprite's 25 pixels, many headings, level and banked) and live in the hangar bay.
-   (Models page: models/speeders3d.html; without WebGL the game falls back to the pixel sprites in 05-sprites.js.) */
+   (Models page: speeder-models.html; without WebGL the game falls back to the pixel sprites in HULLS, "pixel-art sprites".) */
 const mix3 = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
 /* ---------- the parts every speeder is built from (nose along +x, up +y, right +z) ---------- */
 function kit(paint) {
@@ -4190,7 +4197,6 @@ function bayModelDraw(g, hull, col, cx, cy, t, S = 2) {
   return true;
 }
 
-'use strict';
 /* ================= settings: the world around the track =================
    Everything that is decoration rather than racing comes from the track's SETTING: the backdrop far below, the
    specks drifting past at different depths, the blurred shapes nearest the camera, what is scattered beside the
@@ -4399,7 +4405,6 @@ function paintRock(r, v, col, far, craters) {
   return { c: out, w: S, h: S };
 }
 
-'use strict';
 /* ================= setting: deep space =================
    The original world: a nebula with a ringed planet far below, stars at three depths, purple asteroids beside
    the lane (amber-lit), molten-looking asteroids drifting onto it, and gas clouds or ice over sunken stretches. */
@@ -4525,7 +4530,6 @@ defineSetting({
   }
 });
 
-'use strict';
 /* ================= setting: dune world =================
    A sand planet at dusk: a desert of dunes and wind ripples. Sandstone rocks (and the odd cactus or spiky plant)
    stand beside the lane, tall spiky plants reach up around raised stretches on a sky track, tumbleweeds blow onto the lane (shoot them apart),
@@ -4918,7 +4922,6 @@ function cactusStack(r, v, far) {
   return out;
 }
 
-'use strict';
 /* ================= setting: arctic =================
    A frozen world under a low polar sun, with a hint of aurora in the sky's colour. The track runs on the snow: drifts
    and wind-carved ridges, glaciers of blue ice out in the open (flat-topped, steep-sided, cracked with crevasses),
@@ -5262,7 +5265,6 @@ function deadTreeStack(r, v, far) {
   return out;
 }
 
-'use strict';
 /* ================= setting: forest =================
    A green forest on an early summer afternoon. The track is a dirt road through the trees: pines and broad round-
    crowned trees (a few already turning gold), bushes, mossy boulders, fallen logs, the odd ring of red toadstools,
@@ -5623,7 +5625,6 @@ function toadstoolStack(r, v, far) {
   return out;
 }
 
-'use strict';
 /* ================= setting: volcano =================
    A mining world on a volcano: black basalt ground dusted with ash and split by faintly glowing cracks, cinder cones
    and crags of obsidian, crusts of cooling lava, a river of molten rock (it glows) crossing under the lane where it
@@ -5906,27 +5907,6 @@ function oreCartStack(r, v, far) {
   return out;
 }
 
-/* a length of pipeline lying on low stands: a steel tube with flanged joints, lit along its top */
-function pipeStack(r, v, far) {
-  const R = rng(Math.floor(r * 3) * 97 + v * 251 + 4501), L = Math.min(34 + Math.min(r, 30) * 0.9, r * 2 + 8), rp = 3 + (v & 1), a = R() * Math.PI, ca = Math.cos(a), sa = Math.sin(a);
-  const S = Math.ceil(L + 12), c0 = S / 2 - 2, n = 3, out = [];
-  const pal = v % 3 === 2 ? { lit: [230, 190, 90], base: [170, 130, 40], dark: [80, 60, 20] } : { lit: [200, 204, 212], base: [128, 132, 140], dark: [52, 56, 64] };
-  for (let s = 0; s < n; s++) {
-    const t = s / (n - 1), w2 = rp * (s === n - 1 ? 0.75 : 1);
-    const c = pixelSprite(S, S, (x, y) => {
-      const dx = x + 0.5 - c0, dy = y + 0.5 - c0, u = dx * ca + dy * sa, q = -dx * sa + dy * ca;
-      if (Math.abs(u) > L / 2) return null;
-      const flange = Math.abs(((u + L / 2) % 14) - 7) < 1.2;
-      if (Math.abs(q) > w2 + (flange ? 1.2 : 0)) return null;
-      if (flange) return [...pal.dark, 255];
-      const side = q * (-sa * 0.6 + ca * 0.8) < 0 ? 1 : -1, m = 0.7 + 0.3 * t;
-      const col = side > 0 && Math.abs(q) > w2 * 0.2 ? pal.lit : Math.abs(q) > w2 * 0.7 ? pal.dark : pal.base;
-      return [col[0] * m | 0, col[1] * m | 0, col[2] * m | 0, 255];
-    });
-    out.push({ c, w: S, h: S, t });
-  }
-  return out;
-}
 
 /* a lava vent: a squat cone of black rock with a glowing mouth at its top */
 function ventStack(r, v, far) {
@@ -5946,7 +5926,6 @@ function ventStack(r, v, far) {
   return out;
 }
 
-'use strict';
 /* ================= setting: gale world =================
    High in the sky of a windy planet: far below, its surface through a blue haze (grassland, uplands, lakes and
    rivers); motes of spore dust everywhere. Beside the lane drift
@@ -6270,7 +6249,6 @@ defineSetting({
   alias: {}
 });
 
-'use strict';
 /* ================= setting: neon strip (space Las Vegas) =================
    A pleasure strip in orbit, a real place: the lane runs between the roofs of casino and hotel towers rising out of
    the dark below, and billboards on masts. Each casino wears its theme on its building: a glass dome ringed with
@@ -6281,7 +6259,6 @@ defineSetting({
    barges pushing lit advertising screens), round a spinning resort station and a pyramid hotel. Stray advertising
    drones wander onto the lane to be shot down. A sky track, like deep space: nothing is on the ground. */
 const NEON = ['#ff4fd8', '#5ff4ff', '#ffd54a', '#9dff6a', '#ff7a4a', '#b98aff'];
-const neonRgb = NEON.map(hexA);
 
 /* ---------- the strip: casinos, hotels and billboards beside the lane ----------
    Everything stands on something: each is the roof of a tower rising out of the dark far below (its walls drawn as
@@ -6730,7 +6707,6 @@ defineSetting({
   alias: {}
 });
 
-'use strict';
 /* ================= renderer: low-res pixel scene + HD-2D post effects ================= */
 const VW = 640, VH = 360;   // the scene in world pixels (how much of the track you see)
 const BW = VW / 4, BH = Math.ceil(VH / 4), BW2 = VW / 8, BH2 = Math.ceil(VH / 8);
@@ -7330,14 +7306,6 @@ function bakeWorld() {
   // (nothing at ground level over a river's opening: it is a drop)
   if (RIVER.paths.length || RIVER.lakes.length) for (const c of [l, e]) { c.globalCompositeOperation = 'destination-out'; c.fillStyle = '#000'; c.strokeStyle = '#000'; riverOpenings(c, 0, true, false); c.globalCompositeOperation = 'source-over'; }
 }
-function blit(src, ctx, cx, cy) {
-  let sx = cx - VW / 2 - BAKE.x, sy = cy - VH / 2 - BAKE.y, dx = 0, dy = 0, w = VW, h = VH;
-  if (sx < 0) { dx = -sx; w += sx; sx = 0; }
-  if (sy < 0) { dy = -sy; h += sy; sy = 0; }
-  if (sx + w > BAKE.w) w = BAKE.w - sx;
-  if (sy + h > BAKE.h) h = BAKE.h - sy;
-  if (w > 0 && h > 0) ctx.drawImage(src, sx, sy, w, h, dx, dy, w, h);
-}
 /* ---------- elevation: everything is scaled about the screen centre by how far above the camera it is ---------- */
 const PAR = { K: 0.3 };   // scale change per level, relative to the player's own level (raised 1.3x, sunken 0.7x)
 const HK = PAR.K / 0.15;   // how much deeper shadows and side walls are drawn than at the old, gentler 0.15
@@ -7795,14 +7763,6 @@ function plantShadowShape(p, SH) {
   x.globalCompositeOperation = 'source-in'; x.fillStyle = 'rgb(' + groundLight().cast.join(',') + ')'; x.fillRect(0, 0, W, Hh);
   return (DECOR_CACHE[key] = { c, bx, by });
 }
-function plantShadow(st) {
-  if (st.shadow) return st.shadow;
-  // (the whole plant's outline: every slice laid together, as the sun sees it)
-  const top = st[st.length - 1], c = mkCanvas(top.w, top.h), x = c.getContext('2d');
-  for (const sl of st) x.drawImage(sl.c, 0, 0);
-  x.globalCompositeOperation = 'source-in'; x.fillStyle = 'rgba(' + groundLight().cast.join(',') + ',0.34)'; x.fillRect(0, 0, top.w, top.h);
-  return (st.shadow = c);
-}
 function drawPlants() {
   if (!PLANTS) return;
   const f0 = fscale(0), C = PLANTS.C, wx = VW / (2 * f0) + 80, wy = VH / (2 * f0) + 80, SH = (SET.ground && SET.ground.shadow) || 170;
@@ -8134,7 +8094,7 @@ function buildHills() {
     L.sort((a, b) => a[0] - b[0]);
     return { k: Int32Array.from(L.map((c) => c[1])), flat: Uint8Array.from(L.map((c) => c[3])) };
   });
-  if (!g3Upload(lit)) buildHillSkins(lit, sh, flat);   // (3D hills when the graphics card can: see 06c-ground3d.js)
+  if (!g3Upload(lit)) buildHillSkins(lit, sh, flat);   // (3D hills when the graphics card can: see "hills in real 3D")
   // where the hill had to be held down below the road's edge (lower track close by), the road stands on a wall there
   WALL = new Uint8Array(N);
   const Hat = (x, y) => { const fx = (x - HILL.x0) / C, fy = (y - HILL.y0) / C, gx = clamp(Math.floor(fx), 0, NX - 2), gy = clamp(Math.floor(fy), 0, NY - 2), u = fx - gx, v = fy - gy, k = gy * NX + gx; return (H[k] * (1 - u) + H[k + 1] * u) * (1 - v) + (H[k + NX] * (1 - u) + H[k + NX + 1] * u) * v; };
@@ -8233,7 +8193,6 @@ const BANK_RGB = {}, BANK_PAT = {};
 const bankCv = mkCanvas(VW, VH), bk = bankCv.getContext('2d'), bankShadeCv = mkCanvas(VW, VH), bs = bankShadeCv.getContext('2d');
 const bankMaskC = mkCanvas(VW, VH), bm = bankMaskC.getContext('2d');
 bk.imageSmoothingEnabled = false; bs.imageSmoothingEnabled = false;
-const GREYS = Array.from({ length: 256 }, (_, v) => 'rgb(' + v + ',' + ((v * 0.96) | 0) + ',' + ((v * 0.9) | 0) + ')');
 function drawHills(ri) {
   const L = HILL.runs[ri];
   if (!L || !L.k.length) return;
@@ -8459,21 +8418,6 @@ function drawGround() {
   // the ground hides the glow of everything below it, too (lights on a trench floor under the overhang, say)
   ec.setTransform(1, 0, 0, 1, 0, 0); ec.globalCompositeOperation = 'destination-out'; ec.drawImage(groundCv, 0, 0); ec.globalCompositeOperation = 'source-over';
   setScale(1);
-}
-/* is this ship underneath an overpass? */
-function shipHidden(s) {
-  if (s.h > 0.45) return false;
-  const r2 = (T.hw + 4) * (T.hw + 4);
-  for (const r of T.runs) {
-    if (r.lv <= 0) continue;
-    for (let q = 0; q < r.n; q++) {
-      const i = (r.s + q) % T.N;
-      if (T.h[i] < 0.6) continue;
-      const dx = s.x - T.x[i], dy = s.y - T.y[i];
-      if (dx * dx + dy * dy < r2) return true;
-    }
-  }
-  return false;
 }
 /* is there a deck above this racer, over where it is (an overpass it is passing under)? */
 function deckOver(s) {
@@ -9900,7 +9844,6 @@ function drawMinimap(cv, ctx2) {
   ctx2.setTransform(1, 0, 0, 1, 0, 0);
 }
 
-'use strict';
 /* ================= shortcut corridors off the ground =================
    A corridor whose ends are on a raised or sunken stretch climbs or drops between them (see chordH), so it cannot be
    painted once into the flat track picture with the rest. It is drawn live instead, in pieces by level, each at the
@@ -10048,7 +9991,6 @@ function loopShape(L) {
   L.shape = S;
   return S;
 }
-const quadPath = (ctx, a, b, c, d) => { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); };
 
 /* on the ground: speed arrows on the run-up (the ring floats free: no pillars, no shadow) */
 function drawLoopGround(L, time) {
@@ -10381,7 +10323,6 @@ function loopItems3D(items, time) {
   if (W.fx.length) items.push({ k: 0.95, y: 0, fn: () => { setScale(1); drawLoopFx(time); } });
 }
 
-'use strict';
 /* ================= hills in real 3D (WebGL) =================
    On a ground-level track the hills and dunes (the height field worked out in buildHills) are drawn as a true 3D
    surface on the graphics card, with a depth test, so slopes, corners and overlapping hills come out smooth and
@@ -10973,7 +10914,6 @@ function drawTrenches3D(time) {
   setScale(1);
 }
 
-'use strict';
 /* ================= rivers and lakes (on a ground-level track, when the setting gives ground.river) =================
    A river crosses the track only where the lane jumps a gap: every gap in a flat stretch of lane is a crossing. From
    each side of a crossing the river runs on, keeping well clear of the lane, either out to the edge of the map, or,
@@ -11399,13 +11339,6 @@ function cutRiver(o, s) {
   riverOpenings(o, 0);
   o.globalCompositeOperation = 'source-over'; o.setTransform(1, 0, 0, 1, 0, 0);
 }
-function inLakeOpening(x, y, k) {
-  for (const L of RIVER.lakes) {
-    const dx = x - L.x, dy = y - L.y, c = Math.cos(L.ang), s = Math.sin(L.ang), u = (dx * c + dy * s) / L.rx, v = (-dx * s + dy * c) / L.ry;
-    if (u * u + v * v < k) return true;
-  }
-  return false;
-}
 /* is (x, y) inside a lake's shoreline (its ring of points, exactly as drawn)? */
 function inLakeRing(x, y) {
   for (const L of RIVER.lakes) {
@@ -11630,7 +11563,6 @@ function drawRiverRim() {
   setScale(1);
 }
 
-'use strict';
 /* ================= overpasses (on a ground-level track) =================
    Where the road at ground level crosses over a sunken stretch, that bit of road is a bridge: its deck is solid (the
    glow of the trench's edges below does not show through it), its sides drop as girders into the trench, it throws a
@@ -11793,7 +11725,6 @@ function cutOverpassDecks(ctx) {
   ctx.globalCompositeOperation = 'source-over';
 }
 
-'use strict';
 /* ================= towers in real 3D (WebGL) =================
    A sky setting whose towers are buildings (stem.solid(o): the roof's outline, { shape: 'rect' | 'oct' | 'round' |
    'pole', w, h }) has them drawn as solid shafts on the graphics card, with the same camera as everything else
@@ -11966,7 +11897,6 @@ function drawTowers3D() {
   return true;
 }
 
-'use strict';
 /* ================= sound: a tiny Web Audio synth ================= */
 const AUD = { ctx: null, master: null, noise: null, eng: null, engGain: null, muted: false };
 function audioInit() {
@@ -12052,8 +11982,7 @@ function audioEngine(ratio, boosting, on) {
   AUD.engGain.gain.setTargetAtTime(on ? 0.05 + ratio * 0.06 : 0, t, 0.1);
 }
 
-'use strict';
-/* ================= music: each world's race theme, synthesized live (no recordings) =================
+/* ================= music: each world's race theme, synthesized live (the Synth soundtrack; see RECORDINGS for the recorded one) =================
    A song is a step function: play 16th-note step s at time t. The player schedules a little ahead of the clock,
    plays the intro once, then loops the body (from bar LOOP_TO) for as long as the race runs, so there is no seam. */
 const SONGS = {};
@@ -12350,7 +12279,6 @@ setMusicStyle(MUSIC_STYLE);
 /* while paused the music drops low and keeps its place */
 function musicDuck(low) { if (MUSIC.bus && AUD.ctx) { const t = AUD.ctx.currentTime; MUSIC.bus.gain.cancelScheduledValues(t); MUSIC.bus.gain.setTargetAtTime(musicVol() * (low ? 0.3 : 1), t, 0.08); } }
 
-'use strict';
 /* ================= the other worlds' race themes =================
    One instrument kit and one arranger shared by all of them. Every song has the same shape as Dune Run:
      bars 1-4 intro (played once) | 5-12 theme | 13-20 climb | 21-24 break | 25-32 full theme, then back to bar 5.
@@ -12843,7 +12771,6 @@ SONGS.menu = arrangeSong({
   fill(c) { const { K, i, t, ch } = c; if (i >= 8) K.snare(t, 0.3 + (i - 8) * 0.08); if (i === 8 || i === 12) K.timp(t, ch.b - 12, 0.9); }
 });
 
-'use strict';
 /* ================= game shell: input, screens, HUD, main loop ================= */
 const $ = (id) => document.getElementById(id);
 const stage = $('stage'), view = $('view'), hud = $('hud'), mini = $('mini'), mctx = mini.getContext('2d');
@@ -14656,7 +14583,6 @@ syncShadowChips();
 /* ---------- the player's colour: swatches on the speeder card, and a default in options ---------- */
 const COL_KEY = 'gatebreaker.favCol', COL_CHOICES = [{ col: RACERS[0].col, name: 'Amber' }].concat(ROSTER.map((r) => ({ col: r.col, name: r.name })));
 try { const c = localStorage.getItem(COL_KEY); if (COL_CHOICES.some((q) => q.col === c)) PLAYER_COL = c; } catch (e) { /* default */ }
-function colourName(col) { const q = COL_CHOICES.find((x) => x.col === col); return q ? q.name : col; }
 function pickColour(col) {
   PLAYER_COL = col;
   syncSwatches(); pickMachine(PLAYER_HULL);
@@ -14757,7 +14683,6 @@ addEventListener('pointerdown', firstSound, true); addEventListener('keydown', f
    hold it ready and start it from the top on the first click or key press */
 try { audioInit(); if (AUD.ctx && mode === 'menu') musicPlay('menu'); } catch (e) { /* waits for a click */ }
 
-'use strict';
 /* ================= cup badges: each cup's emblem in pixel art, and the medal won there =================
    Drawn pixel by pixel on a small canvas (40 x 40 for the emblem, a medal beside it) and shown enlarged with crisp
    scaling, like the rest of the art. Each emblem is a shield in the cup's colour round its namesake:
@@ -14846,7 +14771,6 @@ function drawCupBadge(cv, c, medals, k, hi, stack) {
   g.setTransform(1, 0, 0, 1, 0, 0);
 }
 
-'use strict';
 /* ================= how to play: a little looping demo of the controls =================
    A stretch of lane with the player's own speeder on it, going through each control in turn: steering after the
    mouse, thrust (left button), boost (right button), brake (Space), shooting (W) at a rival ahead, a sideswipe (A)
