@@ -15526,10 +15526,13 @@ function arenaStart() {
   if (!A.g) {
     A.g = cv.getContext('2d'); A.g.imageSmoothingEnabled = false;
     const at = (e) => { const r = cv.getBoundingClientRect(); A.mouse.sx = (e.clientX - r.left) / r.width * A.W; A.mouse.sy = (e.clientY - r.top) / r.height * A.H; };
-    cv.addEventListener('mousemove', (e) => { at(e); A.mouse.in = true; if (A.pad) { A.pad = false; arenaHint(); } });
-    cv.addEventListener('mouseleave', () => { A.mouse.in = false; A.mouse.d0 = false; A.keys = {}; });
-    cv.addEventListener('mousedown', (e) => { at(e); A.mouse.in = true; if (e.button === 0) A.mouse.d0 = true; if (e.button === 2) A.boostQ = true; e.preventDefault(); });
-    window.addEventListener('mouseup', (e) => { if (e.button === 0) A.mouse.d0 = false; });
+    cv.addEventListener('mousemove', (e) => { at(e); A.mouse.in = true; A.mouse.over = true; if (A.pad) { A.pad = false; arenaHint(); } });
+    // (with the button held, flying carries on outside the box: the pointer still steers from wherever it is, until
+    //  the button is let go; only then does leaving the box stop it)
+    window.addEventListener('mousemove', (e) => { if (A.mouse.d0 && !A.mouse.over) at(e); });
+    cv.addEventListener('mouseleave', () => { A.mouse.over = false; if (!A.mouse.d0) { A.mouse.in = false; A.keys = {}; } });
+    cv.addEventListener('mousedown', (e) => { at(e); A.mouse.in = true; A.mouse.over = true; if (e.button === 0) A.mouse.d0 = true; if (e.button === 2) A.boostQ = true; e.preventDefault(); });
+    window.addEventListener('mouseup', (e) => { if (e.button !== 0) return; A.mouse.d0 = false; if (!A.mouse.over) { A.mouse.in = false; A.keys = {}; } });
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
     // the keys, while the pointer is over the arena (Space would otherwise scroll the page)
     window.addEventListener('keydown', (e) => {
