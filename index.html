@@ -11323,6 +11323,7 @@ function buildRiver() {
   if (!RV || !T.gaps.length) return;
   if (RV.canyon) buildCanyons(); else buildRiverCourse();
   buildRavines();
+  riverCover();
   if (RIVER.paths.length || RIVER.lakes.length) riverMask();
   laneHoles();
 }
@@ -11330,9 +11331,22 @@ function buildRiver() {
    that part of the lane is open: a racer driving onto it drops in. RIVER.hole[i] marks lane samples with open
    water across part of them; RIVER.safe[i] is the stretch across the lane that is still deck there [lo, hi]. */
 function holeAt(x, y) {
+  // (by the distance to the water's centre line, its two ends square as they are drawn: a channel that stops where the
+  //  road resumes does not reach round onto it)
   for (const P of RIVER.paths) {
     if (P.ravine) continue;
-    for (let i = 0; i < P.x.length; i++) if ((P.x[i] - x) ** 2 + (P.y[i] - y) ** 2 < (P.w[i] / 2) ** 2) return true;
+    const n = P.x.length;
+    if (n < 2) continue;
+    // (behind either square end, close to it: not in it, however its first or last few points round off)
+    const behind = (k, k2) => { const tx = P.x[k2] - P.x[k], ty = P.y[k2] - P.y[k], ex = x - P.x[k], ey = y - P.y[k]; return ex * tx + ey * ty < 0 && ex * ex + ey * ey < (P.w[k] / 2 + 40) ** 2; };
+    if (behind(0, 1) || behind(n - 1, n - 2)) continue;
+    for (let i = 0; i + 1 < n; i++) {
+      const ax = P.x[i], ay = P.y[i], dx = P.x[i + 1] - ax, dy = P.y[i + 1] - ay, l2 = dx * dx + dy * dy || 1;
+      let t = ((x - ax) * dx + (y - ay) * dy) / l2;
+      t = clamp(t, 0, 1);
+      const w = P.w[i] + (P.w[i + 1] - P.w[i]) * t, ex = ax + dx * t - x, ey = ay + dy * t - y;
+      if (ex * ex + ey * ey < (w / 2) ** 2) return true;
+    }
   }
   return inLakeRing(x, y);
 }
@@ -11386,9 +11400,9 @@ function buildRiverCourse() {
     // (as wide as the gap is long, less a little, so the lane's ends rest on the banks)
     let L = 0;
     for (let i = g.a; i !== g.b; i = (i + 1) % N) { const j = (i + 1) % N; L += Math.hypot(T.x[j] - T.x[i], T.y[j] - T.y[i]); }
-    // (a long gap: the river broadens into a pool where it passes under it, but runs its course at most RIVER_W wide,
-    //  so it still finds its way between the parts of the track)
-    crossings.push({ gi, m, w: Math.max(RV.width || 44, Math.min(RIVER_W, L - 10)), wx: Math.max(RV.width || 44, L - 10) });
+    // (a gap longer than RIVER_W: the river runs at that width, and the rest of the gap is a channel of the same water
+    //  along the road's own course, where the road has gone: see gapChannel)
+    crossings.push({ gi, m, g, w: Math.max(RV.width || 44, Math.min(RIVER_W, L - 10)), long: L - 10 > RIVER_W });
   });
   if (!crossings.length) return;
   // (the broadest course that fits: a river too broad to find its way between the parts of the track tries narrower)
@@ -11519,15 +11533,16 @@ function buildRiverCourse() {
       void W2;
       // (flowing toward a lake if there is one, else either way)
       if (!ends[0].edge && ends[1].edge) pts.reverse();
-      const P = smoothCourse(pts, c.w, R, m, c.wx);
+      const P = smoothCourse(pts, c.w, R, m);
       RIVER.gaps.add(c.gi);
+      if (c.long) RIVER.paths.push(gapChannel(c.g, hw + lip));
       // (a river running into a lake runs on into it, so the two openings are one; which of its points are out in the lake)
       P.inLake = P.x.map((x, i) => RIVER.lakes.some((L) => { const dx = x - L.x, dy = P.y[i] - L.y, c2 = Math.cos(L.ang), s2 = Math.sin(L.ang), u = (dx * c2 + dy * s2) / L.rx, v = (-dx * s2 + dy * c2) / L.ry; return u * u + v * v < 0.85; }));
       RIVER.paths.push(P);
     }
-    if (RIVER.paths.length === crossings.length) break;
-    if (RIVER.paths.length > bestN) { bestN = RIVER.paths.length; bestCap = cap; }
-    if (cap === caps[caps.length - 1] && bestN > RIVER.paths.length) caps.push(bestCap);   // (none fits all: the broadest that fitted most)
+    if (RIVER.gaps.size === crossings.length) break;
+    if (RIVER.gaps.size > bestN) { bestN = RIVER.gaps.size; bestCap = cap; }
+    if (cap === caps[caps.length - 1] && bestN > RIVER.gaps.size) caps.push(bestCap);   // (none fits all: the broadest that fitted most)
   }
   // lily pads round the lakes' shallows
   for (const L of RIVER.lakes) {
@@ -11658,7 +11673,23 @@ function buildRavines() {
 }
 /* a course through grid points smoothed into easy curves (corners cut again and again), then laid out evenly, with
    the river's width wandering a little along it. Kept straight and square through the crossing at the lane (m). */
-const RIVER_W = 240;   // (the widest a river runs, away from where it passes under a gap)
+const RIVER_W = 240;   // (the widest a river runs)
+/* the water filling a gap longer than the river is broad: a channel along the road's own course from one end of the
+   gap to the other, as wide as the road and its shoulders, square at each end where the road resumes. So the water is
+   exactly where the road is gone: what looks like road is road, and what looks like lava is the drop. */
+function gapChannel(g, half) {
+  const N = T.N, X = [], Y = [], Wd = [], NX = [], NY = [], step = 8;
+  for (let i = g.a; ; i = (i + 1) % N) {
+    if (i === g.b) { X.push(T.x[i]); Y.push(T.y[i]); break; }
+    const j = (i + 1) % N, L = Math.hypot(T.x[j] - T.x[i], T.y[j] - T.y[i]), n = Math.max(1, Math.round(L / step));
+    for (let k = 0; k < n; k++) { const t = k / n; X.push(T.x[i] + (T.x[j] - T.x[i]) * t); Y.push(T.y[i] + (T.y[j] - T.y[i]) * t); }
+  }
+  for (let k = 0; k < X.length; k++) {
+    const a = Math.max(0, k - 2), b = Math.min(X.length - 1, k + 2), dx = X[b] - X[a], dy = Y[b] - Y[a], l = Math.hypot(dx, dy) || 1;
+    NX.push(-dy / l); NY.push(dx / l); Wd.push(half * 2);
+  }
+  return { x: X, y: Y, w: Wd, nx: NX, ny: NY, step, path: null, inLake: X.map(() => false), channel: true };
+}
 function smoothCourse(pts, width, R, m, wCross) {
   let P = pts;
   for (let it = 0; it < 1; it++) {
@@ -11759,6 +11790,24 @@ function inLakeRing(x, y) {
     if (ins) return true;
   }
   return false;
+}
+/* where two openings meet (a river crossing the channel along a long gap): which of each one's bank tops lie out in
+   the other's water, so no bank wall is drawn standing across it. P.cov[i * 2 + (0 left, 1 right)] */
+function riverCover() {
+  const PS = RIVER.paths;
+  for (const P of PS) P.cov = null;
+  if (PS.length < 2) return;
+  const inOther = (P, x, y) => { for (const Q of PS) { if (Q === P || Q.ravine) continue; for (let i = 0; i < Q.x.length; i += 2) if ((Q.x[i] - x) ** 2 + (Q.y[i] - y) ** 2 < (Q.w[i] / 2 - 1) ** 2) return true; } return false; };
+  for (const P of PS) {
+    if (P.ravine) continue;
+    const c = new Uint8Array(P.x.length * 2);
+    let any = false;
+    for (let i = 0; i < P.x.length; i++) for (const sd of [1, -1]) {
+      const o = P.w[i] / 2 * sd;
+      if (inOther(P, P.x[i] + P.nx[i] * o, P.y[i] + P.ny[i] * o)) { c[i * 2 + (sd > 0 ? 0 : 1)] = 1; any = true; }
+    }
+    if (any) P.cov = c;
+  }
 }
 function nearRiverPath(x, y, extra) {
   for (const P of RIVER.paths) for (let i = 0; i < P.x.length; i += 2) if ((P.x[i] - x) ** 2 + (P.y[i] - y) ** 2 < (P.w[i] / 2 + extra) ** 2) return true;
@@ -11944,6 +11993,7 @@ function drawRiverBed(time, ravines) {
         const oa = (P.w[i] / 2) * sd, ob = (P.w[j] / 2) * sd, ia = oa * inset, ib = ob * inset;
         const ax = P.x[i] + P.nx[i] * oa, ay = P.y[i] + P.ny[i] * oa, bx = P.x[j] + P.nx[j] * ob, by = P.y[j] + P.ny[j] * ob;
         if (inLakeRing(ax, ay) && inLakeRing(bx, by)) continue;   // (where it opens into a lake)
+        if (P.cov && P.cov[i * 2 + (sd > 0 ? 0 : 1)] && P.cov[j * 2 + (sd > 0 ? 0 : 1)]) continue;   // (out over another river's water, where they cross)
         if ((bx - ax) * (P.x[j] - P.x[i]) + (by - ay) * (P.y[j] - P.y[i]) <= 0) continue;   // (folded back on the inside of a tight bend: hidden anyway)
         wall(ax, ay, bx, by, P.x[i] + P.nx[i] * ia, P.y[i] + P.ny[i] * ia, P.x[j] + P.nx[j] * ib, P.y[j] + P.ny[j] * ib, -P.nx[i] * sd, -P.ny[i] * sd, P.top ? fscale((sd > 0 ? P.topA : P.topB)[i]) : f0, P.top ? fscale((sd > 0 ? P.topA : P.topB)[j]) : f0, P.fdv);
       }
