@@ -2201,14 +2201,14 @@ function moveIdx(s, i) {
 /* ---------- in the air ---------- */
 function startJump(s) {
   const q = jumpQ(Math.hypot(s.vx, s.vy));   // (faster off the pad: higher, and a longer hang)
-  s.edgeFall = false;
+  s.edgeFall = false; s.edgeHit = false;
   s.air = 1; s.airBase = s.h; s.airTop = s.h + AIR.H * q; s.airHold = AIR.HOLD * q; s.airFrom = s.idx; s.vh = 0;
   const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
   for (let i = 0; i < 14; i++) part(s.x - fx * 6 + (Math.random() - 0.5) * 16, s.y - fy * 6 + (Math.random() - 0.5) * 16, -fx * 40 + (Math.random() - 0.5) * 60, -fy * 40 + (Math.random() - 0.5) * 60, 0.4, '#c8ff7a', 2, true);
   emit('jump', s);
 }
 function startFall(s) {
-  s.air = 3; s.airBase = s.h; s.airTop = s.h; s.airFrom = s.idx; s.vh = 0;
+  s.air = 3; s.airBase = s.h; s.airTop = s.h; s.airFrom = s.idx; s.vh = 0; s.edgeHit = false;
   // (off the edge without a jump: no lift at all, so nothing catches it but a deck right at its height or below; the
   //  far side of a gap is out of reach at any speed, boosted or not. A drop gap's lower deck still catches it)
   // (a drop gap, down to a lower stretch beyond it, is the exception: driving off it is the way on, and that lower
@@ -2246,7 +2246,7 @@ function land(s, i, h) {
   // back to an earlier part only costs the racer)
   const hard = s.air === 3 ? clamp(-s.vh / 6, 0, 1) : 0;
   moveIdx(s, i);
-  s.h = h; s.floorH = h; s.air = 0; s.vh = 0; s.pit = null;
+  s.h = h; s.floorH = h; s.air = 0; s.vh = 0; s.pit = null; s.edgeHit = false;
   s.vx *= 0.96 - 0.06 * hard; s.vy *= 0.96 - 0.06 * hard;
   CURH = h;
   burst(s.x, s.y, 8 + Math.round(hard * 10), 90, '#d8f6ff', 0.3, true);
@@ -2275,16 +2275,28 @@ function stepAir(s, dt) {
   if (fl > -1e8 && laneOpen(s.x, s.y, fi)) { fl = -1e9; s.floorH = null; }   // (open water: no deck there)
   if (fl > -1e8 && T.pits.length) { const pt = pitAt(s.x, s.y, fi, fl, -3); if (pt) { fl = -1e9; s.floorH = null; s.pit = pt; } }   // (nor in a hole)
   if (s.air === 3 && fl > -1e8 && s.h <= fl + 0.001) { land(s, fi, fl); s.doomed = false; return; }
-  // coming down onto the lane is forgiving: a racer that clips the lane's edge, or meets a deck above it (coming in
-  // low beside a raised stretch), lands on it rather than slipping past and falling out
+  // coming in low beside a raised stretch, over its deck, up to a level above it: it scrambles up onto the deck,
+  // losing some speed (only over the deck itself: a racer coming down beside the lane is not pulled onto it)
   if (s.air === 3 && !s.edgeFall) {
-    // (a raised stretch it comes in under, up to a level above it: it scrambles up onto the deck, losing some speed)
-    const fc = floorAt(s.x, s.y, Math.max(h0, s.h) + 1.05, 20), fci = _fi;
+    const fc = floorAt(s.x, s.y, Math.max(h0, s.h) + 1.05), fci = _fi;
     if (fc > -1e8 && s.h <= fc + 0.001 && !laneOpen(s.x, s.y, fci) && !(T.pits.length && pitAt(s.x, s.y, fci, fc, -3))) {
-      const dx = s.x - T.x[fci], dy = s.y - T.y[fci], d = Math.hypot(dx, dy), lim = T.hw - CFG.shipR - 1;
-      if (d > lim) { s.x = T.x[fci] + dx / d * lim; s.y = T.y[fci] + dy / d * lim; }
       if (fc > s.h + 0.2) { s.vx *= 0.85; s.vy *= 0.85; }
       land(s, fci, fc); s.doomed = false; return;
+    }
+  }
+  // coming down on the lane's edge, its middle just outside it: the hull clips the edge and it bounces off, outward,
+  // and falls (to be put back on the lane, as any fall is)
+  if (s.air === 3 && !s.edgeHit) {
+    const fe = floorAt(s.x, s.y, Math.max(h0, s.h) + 0.02, CFG.shipR + 6), fei = _fi;
+    if (fe > -1e8 && s.h <= fe + 0.05) {
+      const dx = s.x - T.x[fei], dy = s.y - T.y[fei], d = Math.hypot(dx, dy);
+      if (d > T.hw) {
+        const nx = dx / d, ny = dy / d, vn = s.vx * nx + s.vy * ny;
+        if (vn < 60) { s.vx += nx * (60 - vn); s.vy += ny * (60 - vn); }
+        s.vx *= 0.8; s.vy *= 0.8; s.edgeHit = true; s.ang += (Math.random() - 0.5) * 0.6;
+        CURH = fe; burst(s.x - nx * 4, s.y - ny * 4, 10, 120, '#ffd9a0', 0.35, true);
+        emit('wall', s, 120);
+      }
     }
   }
   // already below the deck it could come down on (the far side of the gap it is over, or the one it left): it will fall out
@@ -2450,9 +2462,9 @@ function stepShip(s, dt, locked) {
   const ml = shipMotion(s, dt, live, slope), fx = Math.cos(s.ang), fy = Math.sin(s.ang), boosting = s.boostT > 0;
 
   // in the air, a ship clears the lane walls once it is a little above them (or below the deck, falling)
-  // (in the air, only near the lane it is over: coming down just beside it, the wall catches it and turns it back in;
-  // out over the infield there is no wall, and it is never dragged back to the stretch it took off from)
-  const walls = !s.air || (Math.abs(s.h - T.h[s.idx]) < 0.35 && sd(s.x, s.y, s.idx) < 40);
+  // (in the air, the walls hold it in only while it is over the lane: coming down beside the lane, outside them, it
+  // clips the edge and bounces off (see stepAir), and out over the infield there is no wall at all)
+  const walls = !s.air || (Math.abs(s.h - T.h[s.idx]) < 0.35 && sd(s.x, s.y, s.idx) < 0);   // (in the air, only from inside the lane: a racer coming down outside it is not pulled back in)
   const prevIdx = s.idx;
   for (let q = 0; q < 2; q++) {
     s.x += s.vx * dt * 0.5; s.y += s.vy * dt * 0.5;
