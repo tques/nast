@@ -1081,7 +1081,7 @@ const TRACKS = [
     elevation: [{from: 0.74086, to: 0.97584, level: 1, rocks: true}, {from: 0.30193, to: 0.44049, level: -1, canopy: 'ice'}],
     barricades: [0.51355, 0.16995],
     jumps: [{at: 0.63947}],
-    gaps: [{from: 0.64391, to: 0.66242}]
+    gaps: [{from: 0.64391, to: 0.68722}]
   }
 ];
 let TRACK = TRACKS[0], CTRL = null, CHORD_DEFS = null, ELEV_DEFS = null;
@@ -1611,7 +1611,7 @@ TRACKS.push(
     elevation: [{from: 0.36058, to: 0.4148, level: -1, canopy: 'ice'}, {from: 0.62938, to: 0.6836, level: -1, canopy: 'gas'}, {from: 0.70394, to: 0.76023, level: -1, canopy: 'ice'}, {from: 0.07408, to: 0.23187, level: -1, canopy: 'gas'}, {from: 0.46155, to: 0.61111, level: 1, rocks: true}, {from: 0.29709, to: 0.33366, level: 1}],
     barricades: [0.26619, 0.78],
     jumps: [{at: 0.43135}],
-    gaps: [{from: 0.43889, to: 0.45145}, {from: 0.70544, to: 0.71297}]
+    gaps: [{from: 0.43889, to: 0.46025}, {from: 0.70544, to: 0.71297}]
   },
   {
     id: 'rime-belt', name: 'Rime Belt', setting: 'arctic', seed: 45,
@@ -1659,7 +1659,7 @@ TRACKS.push(
     elevation: [{from: 0.27526, to: 0.35408, level: -1, canopy: 'storm'}, {from: 0.69274, to: 0.73821, level: 1, rocks: true}, {from: 0.06983, to: 0.22683, level: 1, rocks: true}],
     barricades: [0.7799, 0.58647, 0.5334],
     jumps: [{at: 0.39652}],
-    gaps: [{from: 0.40714, to: 0.41471}]
+    gaps: [{from: 0.40714, to: 0.43511}]
   },
   {
     id: 'frostline', name: 'Frostline', setting: 'arctic', seed: 87,
@@ -1675,7 +1675,7 @@ TRACKS.push(
     elevation: [{from: 0.36713, to: 0.42611, level: 1}, {from: 0.20813, to: 0.24732, level: -1, canopy: 'mist'}, {from: 0.79177, to: 0.93484, level: -1, canopy: 'mist'}],
     barricades: [0.13543, 0.71364],
     jumps: [{at: 0.30242}],
-    gaps: [{from: 0.31089, to: 0.3195}]
+    gaps: [{from: 0.31089, to: 0.3323}]
   },
   {
     id: 'cinder-coil', name: 'Cinder Coil', setting: 'volcano', seed: 101,
@@ -8533,9 +8533,7 @@ function drawChasms(time) {
   const C = WALL_RGB[SET.id] || (WALL_RGB[SET.id] = { hi: hexRgb(G.wall.hi), lo: hexRgb(G.wall.lo), band: G.wall.band }), pit = hexRgb(G.pit);
   // (a gap in the flat road: a hole down from the ground; a gap in a sunken road: a pit down from the trench's floor,
   // with water at the bottom where the setting has rivers)
-  // (in a molten world, a gap in the flat road with no river under it is a chasm filled with lava a little way down)
-  const molten = !!(G.river && G.river.glow && !G.river.canyon);
-  const all = FLAT_GAPS.map((P) => [P, 0, hw + lip, molten ? -0.55 : -2.4, molten]).concat(TRENCH_GAPS.map((P) => [P, P.base, hw + 2, P.base - 1.1, !!G.river]));
+  const all = FLAT_GAPS.map((P) => [P, 0, hw + lip, -2.4, false]).concat(TRENCH_GAPS.map((P) => [P, P.base, hw + 2, P.base - 1.1, !!G.river]));
   for (const [P, base, wd, bottom, water] of all) {
     const f0 = fscale(base), fd = Math.max(0.2, fscale(bottom));
     const m = P[(P.length / 2) | 0];
@@ -8547,21 +8545,6 @@ function drawChasms(time) {
     for (let k = P.length - 1; k >= 0; k--) O.push([P[k].x - P[k].nx * wd, P[k].y - P[k].ny * wd]);
     const at = (p, f) => [CX + (p[0] - CX) * f, CY + (p[1] - CY) * f];
     lc.fillStyle = water ? G.river.colours.deep : G.pit; lc.beginPath(); O.forEach((p, k) => { const s = at(p, fd); if (k) lc.lineTo(s[0], s[1]); else lc.moveTo(s[0], s[1]); }); lc.closePath(); lc.fill();
-    if (water && G.river.glow) {   // (molten: a brighter middle, plates of dark crust drifting on it, and its light on the glow layer)
-      const RV = G.river;
-      lc.fillStyle = RV.colours.water; lc.beginPath(); P.forEach((p, k) => { const s = at([p.x + p.nx * wd * 0.55, p.y + p.ny * wd * 0.55], fd); if (k) lc.lineTo(s[0], s[1]); else lc.moveTo(s[0], s[1]); });
-      for (let k = P.length - 1; k >= 0; k--) { const s = at([P[k].x - P[k].nx * wd * 0.55, P[k].y - P[k].ny * wd * 0.55], fd); lc.lineTo(s[0], s[1]); } lc.closePath(); lc.fill();
-      if (RV.crust) for (let k = 0; k < P.length * 2; k++) {
-        const u = (hash2(k, 1, 83) + time * 0.004 * (0.5 + hash2(k, 2, 83))) % 1, i = Math.min(P.length - 1, Math.floor(u * P.length)), p = P[i], o = (hash2(k, 3, 83) - 0.5) * 1.6 * wd;
-        const c = at([p.x + p.nx * o, p.y + p.ny * o], fd), r = (2.5 + hash2(k, 4, 83) * 5) * fd;
-        for (let q = 0; q < 3; q++) {
-          const lx = c[0] + (hash2(k, q + 5, 83) - 0.5) * r * 1.4, ly = c[1] + (hash2(k, q + 9, 83) - 0.5) * r, lr = r * (0.45 + hash2(k, q + 13, 83) * 0.35);
-          lc.fillStyle = RV.colours.current; lc.beginPath(); lc.arc(lx, ly, lr + 1, 0, TAU); lc.fill();
-          lc.fillStyle = RV.crust; lc.beginPath(); lc.arc(lx, ly, lr, 0, TAU); lc.fill();
-        }
-      }
-      ec.setTransform(1, 0, 0, 1, VW / 2 - CX, VH / 2 - CY); ec.globalAlpha = RV.glowAlpha || 0.4; ec.fillStyle = RV.glow; ec.beginPath(); O.forEach((p, k) => { const s = at(p, fd); if (k) ec.lineTo(s[0], s[1]); else ec.moveTo(s[0], s[1]); }); ec.closePath(); ec.fill(); ec.globalAlpha = 1;
-    }
     if (water) {   // (flecks of light drifting on it, across the road's line)
       lc.fillStyle = G.river.colours.fleck;
       for (let k = 0; k < 26; k++) {
@@ -11398,14 +11381,11 @@ function buildRiverCourse() {
   const crossings = [];
   T.gaps.forEach((g, gi) => {
     if (T.runOf[g.a] >= 0 || T.runOf[g.b] >= 0) return;   // (only gaps in flat lane: not in a trench, nor up on a hill)
+    for (let i = g.a; i !== g.b; i = (i + 1) % N) gapOf[i] = gi;
+    const m = (g.a + (((g.b - g.a + N) % N) >> 1)) % N;
     // (as wide as the gap is long, less a little, so the lane's ends rest on the banks)
     let L = 0;
     for (let i = g.a; i !== g.b; i = (i + 1) % N) { const j = (i + 1) % N; L += Math.hypot(T.x[j] - T.x[i], T.y[j] - T.y[i]); }
-    const m = (g.a + (((g.b - g.a + N) % N) >> 1)) % N;
-    // (no river is broader than 260: a longer gap is a chasm, molten where the world is (see drawChasms), and keeps only
-    //  the lake a river there would have run into, found from just past its start and sized for a river of 226)
-    if (L - 10 > 260) { crossings.push({ gi, m: (g.a + Math.round(50 / T.step)) % N, w: 226, lakeOnly: true }); return; }
-    for (let i = g.a; i !== g.b; i = (i + 1) % N) gapOf[i] = gi;
     crossings.push({ gi, m, w: Math.max(RV.width || 44, L - 10) });
   });
   if (!crossings.length) return;
@@ -11471,7 +11451,7 @@ function buildRiverCourse() {
       if (!(D[k0] > keep)) { ok = false; break; }
       const rg = region(k0);
       let path;
-      if (rg.edge) path = c.lakeOnly ? [] : search(k0, (k) => { const gx = k % nx, gy = (k / nx) | 0; return gx === 0 || gy === 0 || gx === nx - 1 || gy === ny - 1; });
+      if (rg.edge) path = search(k0, (k) => { const gx = k % nx, gy = (k / nx) | 0; return gx === 0 || gy === 0 || gx === nx - 1 || gy === ny - 1; });
       else {
         // into a lake in the middle of the closed-in side (one lake for each such region, shared)
         let lk = lakeAt.get(rg.best);
@@ -11482,12 +11462,12 @@ function buildRiverCourse() {
           for (let i = 0; i < n; i++) { const a = (i / n) * TAU, kk = 0.86 + 0.14 * Math.sin(a * 3 + R() * 6) + R() * 0.06; lk.pts.push([Math.cos(a) * kk, Math.sin(a) * kk]); }
           lakeAt.set(rg.best, lk); RIVER.lakes.push(lk);
         }
-        if (!c.lakeOnly) path = search(k0, (k) => { const wx = x0 + (k % nx) * gc - lk.x, wy = y0 + ((k / nx) | 0) * gc - lk.y; return Math.hypot(wx, wy) < Math.min(lk.rx, lk.ry) * 0.6; });
+        path = search(k0, (k) => { const wx = x0 + (k % nx) * gc - lk.x, wy = y0 + ((k / nx) | 0) * gc - lk.y; return Math.hypot(wx, wy) < Math.min(lk.rx, lk.ry) * 0.6; });
       }
       if (!path) { ok = false; break; }
       ends.push({ path, sx, sy, edge: rg.edge });
     }
-    if (!ok || c.lakeOnly) continue;
+    if (!ok) continue;
     // the whole course: out of one side's far end, to the crossing, straight over it, and on to the other's. Each
     // side's path is pulled as straight as it will go (long straight reaches, kept clear of the lane), and the corners
     // between reaches rounded off wide, so the river never bends tighter than it is broad.
