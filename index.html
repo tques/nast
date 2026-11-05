@@ -14992,6 +14992,8 @@ function logResult(p) {
 /* the best medal won in each cup on each difficulty: gold for 1st overall, silver for 2nd, bronze for 3rd.
    Saved as { cup: { easy, normal, hard } } (a medal saved before difficulties existed counts as Normal) */
 const MEDAL_KEY = 'gatebreaker.medals.v1', MEDAL_RANK = { gold: 3, silver: 2, bronze: 1 };
+// (each medal's colours: base, highlight, shadow; for the medals drawn on cup badges and Race All's star)
+const MEDAL_ART = { gold: ['#ffd54a', '#fff3b0', '#a8780e'], silver: ['#d8dce8', '#ffffff', '#7c8094'], bronze: ['#d08a50', '#f4c08a', '#7a4620'] };
 function loadMedals() {
   let all;
   try { all = JSON.parse(localStorage.getItem(MEDAL_KEY)) || {}; } catch (e) { all = {}; }
@@ -15262,7 +15264,6 @@ if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) $('touc
 
 BUILTIN_N = TRACKS.length;
 buildTrackCards();
-syncRaceAll();
 for (const code of loadCustom()) { try { addCustomTrack(code, true); } catch (e) { /* a saved track that no longer builds is skipped */ } }
 setTrack(randomTrack());
 startAttract();
@@ -15275,6 +15276,7 @@ showScreen('menu');
 lastT = performance.now();
 requestAnimationFrame(frame);
 // (set up: the loading screen fades away, the menu already running under it)
+syncRaceAll();
 requestAnimationFrame(() => { const b = $('boot'); BOOT.show(1); if (b) { b.classList.add('gone'); setTimeout(() => b.remove(), 800); } });
 
 /* the menu theme: the browser lets sound start only on the player's first click or key press */
@@ -15299,7 +15301,6 @@ const CUP_ART = [
   { rim: '#b79bff', glow: '#f0e8ff', dark: '#1c1440' },   // Pulsar
   { rim: '#f0629f', glow: '#ffd0e6', dark: '#2e0c1e' }    // Quasar
 ];
-const MEDAL_ART = { gold: ['#ffd54a', '#fff3b0', '#a8780e'], silver: ['#d8dce8', '#ffffff', '#7c8094'], bronze: ['#d08a50', '#f4c08a', '#7a4620'] };
 function cupEmblem(c) {
   const key = 'emblem' + c;
   if (CUP_CACHE[key]) return CUP_CACHE[key];
