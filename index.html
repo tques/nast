@@ -8710,6 +8710,32 @@ function drawGround() {
   ec.setTransform(1, 0, 0, 1, 0, 0); ec.globalCompositeOperation = 'destination-out'; ec.drawImage(groundCv, 0, 0); ec.globalCompositeOperation = 'source-over';
   setScale(1);
 }
+/* the window through an overpass over a racer (see renderFrame): the scene round it as it was before the deck went
+   over it, kept here, then laid back over the deck through an ordered dither, densest over the racer */
+const UW_R = 34, UW_POOL = [];
+let uwN = 0;   // (copies taken this frame: each its own small canvas, reused frame to frame)
+function underCopy(u) {
+  const cv = UW_POOL[uwN] || (UW_POOL[uwN] = mkCanvas(UW_R * 2, UW_R * 2)), g = cv.getContext('2d');
+  uwN++;
+  u.cv = cv; u.x0 = u.sx - UW_R; u.y0 = u.sy - UW_R;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, UW_R * 2, UW_R * 2);
+  g.drawImage(lc.canvas, u.x0, u.y0, UW_R * 2, UW_R * 2, 0, 0, UW_R * 2, UW_R * 2);
+  u.done = true;
+}
+function underLay(u) {
+  const g = u.cv.getContext('2d'), R = UW_R;
+  // (the dither fixed to the screen, so it holds still as the racer moves through it)
+  g.setTransform(1, 0, 0, 1, -u.x0, -u.y0);
+  g.globalCompositeOperation = 'destination-in'; g.fillStyle = '#000';
+  g.beginPath(); g.arc(u.sx, u.sy, R, 0, TAU); g.fill();
+  g.globalCompositeOperation = 'destination-out';
+  for (const [r0, r1, k] of [[R * 0.7, R, 14], [R * 0.4, R * 0.7, 30], [0, R * 0.4, 40]]) {   // (rings: how much of what is under shows)
+    g.fillStyle = DCUT[k]; g.beginPath(); g.arc(u.sx, u.sy, r1, 0, TAU); if (r0) g.arc(u.sx, u.sy, r0, 0, TAU, true); g.fill();
+  }
+  g.globalCompositeOperation = 'source-over'; g.setTransform(1, 0, 0, 1, 0, 0);
+  lc.setTransform(1, 0, 0, 1, 0, 0); lc.globalCompositeOperation = 'source-over'; lc.globalAlpha = 1;
+  lc.drawImage(u.cv, u.x0, u.y0);
+}
 /* is there a deck above this racer, over where it is (an overpass it is passing under)? */
 function deckOver(s) {
   const N = T.N, r2 = (T.hw + 4) * (T.hw + 4), hi = s.h + 0.35;
@@ -10077,13 +10103,25 @@ function renderFrame(time) {
     items.push({ k: hh >= 0.25 ? 0.9 : hh <= -0.25 ? -0.7 : 0.26, y: 1e9, fn: () => drawBulletsAndParts(bb9[q], pp9[q], fscale(hh)) });
   }
   items.sort((a, b) => a.k - b.k || a.y - b.y);
-  for (const it of items) it.fn();
-  // racers passing under an overpass: the deck hides them (all but their engine glow), so a faint silhouette of
-  // each is drawn over it, at its own height
+  // racers passing under an overpass: what passes over them (the deck, its walls and rails) is dithered there, so
+  // they and their lane show through it. The scene round each is copied just before the first thing above its level
+  // is drawn, then laid back over the finished scene through an ordered dither, thinning out to nothing at its edge
+  const UW = [];
   for (const s of W.ships) {
-    if (s.wreck > 0 || s.loop || !deckOver(s)) continue;
-    atPos(s.h, s.x, s.y, (f) => drawShipGhost(s, f, time));
+    if (s.wreck > 0 || s.loop) continue;
+    const f = fscale(s.h), sx = Math.round(VW / 2 + (s.x - CX) * f), sy = Math.round(VH / 2 + (s.y - CY) * f);
+    if (sx < -UW_R || sy < -UW_R || sx > VW + UW_R || sy > VH + UW_R || !deckOver(s)) continue;
+    UW.push({ s, sx, sy, cut: shipKey(s) + 0.008, done: false });
   }
+  UW.sort((a, b) => a.cut - b.cut);
+  let uq = 0; uwN = 0;
+  for (const it of items) {
+    while (uq < UW.length && it.k >= UW[uq].cut) underCopy(UW[uq++]);
+    it.fn();
+  }
+  for (const u of UW) if (u.done) underLay(u);
+  // (one that nothing was drawn over after all: a faint silhouette, as before)
+  for (const u of UW) if (!u.done) atPos(u.s.h, u.s.x, u.s.y, (f) => drawShipGhost(u.s, f, time));
   setScale(1);
   lc.setTransform(1, 0, 0, 1, 0, 0); ec.setTransform(1, 0, 0, 1, 0, 0);
   drawShade(cx, cy, time);
