@@ -407,6 +407,9 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .optRow .chips { flex-wrap: wrap; }
 .optNote { margin: -6px 0 0; }
 .confirmBox { display: grid; gap: 10px; margin-top: 10px; }
+/* quitting, on the pause screen: set apart below the rest, across a rule */
+.quitRow { margin-top: 14px; padding-top: 22px; border-top: 1px solid rgba(255, 255, 255, 0.12); }
+.quitRow .confirmBox { margin-top: 0; }
 .btn.danger { color: #ffd0e3; box-shadow: inset 0 0 0 2px var(--rose); }
 .btn.danger:not(.alt) { background: #8a1e4a; color: #fff; }
 #clearSaveBtn { justify-self: start; }
@@ -693,14 +696,6 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
     </div>
     <div class="setup">
       <button class="btn" type="button" id="optionsBack">Back</button>
-      <button class="btn alt danger pauseOnly" type="button" id="quitBtn">Quit race</button>
-    </div>
-    <div class="confirmBox pauseOnly" id="quitConfirm" hidden>
-      <p class="warn" id="quitWarn">Quit this race? Where you are in it is lost.</p>
-      <div class="setup">
-        <button class="btn danger" type="button" id="quitYes">Quit</button>
-        <button class="btn alt" type="button" id="quitNo">Keep racing</button>
-      </div>
     </div>
   </div>
 </section>
@@ -869,6 +864,16 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       <button class="btn alt" type="button" id="pauseHelpBtn">How to play</button>
       <button class="btn alt" type="button" id="pauseOptionsBtn">Options</button>
       <button class="btn alt fsBtn" type="button">Fullscreen</button>
+    </div>
+    <div class="quitRow">
+      <button class="btn alt danger" type="button" id="quitBtn">Quit race</button>
+      <div class="confirmBox" id="quitConfirm" hidden>
+        <p class="warn" id="quitWarn">Quit this race? Where you are in it is lost.</p>
+        <div class="setup">
+          <button class="btn danger" type="button" id="quitYes">Quit</button>
+          <button class="btn alt" type="button" id="quitNo">Keep racing</button>
+        </div>
+      </div>
     </div>
     <p class="warn" id="hillNote" hidden></p>
   </div>
@@ -13218,7 +13223,8 @@ function toMenu() {
   audioEngine(0, false, false);
   if (AUD.ctx && MUSIC.id !== 'menu') musicPlay('menu');
 }
-function pauseGame() { if (mode !== 'race') return; mode = 'pause'; musicDuck(true); syncRestartBtn(); { const n = $('hillNote'); n.hidden = !(SET.ground && !G3.ok); n.textContent = 'Simple hills: this browser is drawing the older 2D hills, because ' + (G3.why || 'it cannot draw them in 3D') + '. Hills and their shadows will look rougher.'; } showScreen('pause'); audioEngine(0, false, false); $('resumeBtn').focus(); }
+function pauseGame() { if (mode !== 'race') return; mode = 'pause'; musicDuck(true); syncRestartBtn();
+  $('quitConfirm').hidden = true; $('quitBtn').hidden = false; $('quitBtn').textContent = TOUR ? 'Quit tournament' : 'Quit race'; { const n = $('hillNote'); n.hidden = !(SET.ground && !G3.ok); n.textContent = 'Simple hills: this browser is drawing the older 2D hills, because ' + (G3.why || 'it cannot draw them in 3D') + '. Hills and their shadows will look rougher.'; } showScreen('pause'); audioEngine(0, false, false); $('resumeBtn').focus(); }
 function resumeGame() { if (mode !== 'pause') return; mode = 'race'; musicDuck(false); showScreen(null); lastT = performance.now(); acc = 0; }
 /* the results board stays live: racers still on track read "In Progress" until they cross the line */
 let boardSig = '', boardFin = {};
@@ -13440,7 +13446,7 @@ window.addEventListener('keydown', (e) => {
       if (k === 'KeyD' || k === 'ArrowRight') swipeQueued = 1;
       if (k === 'KeyS' || k === 'ArrowDown') mineQueued = true;
     }
-    if (k === 'Escape') { if (!screens.options.hidden) closeOptions(); else if (!screens.help.hidden) closeHelp(); else if (mode === 'race') pauseGame(); else if (mode === 'pause') resumeGame(); }
+    if (k === 'Escape') { if (!screens.options.hidden) closeOptions(); else if (!screens.help.hidden) closeHelp(); else if (mode === 'race') pauseGame(); else if (mode === 'pause') { if (!$('quitConfirm').hidden) $('quitNo').click(); else resumeGame(); } }
     if (k === 'KeyM') audioMute(!AUD.muted);
     if (k === 'KeyF') toggleFullscreen();
   }
@@ -14993,15 +14999,14 @@ function syncFavChips() {
   document.querySelectorAll('.chip[data-fav]').forEach((c) => c.setAttribute('aria-pressed', c.dataset.fav === fav ? 'true' : 'false'));
 }
 /* the same screen from the start screen (everything, and clearing the save) or from the pause menu (sound, the
-   sideswipe keys, shadows on a ground track, and quitting the race) */
+   sideswipe keys and shadows on a ground track) */
 let optFrom = 'menu';
 function openOptions(from) {
   optFrom = from;
   syncVolumes(); syncShadowChips(); syncFavChips(); syncHintChips(); syncSwatches();
-  $('clearConfirm').hidden = true; $('clearSaveBtn').hidden = false; $('quitConfirm').hidden = true; $('quitBtn').hidden = false;
+  $('clearConfirm').hidden = true; $('clearSaveBtn').hidden = false;
   screens.options.classList.toggle('fromPause', from === 'pause');
   $('optShadows').hidden = from === 'pause' && !(SET.ground && G3.ok);
-  $('quitBtn').textContent = TOUR ? 'Quit tournament' : 'Quit race';
   showScreen('options'); $('optionsBack').focus();
 }
 function closeOptions() { showScreen(optFrom); $(optFrom === 'pause' ? 'pauseOptionsBtn' : 'optionsBtn').focus(); }
