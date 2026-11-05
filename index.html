@@ -262,8 +262,6 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .pts b { font: 700 12px/1 var(--body); letter-spacing: 0.08em; color: var(--mute); }
 .cuplist { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin: 0; padding-left: 22px; font-size: 15px; }
 .cuplist { grid-template-columns: 1fr; }
-.cuplist li.feature { color: var(--amber); }
-.cuplist li.feature b { font: 700 11px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 6px 4px; margin-left: 6px; color: #2a1300; background: var(--amber); clip-path: var(--notch); --n: 2px; vertical-align: 2px; }
 /* the cups: a card each, its badge (emblem and medal) over its name */
 #cup .panel { grid-template-columns: minmax(0, 1fr); }   /* one fixed column: a longer cup name never widens the cards */
 .cupHead { display: flex; align-items: center; gap: 16px; }
@@ -352,7 +350,6 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .ctrack .tn { font: 700 15px/1.1 var(--display); color: var(--amber); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
 .ctrack .tn i { font: 500 12px/1 var(--body); font-style: normal; color: var(--mute); }
 .ctrack .tn b { font: 700 10px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 5px 4px; color: #2a1300; background: var(--amber); clip-path: var(--notch); --n: 2px; }
-.ctrack.feature { box-shadow: inset 0 0 0 2px #b4640f, inset 0 -3px 0 var(--rim-lo); }
 @media (max-width: 900px) {
   #tracks { overflow: auto; } #tracks .duo { height: auto; } #tracks .tscroll { height: auto; overflow: visible; margin-right: 0; padding-right: 0; }
   .duo { grid-template-columns: minmax(0, 1fr); }
@@ -821,7 +818,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
     
   <div class="panel">
     <div class="cupHead"><canvas id="cupLogo" aria-hidden="true"></canvas><h1 id="cupTitle">Comet Cup</h1></div>
-    <p class="note">Four races against the same five rival breakers: three tracks that are always in the cup, then a feature track drawn at random. Each race scores points; the most points after the feature race wins the cup.</p>
+    <p class="note">Four races against the same five rival breakers, on the cup's four tracks. Each race scores points; the most points after the final race wins the cup.</p>
     <div>
       <h2>Cup</h2>
       <div class="ccards" id="cupPick" role="group" aria-label="Which cup"></div>
@@ -13273,10 +13270,10 @@ function showResults() {
   }
   if (TOUR) {
     const last = TOUR.round >= TOUR.list.length, n = TOUR.list.length;
-    $('resTitle').textContent = (TOUR.round === n ? 'Feature race' : 'Race ' + TOUR.round + ' of ' + n) + ' · ' + TRACKS[TOUR.list[TOUR.round - 1]].name;
+    $('resTitle').textContent = (TOUR.round === n ? 'Final race' : 'Race ' + TOUR.round + ' of ' + n) + ' · ' + TRACKS[TOUR.list[TOUR.round - 1]].name;
     $('tourHead').textContent = last ? 'Standings after the last race' : 'Standings after ' + TOUR.round + ' of ' + n;
     renderStandings(); $('tourBox').hidden = false;
-    $('againBtn').textContent = last ? 'Final standings' : (TOUR.round === n - 1 ? 'Feature race: ' : 'Next race: ') + TRACKS[TOUR.list[TOUR.round]].name;
+    $('againBtn').textContent = last ? 'Final standings' : (TOUR.round === n - 1 ? 'Final race: ' : 'Next race: ') + TRACKS[TOUR.list[TOUR.round]].name;
     $('backBtn').textContent = 'Quit tournament';
   } else {
     $('tourBox').hidden = true;
@@ -13292,22 +13289,17 @@ const CUP_POINTS = [5, 4, 3, 2, 1, 0];
 const CUP_RESTARTS = { easy: Infinity, normal: 3, hard: 1, vhard: 0 };
 const restartWord = (n) => (n === Infinity ? 'unlimited restarts' : n === 0 ? 'no restarts' : n + (n === 1 ? ' restart' : ' restarts'));
 let TOUR = null;   // { round: races scored so far, pts, places: name -> [place per race], gain: this race's points, done }
-/* ---------- the cups: four races each, three tracks always in it and a feature track drawn at random from the rest
-   (any built-in track not already in that cup), run last. Within a cup the tracks run from easiest to hardest. ---------- */
+/* ---------- the cups: four set tracks each, every built-in track in exactly one cup, and no world twice in a cup.
+   Within a cup the tracks run from easiest to hardest. ---------- */
 const CUPS = [
-  { name: 'Comet Cup',  tracks: ['kessler-loop', 'tether-yards', 'high-roller'] },
-  { name: 'Nova Cup',   tracks: ['industrial', 'mirage-basin', 'thermal-rise'] },
-  { name: 'Pulsar Cup', tracks: ['slag-run', 'ion-foundry', 'frostline'] },
-  { name: 'Quasar Cup', tracks: ['lagrange-knot', 'rime-belt', 'cinder-coil'] }
+  { name: 'Comet Cup',  tracks: ['kessler-loop', 'bumpy-ride', 'briar-hollow', 'high-roller'] },    // space, dunes, forest, neon strip
+  { name: 'Nova Cup',   tracks: ['industrial', 'mirage-basin', 'perihelion', 'thermal-rise'] },     // volcano, dunes, neon strip, gale
+  { name: 'Pulsar Cup', tracks: ['ion-foundry', 'frostline', 'slag-run', 'tether-yards'] },         // dunes, arctic, gale, space
+  { name: 'Quasar Cup', tracks: ['lagrange-knot', 'rime-belt', 'cinder-coil', 'elevation'] }        // forest, arctic, volcano, neon strip
 ];
 let cupSel = 0;
-const cupFeature = [];   // (each cup's feature track, drawn when the cup screen opens)
 const trackOf = (id) => TRACKS.findIndex((t) => t.id === id);
-function drawFeature(c) {
-  const C = CUPS[c], pool = TRACKS.slice(0, BUILTIN_N).map((t, i) => i).filter((i) => !C.tracks.includes(TRACKS[i].id));
-  cupFeature[c] = pool[Math.floor(Math.random() * pool.length)];
-}
-function cupRaces(c) { return CUPS[c].tracks.map(trackOf).filter((i) => i >= 0).concat([cupFeature[c]]); }
+function cupRaces(c) { return CUPS[c].tracks.map(trackOf).filter((i) => i >= 0); }
 function renderCup() {
   const C = CUPS[cupSel], medals = loadMedals();
   $('cupTitle').textContent = C.name;
@@ -13319,12 +13311,11 @@ function renderCup() {
   ol.textContent = '';
   cupRaces(cupSel).forEach((ix, k) => {
     const card = document.createElement('div'), cv = document.createElement('canvas'), name = document.createElement('span');
-    card.className = 'ctrack' + (k === 3 ? ' feature' : ''); card.setAttribute('role', 'listitem');
+    card.className = 'ctrack'; card.setAttribute('role', 'listitem');
     cv.width = 320; cv.height = 180;
     const info = TRACK_INFO[ix]; if (info) cv.getContext('2d').drawImage(info.base, 0, 0);
     name.className = 'tn'; name.textContent = (k + 1) + '. ' + TRACKS[ix].name;
     const world = document.createElement('i'); world.textContent = (SETTINGS[TRACKS[ix].setting] || SETTINGS.space).name; name.append(' ', world);
-    if (k === 3) { const f = document.createElement('b'); f.textContent = 'Feature'; name.append(f); }
     card.append(cv, name);
     const id = TRACKS[ix].id;
     card.addEventListener('pointerenter', () => cupReel(card, cv, id));
@@ -13342,7 +13333,6 @@ function cupReel(card, cv, id) {
   cupVid.currentTime = 0; cupVid.play().catch(() => {});
 }
 function showCup() {
-  for (let c = 0; c < CUPS.length; c++) drawFeature(c);
   const pick = $('cupPick');
   if (!pick.children.length) CUPS.forEach((C, c) => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'ccard'; b.dataset.cup = c;
@@ -13372,7 +13362,6 @@ function applyCupPace() {
   for (const s of W.ships) { const m = P[s.name]; if (!m || s.isPlayer) continue; s.skill *= m; s.speedMul *= m; if (s.ai) s.ai.skill *= m; }
 }
 function startTournament() {
-  if (TOUR && TOUR.done) drawFeature(cupSel);   // (a new run of the same cup draws a new feature track)
   pickRivals();   // (the five this cup is raced against, all four races)
   TOUR = { round: 0, pts: {}, places: {}, gain: null, done: false, contenders: [], list: cupRaces(cupSel), cup: CUPS[cupSel].name, diff: DIFF, restarts: CUP_RESTARTS[DIFF], rivals: RIVALS.slice() };
   for (const r of RACERS) { TOUR.pts[r.name] = 0; TOUR.places[r.name] = []; }
@@ -13385,7 +13374,7 @@ function nextRound() {
   RIVALS = TOUR.rivals.slice(); RACERS.length = 1; RACERS.push(...RIVALS);   // (the cup's own five, whatever raced since)
   TOUR.gain = null;
   pickIx = ix;
-  loadThen(ix, () => { syncTrackCards(); startRace(); toast((last ? 'Feature race' : 'Race ' + (TOUR.round + 1) + ' of ' + TOUR.list.length) + '  ·  ' + TRACKS[ix].name); });
+  loadThen(ix, () => { syncTrackCards(); startRace(); toast((last ? 'Final race' : 'Race ' + (TOUR.round + 1) + ' of ' + TOUR.list.length) + '  ·  ' + TRACKS[ix].name); });
 }
 /* the player has finished: the rest race on (quickly, unseen) to the line, so every place is settled, then points */
 function scoreRound() {
