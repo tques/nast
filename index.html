@@ -11386,135 +11386,148 @@ function buildRiverCourse() {
     // (as wide as the gap is long, less a little, so the lane's ends rest on the banks)
     let L = 0;
     for (let i = g.a; i !== g.b; i = (i + 1) % N) { const j = (i + 1) % N; L += Math.hypot(T.x[j] - T.x[i], T.y[j] - T.y[i]); }
-    crossings.push({ gi, m, w: Math.max(RV.width || 44, L - 10) });
+    // (a long gap: the river broadens into a pool where it passes under it, but runs its course at most RIVER_W wide,
+    //  so it still finds its way between the parts of the track)
+    crossings.push({ gi, m, w: Math.max(RV.width || 44, Math.min(RIVER_W, L - 10)), wx: Math.max(RV.width || 44, L - 10) });
   });
   if (!crossings.length) return;
-  const width = Math.max(...crossings.map((c) => c.w)), keep = hw + lip + width * 0.5 + 34;   // (how close to the lane the water may come)
-  // passable: far enough from the lane, or right at a crossing (where the lane is a gap)
-  const open = (k) => D[k] > keep || (NI[k] >= 0 && gapOf[NI[k]] >= 0 && D[k] < (hw + lip) * 1.2);
-  const R = rng((TRACK.seed || 11) * 71 + 13);
-  const cost = (k) => {
-    const gx = k % nx, gy = (k / nx) | 0, wx = x0 + gx * gc, wy = y0 + gy * gc;
-    return 1 + 260 / Math.max(30, D[k] - keep + 30) + 1.4 * vnoise(wx / 260, wy / 260, (TRACK.seed || 11) + 5);
-  };
-  const cellOf = (x, y) => clamp(Math.round((y - y0) / gc), 0, ny - 1) * nx + clamp(Math.round((x - x0) / gc), 0, nx - 1);
-  // the cheapest way from a cell to any cell that ends the search (Dijkstra on the grid, eight ways)
-  const search = (from, isEnd) => {
-    const dist = new Float32Array(nx * ny).fill(1e18), prev = new Int32Array(nx * ny).fill(-1), heap = [];
-    const push = (k, d) => { heap.push([d, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
-    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
-    dist[from] = 0; push(from, 0);
-    while (heap.length) {
-      const [d, k] = pop();
-      if (d > dist[k]) continue;
-      if (isEnd(k)) { const out = []; for (let q = k; q >= 0; q = prev[q]) out.push(q); return out.reverse(); }
-      const gx = k % nx, gy = (k / nx) | 0;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        if (!dx && !dy) continue;
-        const xx = gx + dx, yy = gy + dy;
-        if (xx < 0 || yy < 0 || xx >= nx || yy >= ny) continue;
-        const q = yy * nx + xx;
-        if (!open(q)) continue;
-        const nd = d + cost(q) * (dx && dy ? 1.414 : 1);
-        if (nd < dist[q]) { dist[q] = nd; prev[q] = k; push(q, nd); }
-      }
-    }
-    return null;
-  };
-  // the region a cell is in (everything reachable without crossing the lane): does it reach the map's edge? if not,
-  // where is the middle of it (furthest from the lane), for a lake
-  const region = (from) => {
-    const seen = new Uint8Array(nx * ny), st = [from];
-    seen[from] = 1;
-    let edge = false, best = from;
-    while (st.length) {
-      const k = st.pop(), gx = k % nx, gy = (k / nx) | 0;
-      if (gx === 0 || gy === 0 || gx === nx - 1 || gy === ny - 1) edge = true;
-      if (D[k] > D[best]) best = k;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const xx = gx + dx, yy = gy + dy;
-        if (xx < 0 || yy < 0 || xx >= nx || yy >= ny) continue;
-        const q = yy * nx + xx;
-        if (seen[q] || !(D[q] > keep)) continue;
-        seen[q] = 1; st.push(q);
-      }
-    }
-    return { edge, best };
-  };
-  const lakeAt = new Map();
-  for (const c of crossings) {
-    const m = c.m, nxv = T.nx[m], nyv = T.ny[m], off = keep + gc * 1.5;
-    const ends = [];
-    let ok = true;
-    for (const sd of [1, -1]) {
-      const sx = T.x[m] + nxv * off * sd, sy = T.y[m] + nyv * off * sd, k0 = cellOf(sx, sy);
-      if (!(D[k0] > keep)) { ok = false; break; }
-      const rg = region(k0);
-      let path;
-      if (rg.edge) path = search(k0, (k) => { const gx = k % nx, gy = (k / nx) | 0; return gx === 0 || gy === 0 || gx === nx - 1 || gy === ny - 1; });
-      else {
-        // into a lake in the middle of the closed-in side (one lake for each such region, shared)
-        let lk = lakeAt.get(rg.best);
-        if (!lk) {
-          const bx = x0 + (rg.best % nx) * gc, by = y0 + ((rg.best / nx) | 0) * gc, rad = Math.min(300, (D[rg.best] - keep) * 0.85 + width);
-          lk = { x: bx, y: by, rx: rad, ry: rad * (0.62 + R() * 0.25), ang: R() * Math.PI, pts: [] };
-          const n = 22;
-          for (let i = 0; i < n; i++) { const a = (i / n) * TAU, kk = 0.86 + 0.14 * Math.sin(a * 3 + R() * 6) + R() * 0.06; lk.pts.push([Math.cos(a) * kk, Math.sin(a) * kk]); }
-          lakeAt.set(rg.best, lk); RIVER.lakes.push(lk);
+  // (the broadest course that fits: a river too broad to find its way between the parts of the track tries narrower)
+  const wide = crossings.map((c) => c.w);
+  let R = null, bestN = -1, bestCap = RIVER_W;
+  const caps = [RIVER_W, 170, 120, 80];
+  for (const cap of caps) {
+    RIVER.paths = []; RIVER.lakes = []; RIVER.gaps = new Set();
+    crossings.forEach((c, k) => { c.w = Math.max(RV.width || 44, Math.min(cap, wide[k])); });
+    const width = Math.max(...crossings.map((c) => c.w)), keep = hw + lip + width * 0.5 + 34;   // (how close to the lane the water may come)
+    // passable: far enough from the lane, or right at a crossing (where the lane is a gap)
+    const open = (k) => D[k] > keep || (NI[k] >= 0 && gapOf[NI[k]] >= 0 && D[k] < (hw + lip) * 1.2);
+    R = rng((TRACK.seed || 11) * 71 + 13);
+    const cost = (k) => {
+      const gx = k % nx, gy = (k / nx) | 0, wx = x0 + gx * gc, wy = y0 + gy * gc;
+      return 1 + 260 / Math.max(30, D[k] - keep + 30) + 1.4 * vnoise(wx / 260, wy / 260, (TRACK.seed || 11) + 5);
+    };
+    const cellOf = (x, y) => clamp(Math.round((y - y0) / gc), 0, ny - 1) * nx + clamp(Math.round((x - x0) / gc), 0, nx - 1);
+    // the cheapest way from a cell to any cell that ends the search (Dijkstra on the grid, eight ways)
+    const search = (from, isEnd) => {
+      const dist = new Float32Array(nx * ny).fill(1e18), prev = new Int32Array(nx * ny).fill(-1), heap = [];
+      const push = (k, d) => { heap.push([d, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+      const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+      dist[from] = 0; push(from, 0);
+      while (heap.length) {
+        const [d, k] = pop();
+        if (d > dist[k]) continue;
+        if (isEnd(k)) { const out = []; for (let q = k; q >= 0; q = prev[q]) out.push(q); return out.reverse(); }
+        const gx = k % nx, gy = (k / nx) | 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const xx = gx + dx, yy = gy + dy;
+          if (xx < 0 || yy < 0 || xx >= nx || yy >= ny) continue;
+          const q = yy * nx + xx;
+          if (!open(q)) continue;
+          const nd = d + cost(q) * (dx && dy ? 1.414 : 1);
+          if (nd < dist[q]) { dist[q] = nd; prev[q] = k; push(q, nd); }
         }
-        path = search(k0, (k) => { const wx = x0 + (k % nx) * gc - lk.x, wy = y0 + ((k / nx) | 0) * gc - lk.y; return Math.hypot(wx, wy) < Math.min(lk.rx, lk.ry) * 0.6; });
       }
-      if (!path) { ok = false; break; }
-      ends.push({ path, sx, sy, edge: rg.edge });
-    }
-    if (!ok) continue;
-    // the whole course: out of one side's far end, to the crossing, straight over it, and on to the other's. Each
-    // side's path is pulled as straight as it will go (long straight reaches, kept clear of the lane), and the corners
-    // between reaches rounded off wide, so the river never bends tighter than it is broad.
-    const W2 = c.w, clearSeg = (p, q) => {
-      const L = Math.hypot(q[0] - p[0], q[1] - p[1]), n = Math.ceil(L / 16);
-      for (let k = 1; k < n; k++) { const t = k / n, cc = cellOf(p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t); if (!(D[cc] > keep * 0.9)) return false; }
-      return true;
+      return null;
     };
-    const straighten = (P) => {   // (keep a point only where going straight on past it would run too near the lane)
-      const out = [P[0]];
-      let i = 0;
-      while (i < P.length - 1) {
-        let j = P.length - 1;
-        while (j > i + 1 && !clearSeg(P[i], P[j])) j--;
-        out.push(P[j]); i = j;
+    // the region a cell is in (everything reachable without crossing the lane): does it reach the map's edge? if not,
+    // where is the middle of it (furthest from the lane), for a lake
+    const region = (from) => {
+      const seen = new Uint8Array(nx * ny), st = [from];
+      seen[from] = 1;
+      let edge = false, best = from;
+      while (st.length) {
+        const k = st.pop(), gx = k % nx, gy = (k / nx) | 0;
+        if (gx === 0 || gy === 0 || gx === nx - 1 || gy === ny - 1) edge = true;
+        if (D[k] > D[best]) best = k;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const xx = gx + dx, yy = gy + dy;
+          if (xx < 0 || yy < 0 || xx >= nx || yy >= ny) continue;
+          const q = yy * nx + xx;
+          if (seen[q] || !(D[q] > keep)) continue;
+          seen[q] = 1; st.push(q);
+        }
       }
-      return out;
+      return { edge, best };
     };
-    const cellPts = (cells) => cells.map((k) => [x0 + (k % nx) * gc, y0 + ((k / nx) | 0) * gc]);
-    const A = straighten([[ends[0].sx, ends[0].sy], ...cellPts(ends[0].path)]).reverse(), Bp = straighten([[ends[1].sx, ends[1].sy], ...cellPts(ends[1].path)]);
-    let pts = [...A, [T.x[m], T.y[m]], ...Bp];
-    // an edge end runs on well past the map, so it never stops in view
-    const ext = (a, b) => { const dx = a[0] - b[0], dy = a[1] - b[1], l = Math.hypot(dx, dy) || 1; return [a[0] + (dx / l) * 900, a[1] + (dy / l) * 900]; };
-    if (ends[0].edge && pts.length > 1) pts.unshift(ext(pts[0], pts[1]));
-    if (ends[1].edge && pts.length > 1) pts.push(ext(pts[pts.length - 1], pts[pts.length - 2]));
-    // round each corner: cut back along both reaches and curve across (never into the straight over the lane)
-    const sideA = A.length - 1 + (ends[0].edge ? 1 : 0), sideB = sideA + 2, offMax = Math.max(0, Math.hypot(ends[0].sx - T.x[m], ends[0].sy - T.y[m]) - (hw + lip + 30));
-    const R2 = [pts[0]];
-    for (let i = 1; i + 1 < pts.length; i++) {
-      const p = pts[i], a0 = pts[i - 1], b0 = pts[i + 1], la = Math.hypot(p[0] - a0[0], p[1] - a0[1]), lb = Math.hypot(b0[0] - p[0], b0[1] - p[1]);
-      let cut = Math.min(la, lb) * 0.5;
-      if (i === sideA || i === sideB) cut = Math.min(cut, offMax);
-      if (i === sideA + 1) { R2.push(p); continue; }   // (the crossing itself: straight)
-      const ua = [(p[0] - a0[0]) / la, (p[1] - a0[1]) / la], ub = [(b0[0] - p[0]) / lb, (b0[1] - p[1]) / lb];
-      const s0 = [p[0] - ua[0] * cut, p[1] - ua[1] * cut], s1 = [p[0] + ub[0] * cut, p[1] + ub[1] * cut];
-      for (let k = 0; k <= 12; k++) { const t = k / 12, u = 1 - t; R2.push([u * u * s0[0] + 2 * u * t * p[0] + t * t * s1[0], u * u * s0[1] + 2 * u * t * p[1] + t * t * s1[1]]); }
+    const lakeAt = new Map();
+    for (const c of crossings) {
+      const m = c.m, nxv = T.nx[m], nyv = T.ny[m], off = keep + gc * 1.5;
+      const ends = [];
+      let ok = true;
+      for (const sd of [1, -1]) {
+        const sx = T.x[m] + nxv * off * sd, sy = T.y[m] + nyv * off * sd, k0 = cellOf(sx, sy);
+        if (!(D[k0] > keep)) { ok = false; break; }
+        const rg = region(k0);
+        let path;
+        if (rg.edge) path = search(k0, (k) => { const gx = k % nx, gy = (k / nx) | 0; return gx === 0 || gy === 0 || gx === nx - 1 || gy === ny - 1; });
+        else {
+          // into a lake in the middle of the closed-in side (one lake for each such region, shared)
+          let lk = lakeAt.get(rg.best);
+          if (!lk) {
+            const bx = x0 + (rg.best % nx) * gc, by = y0 + ((rg.best / nx) | 0) * gc, rad = Math.min(300, (D[rg.best] - keep) * 0.85 + width);
+            lk = { x: bx, y: by, rx: rad, ry: rad * (0.62 + R() * 0.25), ang: R() * Math.PI, pts: [] };
+            const n = 22;
+            for (let i = 0; i < n; i++) { const a = (i / n) * TAU, kk = 0.86 + 0.14 * Math.sin(a * 3 + R() * 6) + R() * 0.06; lk.pts.push([Math.cos(a) * kk, Math.sin(a) * kk]); }
+            lakeAt.set(rg.best, lk); RIVER.lakes.push(lk);
+          }
+          path = search(k0, (k) => { const wx = x0 + (k % nx) * gc - lk.x, wy = y0 + ((k / nx) | 0) * gc - lk.y; return Math.hypot(wx, wy) < Math.min(lk.rx, lk.ry) * 0.6; });
+        }
+        if (!path) { ok = false; break; }
+        ends.push({ path, sx, sy, edge: rg.edge });
+      }
+      if (!ok) continue;
+      // the whole course: out of one side's far end, to the crossing, straight over it, and on to the other's. Each
+      // side's path is pulled as straight as it will go (long straight reaches, kept clear of the lane), and the corners
+      // between reaches rounded off wide, so the river never bends tighter than it is broad.
+      const W2 = c.w, clearSeg = (p, q) => {
+        const L = Math.hypot(q[0] - p[0], q[1] - p[1]), n = Math.ceil(L / 16);
+        for (let k = 1; k < n; k++) { const t = k / n, cc = cellOf(p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t); if (!(D[cc] > keep * 0.9)) return false; }
+        return true;
+      };
+      const straighten = (P) => {   // (keep a point only where going straight on past it would run too near the lane)
+        const out = [P[0]];
+        let i = 0;
+        while (i < P.length - 1) {
+          let j = P.length - 1;
+          while (j > i + 1 && !clearSeg(P[i], P[j])) j--;
+          out.push(P[j]); i = j;
+        }
+        return out;
+      };
+      const cellPts = (cells) => cells.map((k) => [x0 + (k % nx) * gc, y0 + ((k / nx) | 0) * gc]);
+      const A = straighten([[ends[0].sx, ends[0].sy], ...cellPts(ends[0].path)]).reverse(), Bp = straighten([[ends[1].sx, ends[1].sy], ...cellPts(ends[1].path)]);
+      let pts = [...A, [T.x[m], T.y[m]], ...Bp];
+      // an edge end runs on well past the map, so it never stops in view
+      const ext = (a, b) => { const dx = a[0] - b[0], dy = a[1] - b[1], l = Math.hypot(dx, dy) || 1; return [a[0] + (dx / l) * 900, a[1] + (dy / l) * 900]; };
+      if (ends[0].edge && pts.length > 1) pts.unshift(ext(pts[0], pts[1]));
+      if (ends[1].edge && pts.length > 1) pts.push(ext(pts[pts.length - 1], pts[pts.length - 2]));
+      // round each corner: cut back along both reaches and curve across (never into the straight over the lane)
+      const sideA = A.length - 1 + (ends[0].edge ? 1 : 0), sideB = sideA + 2, offMax = Math.max(0, Math.hypot(ends[0].sx - T.x[m], ends[0].sy - T.y[m]) - (hw + lip + 30));
+      const R2 = [pts[0]];
+      for (let i = 1; i + 1 < pts.length; i++) {
+        const p = pts[i], a0 = pts[i - 1], b0 = pts[i + 1], la = Math.hypot(p[0] - a0[0], p[1] - a0[1]), lb = Math.hypot(b0[0] - p[0], b0[1] - p[1]);
+        let cut = Math.min(la, lb) * 0.5;
+        if (i === sideA || i === sideB) cut = Math.min(cut, offMax);
+        if (i === sideA + 1) { R2.push(p); continue; }   // (the crossing itself: straight)
+        const ua = [(p[0] - a0[0]) / la, (p[1] - a0[1]) / la], ub = [(b0[0] - p[0]) / lb, (b0[1] - p[1]) / lb];
+        const s0 = [p[0] - ua[0] * cut, p[1] - ua[1] * cut], s1 = [p[0] + ub[0] * cut, p[1] + ub[1] * cut];
+        for (let k = 0; k <= 12; k++) { const t = k / 12, u = 1 - t; R2.push([u * u * s0[0] + 2 * u * t * p[0] + t * t * s1[0], u * u * s0[1] + 2 * u * t * p[1] + t * t * s1[1]]); }
+      }
+      R2.push(pts[pts.length - 1]);
+      pts = R2;
+      void W2;
+      // (flowing toward a lake if there is one, else either way)
+      if (!ends[0].edge && ends[1].edge) pts.reverse();
+      const P = smoothCourse(pts, c.w, R, m, c.wx);
+      RIVER.gaps.add(c.gi);
+      // (a river running into a lake runs on into it, so the two openings are one; which of its points are out in the lake)
+      P.inLake = P.x.map((x, i) => RIVER.lakes.some((L) => { const dx = x - L.x, dy = P.y[i] - L.y, c2 = Math.cos(L.ang), s2 = Math.sin(L.ang), u = (dx * c2 + dy * s2) / L.rx, v = (-dx * s2 + dy * c2) / L.ry; return u * u + v * v < 0.85; }));
+      RIVER.paths.push(P);
     }
-    R2.push(pts[pts.length - 1]);
-    pts = R2;
-    void W2;
-    // (flowing toward a lake if there is one, else either way)
-    if (!ends[0].edge && ends[1].edge) pts.reverse();
-    const P = smoothCourse(pts, c.w, R, m);
-    RIVER.gaps.add(c.gi);
-    // (a river running into a lake runs on into it, so the two openings are one; which of its points are out in the lake)
-    P.inLake = P.x.map((x, i) => RIVER.lakes.some((L) => { const dx = x - L.x, dy = P.y[i] - L.y, c2 = Math.cos(L.ang), s2 = Math.sin(L.ang), u = (dx * c2 + dy * s2) / L.rx, v = (-dx * s2 + dy * c2) / L.ry; return u * u + v * v < 0.85; }));
-    RIVER.paths.push(P);
+    if (RIVER.paths.length === crossings.length) break;
+    if (RIVER.paths.length > bestN) { bestN = RIVER.paths.length; bestCap = cap; }
+    if (cap === caps[caps.length - 1] && bestN > RIVER.paths.length) caps.push(bestCap);   // (none fits all: the broadest that fitted most)
   }
   // lily pads round the lakes' shallows
   for (const L of RIVER.lakes) {
@@ -11539,6 +11552,7 @@ function buildRiverCourse() {
    bridge that is gone. The gorge runs straight across the road (so the lane jumps it square), then winds off into the
    sand each way, opening out wider and deeper-looking, until it pinches shut, short of any other part of the track.
    It is a river course with no water: the same openings, banks and walls (laid in coloured strata), a sandy floor. */
+const CANYON_W = 160;   // (the widest a canyon runs away from the road, before it opens out)
 function buildCanyons() {
   const G = SET.ground, RV = G.river, N = T.N, hw = T.hw, lip = G.lip || 10, B = T.bounds;
   T.gaps.forEach((g, gi) => {
@@ -11546,7 +11560,10 @@ function buildCanyons() {
     const m = (g.a + (((g.b - g.a + N) % N) >> 1)) % N, R = rng((TRACK.seed || 11) * 31 + gi * 7 + 5);
     const GP = gapPts(g), E0 = GP[0], E1 = GP[GP.length - 1], ex = E1.x - E0.x, ey = E1.y - E0.y, el = Math.hypot(ex, ey) || 1;
     const cx0 = (E0.x + E1.x) / 2, cy0 = (E0.y + E1.y) / 2, ux = ex / el, uy = ey / el, dx = -uy, dy = ux;
-    const wc = el + 4, rim = hw + lip + 14, maxW = wc * 2.6;
+    // (a long gap: as wide as the gap where the road crosses it, then narrowing toward CANYON_W as it leaves, so it still
+    //  finds room between the parts of the track; a gap no longer than that keeps its own width all the way)
+    const wc = el + 4, rim = hw + lip + 14, wb = Math.min(wc, CANYON_W), maxW = wb * 2.6;
+    const wAt = (a, open) => { if (a <= rim) return wc; if (wb === wc) return wc * open; const t = clamp((a - rim) / 160, 0, 1); return wc * (1 - t) + wb * open * t; };
     const clear = (x, y, w) => {
       for (let i = 0; i < N; i += 2) { const di = Math.abs(i - m); if (Math.min(di, N - di) < 30) continue; if ((T.x[i] - x) ** 2 + (T.y[i] - y) ** 2 < (hw + lip + w / 2 + 50) ** 2) return false; }
       for (const c of T.chords) for (let k = 0; k < c.px.length; k += 2) if ((c.px[k] - x) ** 2 + (c.py[k] - y) ** 2 < (c.hw + w / 2 + 50) ** 2) return false;
@@ -11558,16 +11575,16 @@ function buildCanyons() {
       const a = Math.abs(s), k = sd < 0 ? 0 : 1, t = clamp((a - rim) / 140, 0, 1), wob = amp[k] * t * t * Math.sin((a - rim) * fr[k] + ph[k]) - amp[k] * t * t * Math.sin(ph[k]);
       return [cx0 + dx * s + ux * wob, cy0 + dy * s + uy * wob];
     };
-    const reach = (sd) => { let s = rim; while (s < (RV.reach || 760)) { const q = at(s * sd, sd); if (!clear(q[0], q[1], Math.min(maxW, wc * (1 + (s - rim) / 260)))) break; s += 8; } return s - 8; };
+    const reach = (sd) => { let s = rim; while (s < (RV.reach || 760)) { const q = at(s * sd, sd); if (!clear(q[0], q[1], wAt(s, Math.min(maxW / wb, 1 + (s - rim) / 260)))) break; s += 8; } return s - 8; };
     const S1 = reach(-1), S2 = reach(1);
     if (S1 < rim + 80 || S2 < rim + 80) return;   // (no room: it stays a plain pit)
     const P = { x: [], y: [], w: [], nx: [], ny: [], inLake: [], step: 8, canyon: true, depth: -(RV.depth || 1.4) };
     for (let s = -S1; s <= S2; s += 8) {
       const a = Math.abs(s), S = s < 0 ? S1 : S2, sd = s < 0 ? -1 : 1, q = at(s, sd);
       // (as wide as the gap across the road; opening out beyond it, ragged; pinching shut at its far ends)
-      const open = a <= rim ? 1 : Math.min(maxW / wc, 1 + (a - rim) / 260) * (0.85 + 0.3 * hash2(Math.round(a / 40), sd, 23));
+      const open = a <= rim ? 1 : Math.min(maxW / wb, 1 + (a - rim) / 260) * (0.85 + 0.3 * hash2(Math.round(a / 40), sd, 23));
       const t = clamp((a - (S - 160)) / 160, 0, 1), shut = 1 - t * t * (3 - 2 * t) * 0.92;
-      P.x.push(q[0]); P.y.push(q[1]); P.w.push(wc * (a <= rim ? 1 : open * shut)); P.inLake.push(false);
+      P.x.push(q[0]); P.y.push(q[1]); P.w.push(a <= rim ? wc : wAt(a, open) * shut); P.inLake.push(false);
     }
     // (each point's sideways: square to its own course)
     for (let i = 0; i < P.x.length; i++) {
@@ -11641,7 +11658,8 @@ function buildRavines() {
 }
 /* a course through grid points smoothed into easy curves (corners cut again and again), then laid out evenly, with
    the river's width wandering a little along it. Kept straight and square through the crossing at the lane (m). */
-function smoothCourse(pts, width, R, m) {
+const RIVER_W = 240;   // (the widest a river runs, away from where it passes under a gap)
+function smoothCourse(pts, width, R, m, wCross) {
   let P = pts;
   for (let it = 0; it < 1; it++) {
     const Q = [P[0]];
@@ -11663,7 +11681,9 @@ function smoothCourse(pts, width, R, m) {
   for (let i = 0; i < X.length; i++) Wd.push(width * (0.88 + 0.24 * vnoise(i * 0.02 + ph, 0.5, 9)));
   // (narrower where it passes under the lane, so it never shows past the gap's edges)
   // (exactly its width where it passes under the lane, wandering only further off)
-  for (let i = 0; i < X.length; i++) { const d = Math.hypot(X[i] - T.x[m], Y[i] - T.y[m]), u = clamp((d - 200) / 200, 0, 1); Wd[i] = width + (Wd[i] - width) * u; }
+  // (a gap longer than the river is broad: as wide as the gap right under it, narrowing to its own width as it leaves)
+  const wc = Math.max(width, wCross || 0), r0 = Math.max(200, wc * 0.5);
+  for (let i = 0; i < X.length; i++) { const d = Math.hypot(X[i] - T.x[m], Y[i] - T.y[m]), u = clamp((d - r0) / 200, 0, 1); Wd[i] = wc + (Wd[i] - wc) * u; }
   const NXs = [], NYs = [];
   for (let i = 0; i < X.length; i++) {
     const a = Math.max(0, i - 5), b = Math.min(X.length - 1, i + 5), dx = X[b] - X[a], dy = Y[b] - Y[a], l = Math.hypot(dx, dy) || 1;
