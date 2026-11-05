@@ -1081,7 +1081,7 @@ const TRACKS = [
     elevation: [{from: 0.74086, to: 0.97584, level: 1, rocks: true}, {from: 0.30193, to: 0.44049, level: -1, canopy: 'ice'}],
     barricades: [0.51355, 0.16995],
     jumps: [{at: 0.63947}],
-    gaps: [{from: 0.64391, to: 0.68722}]
+    gaps: [{from: 0.64391, to: 0.68722, pool: true}]   // (pool: the gap is a broad pit of lava, see buildPool)
   }
 ];
 let TRACK = TRACKS[0], CTRL = null, CHORD_DEFS = null, ELEV_DEFS = null;
@@ -1189,7 +1189,7 @@ function buildTrack(def) {
     const a = atF(g.from), n = wr(atF(g.to) - a);
     if (n < 1 || n > N / 2) continue;
     for (let q = 0; q < n; q++) T.gap[(a + q) % N] = 1;
-    T.gaps.push({ a, n, b: (a + n - 1) % N });
+    T.gaps.push({ a, n, b: (a + n - 1) % N, pool: !!g.pool });
   }
   T.jumps = (TRACK.jumps || []).map((j) => {
     const at = typeof j === 'number' ? j : j.at, side = j.side === 'left' || j.side === 'right' ? j.side : null;
@@ -11322,9 +11322,71 @@ function buildRiver() {
   const G = SET.ground, RV = G && G.river;
   if (!RV || !T.gaps.length) return;
   if (RV.canyon) buildCanyons(); else buildRiverCourse();
+  if (!RV.canyon) T.gaps.forEach((g, gi) => { if (g.pool && T.runOf[g.a] < 0 && T.runOf[g.b] < 0) buildPool(g, gi); });
   buildRavines();
   if (RIVER.paths.length || RIVER.lakes.length) riverMask();
   laneHoles();
+}
+/* A gap marked pool (Industrial's): a broad pit of the world's water or lava, drawn as a lake, round the whole gap and
+   well out beyond it, its shore irregular, coming no nearer any other road (or shortcut) than a little past its edge.
+   Its outline: from the middle of the gap, out along rays all round, each reaching past the gap's own road by a
+   wandering amount, and stopping short of anything it must keep off. */
+function buildPool(g, gi) {
+  const N = T.N, hw = T.hw, lip = SET.ground.lip || 10, R = rng((TRACK.seed || 11) * 53 + gi * 17 + 7);
+  const gs = []; for (let i = g.a; ; i = (i + 1) % N) { gs.push(i); if (i === g.b) break; }
+  const inG = new Set(gs), pre = (g.a - 1 + N) % N, post = (g.b + 1) % N, h = T.step * 0.6;
+  let cx = 0, cy = 0; for (const i of gs) { cx += T.x[i]; cy += T.y[i]; } cx /= gs.length; cy /= gs.length;
+  const RMAX = 700, near = [];
+  for (let i = 0; i < N; i++) if (!inG.has(i) && Math.hypot(T.x[i] - cx, T.y[i] - cy) < RMAX + 200) near.push(i);
+  // (each sample of road a short stretch, square across; the stretches either side of the gap stop square at it)
+  const onRoad = (x, y, w, set, ends) => {
+    for (const i of set) {
+      const dx = x - T.x[i], dy = y - T.y[i], la = dx * T.nx[i] + dy * T.ny[i];
+      if (Math.abs(la) > w) continue;
+      const al = dx * T.tx[i] + dy * T.ty[i];
+      if (ends && i === pre) { if (al > 0 || al < -h) continue; } else if (ends && i === post) { if (al < 0 || al > h) continue; } else if (Math.abs(al) > h) continue;
+      return true;
+    }
+    return false;
+  };
+  const keep = hw + lip + 18;
+  const blocked = (x, y) => {
+    if (onRoad(x, y, keep, near, true)) return true;
+    for (const c of T.chords) for (let k = 0; k < c.px.length; k += 2) if ((x - c.px[k]) ** 2 + (y - c.py[k]) ** 2 < (c.hw + lip + 18) ** 2) return true;
+    return false;
+  };
+  const K = 96, free = [], cover = [];
+  for (let k = 0; k < K; k++) {
+    const a = (k / K) * TAU, ux = Math.cos(a), uy = Math.sin(a);
+    let f = RMAX, c = 0;
+    for (let r = 0; r <= RMAX; r += 6) {
+      const x = cx + ux * r, y = cy + uy * r;
+      if (blocked(x, y)) { f = Math.max(0, r - 6); break; }
+      if (onRoad(x, y, hw + lip + 4, gs, false)) c = r;
+    }
+    free.push(f); cover.push(c);
+  }
+  // (how far past the gap each way: a few long swells round the shore, with smaller wobbles on them)
+  const ph = [R() * TAU, R() * TAU, R() * TAU, R() * TAU];
+  let r = cover.map((c, k) => { const a = (k / K) * TAU, n = 0.5 + 0.28 * Math.sin(a * 2 + ph[0]) + 0.16 * Math.sin(a * 3 + ph[1]) + 0.06 * Math.sin(a * 7 + ph[2]); return Math.max(c, 200) + 90 + 230 * n; });
+  for (let pass = 0; pass < 3; pass++) {
+    r = r.map((v, k) => Math.min(free[k], v));
+    r = r.map((v, k) => 0.25 * r[(k + K - 1) % K] + 0.5 * v + 0.25 * r[(k + 1) % K]);
+  }
+  r = r.map((v, k) => { const a = (k / K) * TAU, j = 1 + 0.04 * Math.sin(a * 9 + ph[3]) + 0.025 * Math.sin(a * 17 + ph[2] * 2); return Math.min(free[k], Math.max(Math.min(cover[k] + 10, free[k]), v * j)); });
+  const mean = r.reduce((s2, v) => s2 + v, 0) / K;
+  const L = { x: cx, y: cy, rx: mean, ry: mean, ang: 0, pts: r.map((v, k) => [Math.cos((k / K) * TAU) * v / mean, Math.sin((k / K) * TAU) * v / mean]), pads: [], pool: true };
+  // (its shore as a fine ring through its outline points, the way the lakes' are)
+  const at = (i) => { const q = L.pts[((i % K) + K) % K]; return [cx + q[0] * mean, cy + q[1] * mean]; };
+  L.ring = [];
+  for (let i = 0; i < K; i++) {
+    const a = at(i), b = at(i + 1), m0 = [(at(i - 1)[0] + a[0]) / 2, (at(i - 1)[1] + a[1]) / 2], m1 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    for (let k = 0; k < 4; k++) { const t = k / 4, u = 1 - t; L.ring.push([u * u * m0[0] + 2 * u * t * a[0] + t * t * m1[0], u * u * m0[1] + 2 * u * t * a[1] + t * t * m1[1]]); }
+  }
+  RIVER.lakes.push(L); RIVER.gaps.add(gi);
+  // (no chasm of its own: the pit is its drop)
+  FLAT_GAPS.length = 0;
+  T.gaps.forEach((q, qi) => { if (T.runOf[q.a] < 0 && T.runOf[q.b] < 0 && !RIVER.gaps.has(qi)) FLAT_GAPS.push(gapPts(q)); });
 }
 /* Where the water (or lava) opening eats into the lane itself (a lake that comes right up over the lane's edge),
    that part of the lane is open: a racer driving onto it drops in. RIVER.hole[i] marks lane samples with open
@@ -11381,6 +11443,7 @@ function buildRiverCourse() {
   const crossings = [];
   T.gaps.forEach((g, gi) => {
     if (T.runOf[g.a] >= 0 || T.runOf[g.b] >= 0) return;   // (only gaps in flat lane: not in a trench, nor up on a hill)
+    if (g.pool) return;   // (a pit of its own, no river: see buildPool)
     for (let i = g.a; i !== g.b; i = (i + 1) % N) gapOf[i] = gi;
     const m = (g.a + (((g.b - g.a + N) % N) >> 1)) % N;
     // (as wide as the gap is long, less a little, so the lane's ends rest on the banks)
