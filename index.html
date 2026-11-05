@@ -11886,11 +11886,13 @@ function drawRiverBed(time, ravines) {
   lc.fillStyle = C.deep;
   for (const r of runs) outLake(r, (a, b) => ribbon(r.P, a, b, 0.45));
   for (const L of lakes) lakeIn(L, 0.55);
+  // (a broad pit of lava (Industrial's) is crusted over and dimmer, so so much of it is easy on the eye)
+  if (RV.glow) { lc.fillStyle = 'rgba(28,8,6,0.6)'; for (const L of lakes) if (L.pool) lakeIn(L, inset); }
   // (molten: the river and its lakes light up the glow layer as well)
   if (RV.glow) {
     ec.setTransform(1, 0, 0, 1, 0, 0); ec.globalAlpha = RV.glowAlpha || 0.4; ec.fillStyle = RV.glow;
     for (const r of runs) ribbon(r.P, r.a, r.b, inset * 0.9, ec);
-    for (const L of lakes) lakeIn(L, inset * 0.9, ec);
+    for (const L of lakes) { ec.globalAlpha = (RV.glowAlpha || 0.4) * (L.pool ? 0.35 : 1); lakeIn(L, inset * 0.9, ec); }
     ec.globalAlpha = 1;
   }
   if (!RV.canyon) { lc.globalAlpha = 0.3; lc.fillStyle = C.current; for (const r of runs) outLake(r, (a, b) => ribbon(r.P, a, b, 0.12)); }
