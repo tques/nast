@@ -1061,7 +1061,7 @@ const TRACKS = [
     elevation: [{from: 0.74086, to: 0.97584, level: 1, rocks: true}, {from: 0.30193, to: 0.44049, level: -1, canopy: 'ice'}],
     barricades: [0.51355, 0.16995],
     jumps: [{at: 0.63947}],
-    gaps: [{from: 0.64391, to: 0.66242}]
+    gaps: [{from: 0.64391, to: 0.68722}]
   }
 ];
 let TRACK = TRACKS[0], CTRL = null, CHORD_DEFS = null, ELEV_DEFS = null;
@@ -1591,7 +1591,7 @@ TRACKS.push(
     elevation: [{from: 0.36058, to: 0.4148, level: -1, canopy: 'ice'}, {from: 0.62938, to: 0.6836, level: -1, canopy: 'gas'}, {from: 0.70394, to: 0.76023, level: -1, canopy: 'ice'}, {from: 0.07408, to: 0.23187, level: -1, canopy: 'gas'}, {from: 0.46155, to: 0.61111, level: 1, rocks: true}, {from: 0.29709, to: 0.33366, level: 1}],
     barricades: [0.26619, 0.78],
     jumps: [{at: 0.43135}],
-    gaps: [{from: 0.43889, to: 0.45145}, {from: 0.70544, to: 0.71297}]
+    gaps: [{from: 0.43889, to: 0.46025}, {from: 0.70544, to: 0.71297}]
   },
   {
     id: 'rime-belt', name: 'Rime Belt', setting: 'arctic', seed: 45,
@@ -1607,7 +1607,7 @@ TRACKS.push(
     elevation: [{from: 0.82287, to: 0.88346, level: 1, rocks: true}, {from: 0.18794, to: 0.36515, level: 1}],
     barricades: [0.71338],
     jumps: [{at: 0.58601}],
-    gaps: [{from: 0.5933, to: 0.61708}],
+    gaps: [{from: 0.5933, to: 0.62028}],
     loops: [{at: 0.49927, r: 220, side: 'right'}],
     gapSign: {text: 'GOOD LUCK'}   // (a billboard down in the gap, its arrow pointing to the landing)
   },
@@ -1618,7 +1618,7 @@ TRACKS.push(
     elevation: [{from: 0.45382, to: 0.50814, level: 1, rocks: true}, {from: 0.33214, to: 0.43405, level: -1, canopy: 'ice'}, {from: 0.54418, to: 0.63562, level: 1}, {from: 0.69222, to: 0.81979, level: 1}, {from: 0.87238, to: 0.90859, level: -1}, {from: 0.92572, to: 0.975, level: -1}, {from: 0.10953, to: 0.22185, level: 1}],
     barricades: [0.06784, 0.31088],
     jumps: [{at: 0.26311}],
-    gaps: [{from: 0.27028, to: 0.28163}, {from: 0.50039, to: 0.50512}, {from: 0.33254, to: 0.3391}, {from: 0.81313, to: 0.8197}],
+    gaps: [{from: 0.27028, to: 0.29363}, {from: 0.50039, to: 0.50512}, {from: 0.33254, to: 0.3391}, {from: 0.81313, to: 0.8197}],
     holes: [{at: 0.91959, side: 'left'}, {at: 0.94806, side: 'right'}],
     landmarks: [{at: [-1175, 1230], r: 180, desc: 'Very big queen jelly. Looks old battered and mean.', art: 'queen-jelly'}]
   },
@@ -1629,7 +1629,7 @@ TRACKS.push(
     elevation: [{from: 0.19254, to: 0.24833, level: 1}, {from: 0.81292, to: 0.96255, level: -1}],
     barricades: [0.41354, 0.65439],
     jumps: [{at: 0.27422}, {at: 0.46471, side: 'left'}, {at: 0.51589, side: 'left'}],
-    gaps: [{from: 0.2819, to: 0.29597}, {from: 0.24271, to: 0.24763}, {from: 0.47096, to: 0.47699}, {from: 0.51982, to: 0.52651}]
+    gaps: [{from: 0.2819, to: 0.31037}, {from: 0.24271, to: 0.24763}, {from: 0.47096, to: 0.50019}, {from: 0.51982, to: 0.55171}]
   },
   // new tracks: one for each setting but deep space
   {
@@ -1639,7 +1639,7 @@ TRACKS.push(
     elevation: [{from: 0.27526, to: 0.35408, level: -1, canopy: 'storm'}, {from: 0.69274, to: 0.73821, level: 1, rocks: true}, {from: 0.06983, to: 0.22683, level: 1, rocks: true}],
     barricades: [0.7799, 0.58647, 0.5334],
     jumps: [{at: 0.39652}],
-    gaps: [{from: 0.40714, to: 0.41471}]
+    gaps: [{from: 0.40714, to: 0.43511}]
   },
   {
     id: 'frostline', name: 'Frostline', setting: 'arctic', seed: 87,
@@ -1655,7 +1655,7 @@ TRACKS.push(
     elevation: [{from: 0.36713, to: 0.42611, level: 1}, {from: 0.20813, to: 0.24732, level: -1, canopy: 'mist'}, {from: 0.79177, to: 0.93484, level: -1, canopy: 'mist'}],
     barricades: [0.13543, 0.71364],
     jumps: [{at: 0.30242}],
-    gaps: [{from: 0.31089, to: 0.3195}]
+    gaps: [{from: 0.31089, to: 0.3323}]
   },
   {
     id: 'cinder-coil', name: 'Cinder Coil', setting: 'volcano', seed: 101,
@@ -1663,7 +1663,7 @@ TRACKS.push(
     elevation: [{from: 0.77573, to: 0.84255, level: 1, rocks: true}, {from: 0.62002, to: 0.66546, level: -1, canopy: 'smoke'}],
     barricades: [0.25017, 0.87931],
     jumps: [{at: 0.71492}, {at: 0.16617}, {at: 0.91525, side: 'left'}, {at: 0.56837}],
-    gaps: [{from: 0.72427, to: 0.73029}, {from: 0.17553, to: 0.17978}, {from: 0.57453, to: 0.58844}],
+    gaps: [{from: 0.72427, to: 0.74869}, {from: 0.17553, to: 0.20018}, {from: 0.57453, to: 0.60244}],
     loops: [{at: 0.33492, r: 220, side: 'right'}]
   },
   {
@@ -1673,7 +1673,7 @@ TRACKS.push(
     elevation: [{from: 0.59765, to: 0.66241, level: 1}, {from: 0.40334, to: 0.49464, level: -1}, {from: 0.28421, to: 0.35488, level: 1}],
     barricades: [0.24131, 0.51658],
     jumps: [{at: 0.17454}, {at: 0.55585}],
-    gaps: [{from: 0.18397, to: 0.18938}, {from: 0.56529, to: 0.57136}]
+    gaps: [{from: 0.18397, to: 0.20898}, {from: 0.56529, to: 0.58976}]
   },
   {
     id: 'high-roller', name: 'High Roller', setting: 'vegas', seed: 115,
@@ -1688,7 +1688,7 @@ TRACKS.push(
     points: [[-515, -1725], [20, -1520], [0, -620], [575, -537], [996, -310], [1150, 0], [695, 355], [355, 120], [700, -265], [1295, 60], [1155, 585], [575, 537], [-155, 890], [-425, 855], [-355, 485], [-545, 355], [-950, 680], [-1505, 580], [-1770, 160], [-1185, -645], [-505, -730], [-305, -905], [-320, -1225], [-635, -1270], [-1000, -1065], [-655, -460], [-1155, -30], [-1680, -455], [-1125, -1610]],
     elevation: [{from: 0.08974, to: 0.25538, level: 1}, {from: 0.34119, to: 0.38653, level: -1}, {from: 0.55748, to: 0.69368, level: -1}, {from: 0.82187, to: 0.90293, level: 1}],
     jumps: [{at: 0.40482}, {at: 0.5313}, {at: 0.91445}],
-    gaps: [{from: 0.40999, to: 0.42046}, {from: 0.5357, to: 0.5491}, {from: 0.91772, to: 0.93599}]
+    gaps: [{from: 0.40999, to: 0.44086}, {from: 0.5357, to: 0.5563}, {from: 0.91772, to: 0.95039}]
   },
   {
     id: 'bumpy-ride', name: 'Bumpy Ride', setting: 'dunes', seed: 129,
@@ -3504,13 +3504,19 @@ function aiThink(s, dt) {
   // on for a jump shortcut: boost up to the speed it takes
   // (at the last moment, once lined up on the pad: a boost there carries it straight off, where an earlier one would
   // have it sliding wide in the bend)
-  if (a.jp && !s.air && sp < a.jp.v - 12 && wrapIdx(a.jp.j.i - s.idx) < 7 && s.energy >= s.st.boostCost && s.boostCd <= 0 && s.align > 0.8) {
+  if (a.jp && !(zone && a.flub) && !s.air && sp < a.jp.v - 12 && wrapIdx(a.jp.j.i - s.idx) < 7 && s.energy >= s.st.boostCost && s.boostCd <= 0 && s.align > 0.8) {
     const j = a.jp.j, lat = (s.x - T.x[s.idx]) * T.nx[s.idx] + (s.y - T.y[s.idx]) * T.ny[s.idx];
     if (!j.side || (lat > j.lo + 4 && lat < j.hi - 4)) { inp.boostPress = true; return; }
   }
   if (a.jp && !s.air) return;   // (and no shooting on the run-up: turning to aim costs the line)
-  // not fast enough to clear the gap ahead: boost, whatever it costs (a fall costs more)
-  if (zone && isFinite(zone.need) && !s.air && sp < zone.need * 1.1 && s.energy >= s.st.boostCost && s.boostCd <= 0 && s.align > 0.85) {
+  // not fast enough to clear the gap ahead: boost, whatever it costs (a fall costs more). Now and then a driver
+  // misjudges one and doesn't (decided once per gap per lap: likelier on Easy, rarer on Hard and for the keen ones)
+  if (zone) {
+    const key = zone.a + ':' + lap;
+    if (a.flubKey !== key) { a.flubKey = key; a.flub = Math.random() < clamp(0.06 + 0.12 * (1 - (a.smart || 1)) - 0.04 * ((a.keen || 1) - 1), 0.02, 0.2); }
+    if (a.flub && !s.air) s.speedMul *= 0.85;   // (and eases off on the run-up: it comes up short)
+  } else a.flub = false;
+  if (zone && !a.flub && isFinite(zone.need) && !s.air && sp < zone.need * 1.1 && s.energy >= s.st.boostCost && s.boostCd <= 0 && s.align > 0.85) {
     inp.boostPress = true; return;
   }
   if (loopAhead && sp < loopAhead.need * 1.12 && s.energy >= s.st.boostCost && s.boostCd <= 0 && s.align > 0.85) { inp.boostPress = true; return; }
@@ -3683,7 +3689,7 @@ function aiThink(s, dt) {
   // power is also the hull, so keep a healthy reserve before spending any on boost
   // (the reserve shrinks the further behind it is, and it will boost into gentler bends)
   const reserve = 42 + sty.reserve - 27 * a.behind;
-  if (!a.tgt && !a.sc && s.energy >= s.st.boostCost + reserve && s.boostCd <= 0 && s.align > 0.9 && sp > 170 &&
+  if (!a.tgt && !a.sc && !(zone && a.flub) && s.energy >= s.st.boostCost + reserve && s.boostCd <= 0 && s.align > 0.9 && sp > 170 &&   // (nor into a gap it has misjudged)
       aiCornerSpeed(s, sty, true) > CFG.top * s.st.top * 1.35) {
     const j = wrapIdx(s.idx + 26);
     if (T.tx[s.idx] * T.tx[j] + T.ty[s.idx] * T.ty[j] > sty.straight - 0.05 * a.behind) inp.boostPress = true;
