@@ -388,6 +388,7 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .optRow { display: grid; gap: 2px; }
 /* colour swatches: on the speeder card (top right) and in options */
 .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.favCol { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .swatch { width: 22px; height: 22px; padding: 0; border: 0; cursor: pointer; background: var(--sw); clip-path: var(--notch); --n: 3px; box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.45), inset 0 3px 0 rgba(255, 255, 255, 0.35); }
 .swatch:hover { filter: brightness(1.15); }
 .swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px rgba(0, 0, 0, 0.6); }
@@ -671,7 +672,10 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
     </div>
     <div class="optRow menuOnly">
       <h2>Default color</h2>
-      <div class="swatches" id="favSwatches" role="group" aria-label="The color you start with"></div>
+      <span class="favCol">
+        <button class="chip" type="button" id="favOrig" aria-pressed="true" title="Each speeder in its own colour">Use original</button>
+        <span class="swatches" id="favSwatches" role="group" aria-label="One color for every speeder"></span>
+      </span>
     </div>
     <div class="optRow" id="optShadows">
       <h2>Shadows</h2>
@@ -681,7 +685,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
         <button class="chip" type="button" data-shadow="hd" aria-pressed="false">HD</button>
       </span>
     </div>
-    <p class="note optNote menuOnly">Shadows are those the hills cast on ground tracks. Laps, your favorite speeder and your default color are what you start with each time; you can still change them before a race.</p>
+    <p class="note optNote menuOnly">Shadows are those the hills cast on ground tracks. Laps, your favorite speeder and your default color are what you start with each time; you can still change them before a race. With no default color, each speeder comes in its own.</p>
     <p class="note optNote menuOnly" id="recCredit">Recorded soundtrack: “Electric Pulse” by DavidKBD (Electric Pulse, Digital Horizon, Cyber Lights, Retrochrome Nights, Neon Arcadia Awakening, Time Warp, Electric Dreams of Infinity and Quantum Ripples of Sound).</p>
     <div class="optRow menuOnly">
       <h2>Save data</h2>
@@ -13819,6 +13823,9 @@ function machineIcon(hull, col) {
   return (MACHINE_ICONS[k] = { frame, shadow: shadowOf(frame) });
 }
 function pickMachine(id) {
+  // (a different speeder comes in its own colour, or in the default color set in Options; the same one again keeps
+  //  whatever colour was picked for it)
+  if (id !== PLAYER_HULL) { PLAYER_COL = startCol(id); syncSwatches(); }
   PLAYER_HULL = id;
   const info = HULL_INFO.find((h) => h.id === id), st = hullStats(id);
   $('bayName').textContent = info.name; $('bayBlurb').textContent = info.blurb;
@@ -13833,7 +13840,7 @@ function pickMachine(id) {
     const on = c.h.id === id;
     c.btn.setAttribute('aria-checked', on ? 'true' : 'false');
     c.btn.tabIndex = on ? 0 : -1;
-    const x = c.cv.getContext('2d'), ic = machineIcon(c.h.id, PLAYER_COL);
+    const x = c.cv.getContext('2d'), ic = machineIcon(c.h.id, on ? PLAYER_COL : startCol(c.h.id));
     x.clearRect(0, 0, 40, 40); x.imageSmoothingEnabled = false;
     x.drawImage(ic.shadow, 10, 11); x.drawImage(ic.frame, 7, 7);
   }
@@ -14955,7 +14962,11 @@ syncShadowChips();
 
 /* ---------- the player's colour: swatches on the speeder card, and a default in options ---------- */
 const COL_KEY = 'gatebreaker.favCol', COL_CHOICES = [{ col: RACERS[0].col, name: 'Amber' }].concat(ROSTER.map((r) => ({ col: r.col, name: r.name })));
-try { const c = localStorage.getItem(COL_KEY); if (COL_CHOICES.some((q) => q.col === c)) PLAYER_COL = c; } catch (e) { /* default */ }
+// each speeder's own colour: its pilot's (the Arrow is yours, in amber)
+function hullCol(id) { if (id === RACERS[0].hull) return PLAYER_BASE_COL; const r = ROSTER.find((q) => q.hull === id); return r ? r.col : PLAYER_BASE_COL; }
+// the default color from Options, if one has been set (none: each speeder in its own)
+function favCol() { let c = null; try { c = localStorage.getItem(COL_KEY); } catch (e) { /* none */ } return COL_CHOICES.some((q) => q.col === c) ? c : null; }
+function startCol(id) { return favCol() || hullCol(id); }
 function pickColour(col) {
   PLAYER_COL = col;
   syncSwatches(); pickMachine(PLAYER_HULL);
@@ -14972,9 +14983,10 @@ function makeSwatches(box, onPick) {
 }
 makeSwatches($('baySwatches'), pickColour);
 makeSwatches($('favSwatches'), (col) => { try { localStorage.setItem(COL_KEY, col); } catch (e) { /* this visit only */ } pickColour(col); });
+$('favOrig').addEventListener('click', () => { try { localStorage.removeItem(COL_KEY); } catch (e) { /* none */ } pickColour(hullCol(PLAYER_HULL)); });
 function syncSwatches() {
-  let fav = null; try { fav = localStorage.getItem(COL_KEY); } catch (e) { /* none */ }
-  fav = fav || PLAYER_BASE_COL;
+  const fav = favCol();
+  $('favOrig').setAttribute('aria-pressed', fav ? 'false' : 'true');
   document.querySelectorAll('#baySwatches .swatch').forEach((b) => b.setAttribute('aria-pressed', b.dataset.col === PLAYER_COL ? 'true' : 'false'));
   document.querySelectorAll('#favSwatches .swatch').forEach((b) => b.setAttribute('aria-pressed', b.dataset.col === fav ? 'true' : 'false'));
 }
@@ -14984,6 +14996,7 @@ syncSwatches();
 // the favorite speeder: the one picked for you each time the game starts
 const FAV_KEY = 'gatebreaker.favHull';
 try { const f = localStorage.getItem(FAV_KEY); if (HULL_INFO.some((h) => h.id === f)) PLAYER_HULL = f; } catch (e) { /* default */ }
+PLAYER_COL = startCol(PLAYER_HULL); syncSwatches();
 for (const h of HULL_INFO) {
   const c = document.createElement('button');
   c.type = 'button'; c.className = 'chip'; c.dataset.fav = h.id; c.textContent = h.name;
