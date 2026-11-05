@@ -13646,7 +13646,7 @@ function padMove(dx, dy, scope) {
   if (!list.length) return;
   if (!cur || !scope.contains(cur) || !list.includes(cur)) { padFocus(padPreferred(scope, list)); return; }
   const machine = cur.closest('#machineList');
-  if (machine && dx) { stepMachine(dx); document.body.classList.add('padNav'); return; }   // (along the row of speeders: pick the next one)
+  if (machine && (dx || dy)) { stepMachine(dx || dy); document.body.classList.add('padNav'); return; }   // (along the speeders, any way: the next one, or the one before; its colour is on the bumpers)
   if (cur.type === 'range' && dx) {
     const v = clamp(+cur.value + dx * (+cur.step || 1), +cur.min || 0, cur.max === '' ? 100 : +cur.max);
     if (v !== +cur.value) { cur.value = v; cur.dispatchEvent(new Event('input', { bubbles: true })); cur.dispatchEvent(new Event('change', { bubbles: true })); }
