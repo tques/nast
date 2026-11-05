@@ -1189,7 +1189,7 @@ function buildTrack(def) {
     const a = atF(g.from), n = wr(atF(g.to) - a);
     if (n < 1 || n > N / 2) continue;
     for (let q = 0; q < n; q++) T.gap[(a + q) % N] = 1;
-    T.gaps.push({ a, n, b: (a + n - 1) % N, pool: !!g.pool });
+    T.gaps.push({ a, n, b: (a + n - 1) % N, pool: !!g.pool, shaft: !!g.shaft });
   }
   T.jumps = (TRACK.jumps || []).map((j) => {
     const at = typeof j === 'number' ? j : j.at, side = j.side === 'left' || j.side === 'right' ? j.side : null;
@@ -1683,7 +1683,7 @@ TRACKS.push(
     elevation: [{from: 0.77573, to: 0.84255, level: 1, rocks: true}, {from: 0.62002, to: 0.66546, level: -1, canopy: 'smoke'}],
     barricades: [0.25017, 0.87931],
     jumps: [{at: 0.71492}, {at: 0.16617}, {at: 0.91525, side: 'left'}, {at: 0.56837}],
-    gaps: [{from: 0.72427, to: 0.74569}, {from: 0.17553, to: 0.19738}, {from: 0.57453, to: 0.59944}],
+    gaps: [{from: 0.72427, to: 0.74569}, {from: 0.17553, to: 0.19738, shaft: true}, {from: 0.57453, to: 0.59944}],
     loops: [{at: 0.33492, r: 220, side: 'right'}]
   },
   {
@@ -8582,6 +8582,18 @@ function drawShaft(P, f0, fd, wd, time) {
   const mid = at([m0(P).x, m0(P).y], fd);
   glow(lc, '#ff5a18', 26 * fd * 3, mid[0], mid[1], 0.18 + 0.06 * Math.sin(time * 2.1));
   glow(ec, '#ff5a18', 30, mid[0], mid[1], 0.12);
+  // (a mine-cart track along the bottom: sleepers, two rails, and an ore cart or two standing on it)
+  const line = (A, B, w, col) => { lc.lineWidth = w; lc.strokeStyle = col; lc.beginPath(); lc.moveTo(A[0], A[1]); lc.lineTo(B[0], B[1]); lc.stroke(); };
+  const off = (p, o) => [p.x + p.nx * o, p.y + p.ny * o];
+  for (let k = 1; k < P.length - 1; k += 2) line(at(off(P[k], -10), fd), at(off(P[k], 10), fd), Math.max(1, 3 * fd), '#2a1c14');
+  for (const o of [-6, 6]) { lc.lineWidth = 1; lc.strokeStyle = '#6a6a72'; lc.beginPath(); for (let k = 1; k < P.length - 1; k++) { const q = at(off(P[k], o), fd); if (k > 1) lc.lineTo(q[0], q[1]); else lc.moveTo(q[0], q[1]); } lc.stroke(); }
+  for (let c2 = 0; c2 < Math.max(1, Math.floor(P.length / 18)); c2++) {
+    const k = clamp(Math.floor((0.2 + 0.6 * hash2(c2, P.length, 41)) * P.length), 2, P.length - 3), p = P[k], tx = -p.ny, ty = p.nx;
+    const cnr = (u, v) => at([p.x + tx * u + p.nx * v, p.y + ty * u + p.ny * v], fd);
+    const box = (u0, u1, v0, v1, col) => { const a = cnr(u0, v0), b = cnr(u1, v0), c = cnr(u1, v1), d = cnr(u0, v1); lc.fillStyle = col; lc.beginPath(); lc.moveTo(a[0], a[1]); lc.lineTo(b[0], b[1]); lc.lineTo(c[0], c[1]); lc.lineTo(d[0], d[1]); lc.closePath(); lc.fill(); };
+    box(-11, 11, -8, 8, '#5a3424'); box(-9, 9, -6, 6, '#2e2622');   // (the cart, and the ore heaped in it)
+    for (let q = 0; q < 4; q++) { const s3 = cnr(-6 + q * 4, (hash2(q, k, 43) - 0.5) * 8); lc.fillStyle = q % 2 ? '#8a5a3a' : '#c07a3a'; lc.fillRect(Math.round(s3[0]), Math.round(s3[1]), 2, 2); }
+  }
   // the walls: rock, darker in steps going down (each face lit by which way it looks)
   const n = O.length, steps = 4;
   for (let k = 0; k < n; k++) {
@@ -8603,6 +8615,16 @@ function drawShaft(P, f0, fd, wd, time) {
   }
   lc.lineWidth = 2; lc.strokeStyle = '#5a3a20';
   for (const k of corners) { const A = at(O[k], f0), Bp = at(O[k], fd); lc.beginPath(); lc.moveTo(A[0], A[1]); lc.lineTo(Bp[0], Bp[1]); lc.stroke(); }
+  // (heavy timbers braced across the mouth every so far along, each with a lamp hung down into the shaft on a wire)
+  const fl = f0 + (fd - f0) * 0.42, every = Math.max(6, Math.round(110 / T.step));
+  for (let k = every >> 1; k < P.length - 2; k += every) {
+    const p = P[k], A = at(off(p, wd + 4), f0), B = at(off(p, -wd - 4), f0), M = at([p.x, p.y], f0), Lm = at([p.x, p.y], fl);
+    line(M, Lm, 1, 'rgba(20,14,10,0.9)');
+    const fl2 = 0.75 + 0.25 * Math.sin(time * 3 + k);
+    lc.fillStyle = '#ffd27a'; lc.fillRect(Math.round(Lm[0]) - 1, Math.round(Lm[1]) - 1, 3, 3);
+    glow(lc, '#ffb040', 14, Lm[0], Lm[1], 0.45 * fl2); glow(ec, '#ffb040', 16, Lm[0], Lm[1], 0.35 * fl2);
+    line(A, B, Math.max(3, 7 * f0), '#3a2412'); line(A, B, Math.max(1, 3 * f0), '#8a5a2e');
+  }
   // a ladder down the middle of one side
   const sa = O[(P.length / 2) | 0], sb = O[((P.length / 2) | 0) + 1] || sa, lx = (sb[0] - sa[0]), ly = (sb[1] - sa[1]), ll = Math.hypot(lx, ly) || 1, rx = (lx / ll) * 5, ry = (ly / ll) * 5;
   lc.strokeStyle = '#8a8a90'; lc.lineWidth = 1;
@@ -11449,7 +11471,7 @@ function buildRiverCourse() {
     // (as wide as the gap is long, less a little, so the lane's ends rest on the banks)
     let L = 0;
     for (let i = g.a; i !== g.b; i = (i + 1) % N) { const j = (i + 1) % N; L += Math.hypot(T.x[j] - T.x[i], T.y[j] - T.y[i]); }
-    crossings.push({ gi, m, w: Math.max(RV.width || 44, L - 10) });
+    crossings.push({ gi, m, w: Math.max(RV.width || 44, L - 10), shaft: g.shaft });   // (a mine shaft: no river, but the lake it would run into still stands)
   });
   if (!crossings.length) return;
   const width = Math.max(...crossings.map((c) => c.w)), keep = hw + lip + width * 0.5 + 34;   // (how close to the lane the water may come)
@@ -11514,7 +11536,7 @@ function buildRiverCourse() {
       if (!(D[k0] > keep)) { ok = false; break; }
       const rg = region(k0);
       let path;
-      if (rg.edge) path = search(k0, (k) => { const gx = k % nx, gy = (k / nx) | 0; return gx === 0 || gy === 0 || gx === nx - 1 || gy === ny - 1; });
+      if (rg.edge) path = c.shaft ? [] : search(k0, (k) => { const gx = k % nx, gy = (k / nx) | 0; return gx === 0 || gy === 0 || gx === nx - 1 || gy === ny - 1; });
       else {
         // into a lake in the middle of the closed-in side (one lake for each such region, shared)
         let lk = lakeAt.get(rg.best);
@@ -11525,12 +11547,12 @@ function buildRiverCourse() {
           for (let i = 0; i < n; i++) { const a = (i / n) * TAU, kk = 0.86 + 0.14 * Math.sin(a * 3 + R() * 6) + R() * 0.06; lk.pts.push([Math.cos(a) * kk, Math.sin(a) * kk]); }
           lakeAt.set(rg.best, lk); RIVER.lakes.push(lk);
         }
-        path = search(k0, (k) => { const wx = x0 + (k % nx) * gc - lk.x, wy = y0 + ((k / nx) | 0) * gc - lk.y; return Math.hypot(wx, wy) < Math.min(lk.rx, lk.ry) * 0.6; });
+        if (!c.shaft) path = search(k0, (k) => { const wx = x0 + (k % nx) * gc - lk.x, wy = y0 + ((k / nx) | 0) * gc - lk.y; return Math.hypot(wx, wy) < Math.min(lk.rx, lk.ry) * 0.6; });
       }
       if (!path) { ok = false; break; }
       ends.push({ path, sx, sy, edge: rg.edge });
     }
-    if (!ok) continue;
+    if (!ok || c.shaft) continue;
     // the whole course: out of one side's far end, to the crossing, straight over it, and on to the other's. Each
     // side's path is pulled as straight as it will go (long straight reaches, kept clear of the lane), and the corners
     // between reaches rounded off wide, so the river never bends tighter than it is broad.
