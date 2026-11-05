@@ -274,6 +274,9 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .ccard canvas { width: 84px; max-width: 100%; height: auto; aspect-ratio: 62 / 72; image-rendering: pixelated; }
 .ccard:hover { background: var(--plate-hi); box-shadow: inset 0 0 0 2px var(--rim-hi), inset 0 -3px 0 var(--rim-lo); }
 .ccard[aria-pressed="true"] { color: var(--amber); background: #231d52; box-shadow: inset 0 0 0 2px #ffb04a, inset 0 0 0 4px #4a2a10, inset 0 -5px 0 #b4640f; }
+.ccard.locked canvas { opacity: 0.4; filter: grayscale(0.85); }
+.ccard.locked { color: var(--mute); }
+.restartNote.lockWarn { color: #ffd0e3; }
 .ccard:focus-visible { outline: none; box-shadow: inset 0 0 0 2px #8ff3ff; }
 /* a time trial: no place to show, the clock is the thing */
 #hud.trial .hud-pos .big { display: none; }
@@ -435,6 +438,12 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .tcard .tn { font: 700 17px/1.1 var(--display); color: var(--amber); text-transform: uppercase; letter-spacing: 0.06em; }
 .tcard dl { display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; margin: 0; font-size: 12.5px; line-height: 1.3; }
 .tcard dt { color: var(--mute); }
+.tcard.locked { cursor: default; background: rgba(14, 12, 34, 0.7); }
+.tcard.locked canvas { opacity: 0.3; filter: grayscale(0.8); }
+.tcard.locked .tn { color: var(--mute); }
+.tcard.locked dl { opacity: 0.45; }
+.tcard .lockNote { font: 600 12.5px/1.3 var(--body); color: #ffd0e3; }
+.tcard .lockNote[hidden] { display: none; }
 .tcard dd { margin: 0; font-variant-numeric: tabular-nums; font-family: 'Saira Semi Condensed', var(--body); }   /* (a touch narrower, so the details fit the card) */
 
 /* ================= pixel UI: the menus drawn like the game's own art =================
@@ -818,7 +827,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
     
   <div class="panel">
     <div class="cupHead"><canvas id="cupLogo" aria-hidden="true"></canvas><h1 id="cupTitle">Comet Cup</h1></div>
-    <p class="note">Four races against the same five rival breakers, on the cup's four tracks. Each race scores points; the most points after the final race wins the cup.</p>
+    <p class="note">Four races against the same five rival breakers, on the cup's four tracks. Each race scores points; the most points after the final race wins the cup. A medal on Normal or harder opens the next cup and its tracks.</p>
     <div>
       <h2>Cup</h2>
       <div class="ccards" id="cupPick" role="group" aria-label="Which cup"></div>
@@ -13310,7 +13319,12 @@ function renderCup(view) {
   $('cupTitle').textContent = C.name;
   drawCupBadge($('cupLogo'), cupView, medals[C.name], 2, DIFF);
   { const n = CUP_RESTARTS[DIFF]; $('cupRestarts').textContent = n === Infinity ? 'Unlimited restarts on Easy.' : (n === 0 ? 'No restarts' : n + (n === 1 ? ' restart' : ' restarts')) + ' for the whole cup on ' + DIFFS[DIFF].name + '.'; }
-  document.querySelectorAll('.ccard').forEach((b) => { const c = +b.dataset.cup; b.setAttribute('aria-pressed', c === cupSel ? 'true' : 'false'); drawCupBadge(b.querySelector('canvas'), c, medals[CUPS[c].name], 2, DIFF, true); });
+  document.querySelectorAll('.ccard').forEach((b) => { const c = +b.dataset.cup; b.setAttribute('aria-pressed', c === cupSel ? 'true' : 'false'); b.classList.toggle('locked', !cupOpen(c)); b.title = cupOpen(c) ? '' : 'Locked: ' + cupLockNote(c); drawCupBadge(b.querySelector('canvas'), c, medals[CUPS[c].name], 2, DIFF, true); });
+  // (a locked cup can be looked at, tracks and all, but not started: what opens it, in place of the restarts note)
+  const open = cupOpen(cupView);
+  $('cupGo').disabled = !open; $('cupGo').textContent = open ? 'Start tournament' : 'Locked';
+  $('cupRestarts').classList.toggle('lockWarn', !open);
+  if (!open) $('cupRestarts').textContent = 'Locked: ' + cupLockNote(cupView) + ' to open this cup.';
   // the cup's tracks as map cards (the track screen's maps). Their reels play one after another, in race order; the
   // one under the pointer plays its own, over and over, until the pointer leaves it
   const ol = $('cupList');
@@ -13362,7 +13376,11 @@ function cupNext() {
     if (REELS && REELS[cupCards[cupAt].id]) { cupReel(cupCards[cupAt], false); return; }
   }
 }
+// (the last open cup at or before this one)
+function firstOpenCupBefore(c) { while (c > 0 && !cupOpen(c)) c--; return c; }
+function cupListRefresh() { $('cupList').dataset.cup = ''; }
 function showCup() {
+  if (!cupOpen(cupSel)) cupSel = firstOpenCupBefore(cupSel);
   const pick = $('cupPick');
   if (!pick.children.length) pick.addEventListener('focusout', (e) => {   // (the selector off the cups without picking one: back to the picked cup)
     if (!pick.contains(e.relatedTarget) && cupView !== cupSel) renderCup();
@@ -13371,7 +13389,7 @@ function showCup() {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'ccard'; b.dataset.cup = c;
     const cv = document.createElement('canvas'), n = document.createElement('span'); n.textContent = C.name;
     b.append(cv, n);
-    b.addEventListener('click', () => { cupSel = c; renderCup(); });
+    b.addEventListener('click', () => { if (cupOpen(c)) { cupSel = c; renderCup(); } else renderCup(c); });   // (a locked cup: looked at, not picked)
     b.addEventListener('focus', () => { if (cupView !== c) renderCup(c); });   // (the selector on a cup: its tracks)
     pick.appendChild(b);
   });
@@ -13397,6 +13415,7 @@ function applyCupPace() {
   for (const s of W.ships) { const m = P[s.name]; if (!m || s.isPlayer) continue; s.skill *= m; s.speedMul *= m; if (s.ai) s.ai.skill *= m; }
 }
 function startTournament() {
+  if (!cupOpen(cupSel)) return;
   pickRivals();   // (the five this cup is raced against, all four races)
   TOUR = { round: 0, pts: {}, places: {}, gain: null, done: false, contenders: [], list: cupRaces(cupSel), cup: CUPS[cupSel].name, diff: DIFF, restarts: CUP_RESTARTS[DIFF], rivals: RIVALS.slice() };
   for (const r of RACERS) { TOUR.pts[r.name] = 0; TOUR.places[r.name] = []; }
@@ -13449,12 +13468,16 @@ function showFinal() {
   TOUR.done = true;
   const order = cupOrder(), me = RACERS[0].name, at = order.indexOf(me) + 1, champ = order[0];
   $('resTitle').textContent = at === 1 ? TOUR.cup + ' champion' : TOUR.cup + ' over';
+  const cupsBefore = CUPS.map((C, c) => cupOpen(c));
   const wasOpen = vhardUnlocked(), medal = awardMedal(TOUR.cup, at, TOUR.diff), mc = $('resMedal'), opened = !wasOpen && vhardUnlocked();
   if (opened) syncDiffChips();
+  const newCups = CUPS.filter((C, c) => !cupsBefore[c] && cupOpen(c)).map((C) => C.name);
+  if (newCups.length) { syncTrackCards(); cupListRefresh(); }
   mc.hidden = false; drawCupBadge(mc, CUPS.findIndex((C) => C.name === TOUR.cup), loadMedals()[TOUR.cup], 3, TOUR.diff);
   $('resPlace').textContent = ord(at);
   $('resNote').textContent = (at === 1 ? 'You win the cup with ' : champ + ' wins the cup with ') + TOUR.pts[champ] + ' points over ' + TOUR.list.length + ' races.' +
-    (at === 1 ? '' : ' You scored ' + TOUR.pts[me] + '.') + (medal ? ' ' + medal[0].toUpperCase() + medal.slice(1) + ' medal on ' + DIFFS[TOUR.diff].name + '!' : ' No medal this time.') + ' Race wins: ' + TOUR.places[me].filter((p) => p === 1).length + '.' + (opened ? ' Every cup won on Hard: Very Hard is unlocked!' : '');
+    (at === 1 ? '' : ' You scored ' + TOUR.pts[me] + '.') + (medal ? ' ' + medal[0].toUpperCase() + medal.slice(1) + ' medal on ' + DIFFS[TOUR.diff].name + '!' : ' No medal this time.') + ' Race wins: ' + TOUR.places[me].filter((p) => p === 1).length + '.' + (opened ? ' Every cup won on Hard: Very Hard is unlocked!' : '') +
+    (newCups.length ? ' Unlocked: the ' + newCups.join(' and the ') + ', and ' + (newCups.length > 1 ? 'their' : 'its') + ' tracks!' : '');
   $('board').hidden = true;
   $('tourHead').textContent = 'Final standings';
   renderStandings(); $('tourBox').hidden = false;
@@ -13739,7 +13762,7 @@ function padMenu(g) {
       if (cur.type !== 'range' && cur.tagName !== 'TEXTAREA') cur.click();
       // (the track screen's steps: each confirmed, on to the next; a colour picked for the speeder stays on that step)
       const st = padFlow(scr) ? PADNAV.stage : null;
-      if (st === 'pick' || st === 'laps' || (st === 'diff' && cur.getAttribute('aria-pressed') === 'true') || (st === 'speeder' && cur.closest('#machineList'))) padNext();
+      if ((st === 'pick' && !cur.classList.contains('locked')) || st === 'laps' || (st === 'diff' && cur.getAttribute('aria-pressed') === 'true') || (st === 'speeder' && cur.closest('#machineList'))) padNext();
     }
     else { const list = padTargets(scope); if (list.length) padFocus(padPreferred(scope, list)); }
     document.body.classList.add('padNav');
@@ -14522,6 +14545,10 @@ function switchTrack(ix) {
 /* stats and a little map for each track, worked out once at start-up */
 function buildTrackCards() {
   TRACKS.forEach((d) => addTrackCard(d));
+  // (the built-in tracks shown cup by cup, in race order, so what is open comes first; pasted ones follow)
+  const rank = (d) => { const c = trackCup(d.id); return c < 0 ? 99 : c * 10 + CUPS[c].tracks.indexOf(d.id); };
+  const list = $('trackList');
+  TRACKS.map((d, i) => i).sort((a, b) => rank(TRACKS[a]) - rank(TRACKS[b]) || a - b).forEach((i) => list.appendChild(TRACK_INFO[i].slot));
   syncTrackCards();
 }
 function addTrackCard(d) {
@@ -14562,7 +14589,8 @@ function addTrackCard(d) {
     btn.type = 'button'; btn.className = 'tcard';
     const name = document.createElement('span'); name.className = 'tn'; name.textContent = d.name;
     const dl = document.createElement('dl');
-    btn.append(cv, name, dl);
+    const lock = document.createElement('span'); lock.className = 'lockNote'; lock.hidden = true;
+    btn.append(cv, name, lock, dl);
     // (the racing line in the preview's own pixels, for the dots that race round a pasted track's map)
     const route = [], step = Math.max(1, Math.floor(N / 240));
     for (let i = 0; i < N; i += step) route.push(T.x[i] * k + 160 - cx * k, T.y[i] * k + 90 - cy * k);
@@ -14572,7 +14600,7 @@ function addTrackCard(d) {
     // (each card sits in a slot, so the difficulty buttons can hang under whichever card is picked)
     const slot = document.createElement('div'); slot.className = 'tslot'; slot.appendChild(btn);
     list.appendChild(slot);
-    TRACK_INFO.push({ info, btn, dl, slot, cv, base, route });
+    TRACK_INFO.push({ info, btn, dl, slot, cv, base, route, lock });
   }
 }
 
@@ -14647,6 +14675,11 @@ function syncTrackCards() {
   const best = loadBest();
   TRACK_INFO.forEach((t, ix) => {
     const d = TRACKS[ix], i = t.info, b = best[d.id] || {};
+    // (locked: shown, dimmed, with what opens it; it can't be picked)
+    const open = trackOpen(ix, best), c = open ? -1 : trackCup(d.id);
+    t.btn.disabled = !open; t.btn.classList.toggle('locked', !open);
+    t.lock.hidden = open; t.lock.textContent = open ? '' : 'Locked: opens with the ' + CUPS[c].name;
+    t.btn.title = open ? '' : 'Locked: ' + cupLockNote(c) + ' to open the ' + CUPS[c].name + ' and its tracks';
     t.btn.setAttribute('aria-pressed', ix === pickIx ? 'true' : 'false');
     if (ix === pickIx) { const dc = document.querySelector('.diffChips'); if (dc.parentNode !== t.slot) t.slot.appendChild(dc); }
     const elev = [i.hills && i.hills + ' raised', i.trenches && i.trenches + ' sunken'].filter(Boolean).join(', ') || 'flat';
@@ -14738,7 +14771,7 @@ function drawDots(now) {
 function showTracks() {
   $('tracksTitle').textContent = PLAY === 'trial' ? 'Time trial' : 'Tracks';
   document.querySelector('.diffChips').hidden = PLAY === 'trial';   // (a time trial is you alone: no rivals to set)
-  $('raceBtn').textContent = PLAY === 'trial' ? 'Start trial' : 'Race'; if (pickIx < 0 || pickIx >= TRACKS.length) pickIx = Math.max(0, trackIx); syncCustomBar(); syncTrackCards(); showScreen('tracks'); placeHangar('tracks'); $('raceBtn').focus(); padScreenOpened(); }
+  $('raceBtn').textContent = PLAY === 'trial' ? 'Start trial' : 'Race'; if (pickIx < 0 || pickIx >= TRACKS.length) pickIx = Math.max(0, trackIx); if (!trackOpen(pickIx)) pickIx = firstOpenTrack(); syncCustomBar(); syncTrackCards(); showScreen('tracks'); placeHangar('tracks'); $('raceBtn').focus(); padScreenOpened(); }
 const BEST_KEY = 'gatebreaker.best.v1';
 function loadBest() { try { return JSON.parse(localStorage.getItem(BEST_KEY)) || {}; } catch (e) { return {}; } }
 function recordBest(p) {
@@ -14857,6 +14890,51 @@ function awardMedal(cup, place, diff) {
   if (!set[diff] || MEDAL_RANK[m] > MEDAL_RANK[set[diff]]) { set[diff] = m; try { localStorage.setItem(MEDAL_KEY, JSON.stringify(all)); } catch (e) { /* storage unavailable */ } }
   return m;
 }
+
+/* ---------- unlocks: the cups one after another, and their tracks with them ----------
+   Comet is open from the start. Each later cup opens with a podium (any medal) in the cup before it on Normal or
+   harder; Quasar, the last, also wants a gold in any cup on Normal or harder. A cup's tracks open with it, for races
+   and time trials too; a track already raced stays open, and pasted tracks are always open. For testing, ?unlockall
+   in the address, or typing "unlockall" on the menus (typed again: locked again), opens everything. */
+const UNLOCK_KEY = 'gatebreaker.unlockAll', UNLOCK_DIFFS = ['normal', 'hard', 'vhard'];
+function unlockAll() {
+  if (/[?&#]unlockall\b/i.test(location.search + location.hash)) return true;
+  try { return localStorage.getItem(UNLOCK_KEY) === '1'; } catch (e) { return false; }
+}
+// (a medal of at least this rank in that cup, on Normal or harder)
+function cupMedalAtLeast(m, name, rank) { const s = m[name] || {}; return UNLOCK_DIFFS.some((d) => s[d] && MEDAL_RANK[s[d]] >= rank); }
+function cupNeeds(c) {   // what this cup still wants before it opens: { podium, gold } (both false: open)
+  if (c <= 0 || unlockAll()) return { podium: false, gold: false };
+  const m = loadMedals();
+  return { podium: !cupMedalAtLeast(m, CUPS[c - 1].name, 1), gold: c === CUPS.length - 1 && !CUPS.slice(0, c).some((C) => cupMedalAtLeast(m, C.name, 3)) };
+}
+function cupOpen(c) { const n = cupNeeds(c); return !n.podium && !n.gold; }
+function cupLockNote(c) {
+  const n = cupNeeds(c), prev = CUPS[c - 1] ? CUPS[c - 1].name : '';
+  if (n.podium && n.gold) return 'Finish the ' + prev + ' in the top 3, and win any cup, on Normal or harder';
+  if (n.podium) return 'Finish the ' + prev + ' in the top 3 on Normal or harder';
+  return 'Win any cup (a gold) on Normal or harder';
+}
+const trackCup = (id) => CUPS.findIndex((C) => C.tracks.includes(id));
+function trackOpen(ix, best) {
+  const d = TRACKS[ix];
+  if (!d || d.custom) return true;
+  const c = trackCup(d.id);
+  return c < 0 || cupOpen(c) || !!(best || loadBest())[d.id];
+}
+function firstOpenTrack() { const best = loadBest(); for (let i = 0; i < TRACKS.length; i++) if (trackOpen(i, best)) return i; return 0; }
+// the testing switch, typed on the menus
+let unlockTyped = '';
+window.addEventListener('keydown', (e) => {
+  if (mode !== 'menu' || e.key.length !== 1) return;
+  unlockTyped = (unlockTyped + e.key.toLowerCase()).slice(-9);
+  if (unlockTyped !== 'unlockall') return;
+  unlockTyped = '';
+  const on = !unlockAll();
+  try { if (on) localStorage.setItem(UNLOCK_KEY, '1'); else localStorage.removeItem(UNLOCK_KEY); } catch (e2) { /* this visit only */ }
+  toast(on ? 'Testing: every cup and track unlocked' : 'Testing: unlocks back to normal');
+  syncTrackCards(); if (!screens.cup.hidden) { cupListRefresh(); renderCup(cupView); }
+});
 
 /* ---------- boot ---------- */
 function syncDiffChips() {
