@@ -153,7 +153,7 @@ body.cover #stage { position: fixed; left: 50%; top: 50%; transform: translate(-
 .pips span.sting { background: var(--rose); box-shadow: 0 0 6px var(--rose); width: 1.1cqw; }
 .pips span.mag.off, .pips span.shield.off { background: rgba(255, 255, 255, 0.12); box-shadow: none; }
 .pips span.gap { width: 0.6cqw; background: none; box-shadow: none; }
-.pips.locked span { opacity: 0.35; }
+.pips.locked span:not(.shield) { opacity: 0.35; }   /* (the shield is live from the start: it can be burned for a boost) */
 .pips em { font-style: normal; font-size: 1.6cqh; letter-spacing: 0.1em; color: var(--amber); align-self: center; margin-left: 0.6cqw; }
 #pass { position: absolute; left: 50%; bottom: 12.4cqh; transform: translateX(-50%); font: 700 1.9cqw/1 var(--display); padding: 0.9cqh 1.4cqw; background: rgba(10, 8, 26, 0.72); border: 1px solid var(--edge); border-radius: 3px; white-space: nowrap; font-variant-numeric: tabular-nums; text-transform: uppercase; letter-spacing: 0.06em; }
 #pass[hidden] { display: none; }
@@ -728,7 +728,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
     <div>
     <div>
       <h2>Power</h2>
-      <p class="note">Power is your boost and your hull in one bar. Boosting and taking hits drain it, and it doesn't refill on its own. Run dry and the next hit wrecks you.</p>
+      <p class="note">Power is your boost and your hull in one bar. Boosting and taking hits drain it, and it doesn't refill on its own. Run dry and the next hit wrecks you. Out of power, a boost burns your shield instead: a weaker boost, and no shield until it comes back.</p>
     </div>
     <div>
       <h2>On the track</h2>
@@ -2324,13 +2324,23 @@ function noseThrust(s) {
   }
   inp.mx = ox; inp.my = oy;
 }
+/* A boost. Out of power, the shield can be burned for one instead: a weaker boost (three quarters of one from a full
+   shield, half from one pip), the shield gone until it comes back on its own. With neither, nothing. */
 function tryBoost(s) {
-  if (s.energy < s.st.boostCost || s.boostCd > 0 || s.stun > 0 || s.wreck > 0 || s.slowT > 0) return;
-  s.energy -= s.st.boostCost; s.boostCd = 0.6; s.boostT = CFG.boostTime;
+  if (s.boostCd > 0 || s.stun > 0 || s.wreck > 0 || s.slowT > 0) return;
+  let k = 1;
+  if (s.energy < s.st.boostCost) {
+    if (s.shield <= 0) return;
+    k = s.shield >= CFG.shieldMax ? 0.75 : 0.5;
+    s.shield = 0; s.shieldT = 0; s.shieldFlash = 0.45;
+    CURH = s.h; burst(s.x, s.y, 22, 150, '#9ef0ff', 0.45, true);
+    emit('shieldburn', s);
+  } else s.energy -= s.st.boostCost;
+  s.boostCd = 0.6; s.boostT = CFG.boostTime;
   // (a boost goes the way the nose points)
   if (s.loop) { loopBoost(s); emit('boost', s); return; }
   const dx = Math.cos(s.ang), dy = Math.sin(s.ang);
-  const bm = s.boostMul || 1, sp = Math.hypot(s.vx, s.vy), ns = clamp(Math.max(sp, 280) + 110 * bm * s.st.boost, 340, 480 * bm * (0.5 + 0.5 * s.st.boost));
+  const bm = s.boostMul || 1, sp = Math.hypot(s.vx, s.vy), ns = clamp(Math.max(sp, 280) + 110 * bm * s.st.boost * k, 340, 480 * bm * (0.5 + 0.5 * s.st.boost));
   s.vx = dx * ns; s.vy = dy * ns;
   for (let i = 0; i < 12; i++) part(s.x - dx * 6, s.y - dy * 6, -dx * (60 + Math.random() * 120) + (Math.random() - 0.5) * 80, -dy * (60 + Math.random() * 120) + (Math.random() - 0.5) * 80, 0.35, '#fff1c4', 2, true);
   emit('boost', s);
@@ -3518,6 +3528,12 @@ function aiThink(s, dt) {
   } else a.flub = false;
   if (zone && !a.flub && isFinite(zone.need) && !s.air && sp < zone.need * 1.1 && s.energy >= s.st.boostCost && s.boostCd <= 0 && s.align > 0.85) {
     inp.boostPress = true; return;
+  }
+  // no power for it, and the pad right ahead: the shield is burned for the boost (a last resort: never anywhere else,
+  // where an unshielded racer only takes harder hits for nothing)
+  if (zone && zone.jump && !a.flub && isFinite(zone.need) && !s.air && sp < zone.need && s.energy < s.st.boostCost && s.shield > 0 && s.boostCd <= 0 && s.align > 0.85) {
+    const toPad = wrapIdx(zone.jump.i - s.idx);
+    if (toPad > 0 && toPad < 7) { inp.boostPress = true; return; }
   }
   if (loopAhead && sp < loopAhead.need * 1.12 && s.energy >= s.st.boostCost && s.boostCd <= 0 && s.align > 0.85) { inp.boostPress = true; return; }
   if (cruise || zone || loopAhead) return;   // (no shooting in the run-up: turning to aim costs speed)
@@ -9145,8 +9161,8 @@ function drawShip(s, time, f) {
   lc.globalAlpha = a;
   lc.drawImage(spr.frameAt(fi, shipBank(s, time)), x - o - 1, y - o - 3 + bob, S, S);   // (rolled into a bend)
   lc.globalAlpha = 1;
-  // its shield, once guns are live: a ring of two arcs, one for each hit it can still take; white as it takes one
-  if (weaponsLive(s) && (s.shield > 0 || s.shieldFlash > 0)) {
+  // its shield: a ring of two arcs, one for each hit it can still take; white as it takes one
+  if (s.shield > 0 || s.shieldFlash > 0) {   // (from the start: it's there on the first lap too, if only to burn)
     const R = 12, hit = s.shieldFlash > 0, cy = y - 2 + bob;
     lc.lineWidth = hit ? 2 : 1;
     for (let k = 0; k < CFG.shieldMax; k++) {
@@ -14176,6 +14192,10 @@ function handleEvents() {
   for (const e of W.ev) {
     switch (e.type) {
       case 'shot': if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.shot(e.b); break;
+      case 'shieldburn':
+        if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) { SFX.wall(80); SFX.boost(); }
+        if (e.a.isPlayer && mode === 'race') { W.shake = Math.max(W.shake, 0.5); if (!W.burnTold) { W.burnTold = true; toast('Out of power: shield burned for a boost'); } }
+        break;
       case 'boost':
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.boost();
         if (e.a.isPlayer) W.shake = Math.max(W.shake, 0.4);
@@ -15349,9 +15369,16 @@ function arenaStep(dt) {
   const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
   if (i.boostPress) {   // a boost (as tryBoost): the way the nose points, at least to boost speed
     i.boostPress = false;
-    if (s.energy >= s.st.boostCost && s.boostCd <= 0 && s.slowT <= 0) {
-      s.energy -= s.st.boostCost; s.boostCd = 0.6; s.boostT = CF.boostTime;
-      const sp = Math.hypot(s.vx, s.vy), ns = clamp(Math.max(sp, 280) + 110 * s.st.boost, 340, 480 * (0.5 + 0.5 * s.st.boost));
+    if (s.boostCd <= 0 && s.slowT <= 0 && (s.energy >= s.st.boostCost || s.shield > 0)) {
+      let k = 1;
+      if (s.energy >= s.st.boostCost) s.energy -= s.st.boostCost;
+      else {   // (out of power: the shield burned for it, as in a race)
+        k = s.shield >= CF.shieldMax ? 0.75 : 0.5; s.shield = 0; s.shieldT = 0; s.shieldFlash = 0.45;
+        for (let q = 0; q < 18; q++) arenaPart(s.x, s.y, (Math.random() - 0.5) * 150, (Math.random() - 0.5) * 150, 0.4, '#9ef0ff', 2, true);
+        SFX.wall(80);
+      }
+      s.boostCd = 0.6; s.boostT = CF.boostTime;
+      const sp = Math.hypot(s.vx, s.vy), ns = clamp(Math.max(sp, 280) + 110 * s.st.boost * k, 340, 480 * (0.5 + 0.5 * s.st.boost));
       s.vx = fx * ns; s.vy = fy * ns; SFX.boost();
     }
   }
