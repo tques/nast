@@ -1053,7 +1053,7 @@ function jumpNeed(D, hFrom, hTo) {
 const LOOP = { R: 220, G: 232, ACC: 0.2, KZ: 0.75, NEAR: 0, SHIFT: 164, EASE: 30, GRIP: 0.25, ROLL_C: -0.42, MIN_R: 160, MAX_R: 300 };
 const TRACKS = [
   {
-    id: 'kessler-loop', name: 'Kessler Loop', seed: 11, wallH: 0.35,   // (wallH: taller walls along the lane's edges, see RAIL)
+    id: 'kessler-loop', name: 'Kessler Loop', seed: 11,
     points: [
       [300, 0], [560, 0], [715, -25], [790, -110], [808, -240], [868, -338], [1025, -338], [1092, -240],
       [1100, -110], [1170, -10], [1310, 30], [1580, 10], [1860, 80], [2080, 340], [2020, 570], [1730, 715],
@@ -7003,8 +7003,6 @@ function initRender(canvas) {
 /* everything drawn from the current track's shape; redone when the track changes */
 function trackGfx() {
   const N = T.N;
-  // (the walls along the lane's edges: a track's own height (wallH), or the usual low wall; as many slices as keep them solid)
-  RAIL.h = TRACK.wallH || 0.05; RAIL.rn = Math.max(3, Math.round(RAIL.h / 0.0167));
   // the track's own setting supplies everything around it
   useSetting(TRACK.setting);
   if (OW) buildGrade();
@@ -8895,14 +8893,12 @@ function drawRails() {
   if (!vis.length) return;
   lc.lineJoin = 'round'; lc.lineCap = 'round'; ec.lineJoin = 'round'; ec.lineCap = 'round';
   // the shadow on the deck
-  const sk = RAIL.h / 0.05;   // (a taller wall casts a longer shadow)
-  lc.setTransform(f0, 0, 0, f0, VW / 2 - f0 * CX + 3 * sk, VH / 2 - f0 * CY + 4 * sk);
-  lc.strokeStyle = 'rgba(0,0,0,0.32)'; lc.lineWidth = 3 + (sk - 1) * 2; for (const c of vis) lc.stroke(c.p);
+  lc.setTransform(f0, 0, 0, f0, VW / 2 - f0 * CX + 3, VH / 2 - f0 * CY + 4);
+  lc.strokeStyle = 'rgba(0,0,0,0.32)'; lc.lineWidth = 3; for (const c of vis) lc.stroke(c.p);
   // the wall, slice by slice, then its lit top and the glow on it
   for (let k = 1; k <= RAIL.rn; k++) {   // (three slices: at this height no gap shows between them)
     setScale(fscale(RAIL.h * k / RAIL.rn));
-    // (a tall wall's side shaded from dark at its foot to its lighter tone near the top, so it reads as standing up)
-    lc.strokeStyle = k === RAIL.rn ? COL.rim : RAIL.rn > 3 ? mixHex(COL.side, C.side, 0.25 + 0.75 * (k / RAIL.rn)) : C.side; lc.lineWidth = 2;
+    lc.strokeStyle = k === RAIL.rn ? COL.rim : C.side; lc.lineWidth = 2;
     for (const c of vis) lc.stroke(c.p);
   }
   ec.globalAlpha = 0.45; ec.strokeStyle = COL.rim; ec.lineWidth = 3; for (const c of vis) ec.stroke(c.p); ec.globalAlpha = 1;
