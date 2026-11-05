@@ -1556,9 +1556,12 @@ function buildRocks(seed) {
     }
     return true;
   }
+  const GZ = gapSignZone();
   function add(x, y, r, layer) {
     if (!free(x, y, r)) return;
-    const o = { x, y, r, layer, v: Math.floor(R() * 8) };
+    const v = Math.floor(R() * 8);
+    if (GZ && Math.hypot(x - GZ.x, y - GZ.y) < GZ.r) return;   // (nothing round the sign over a gap: see gapSignZone)
+    const o = { x, y, r, layer, v };
     rocks.push(o);
     const k = key(x, y);
     if (!grid.has(k)) grid.set(k, []);
@@ -9790,7 +9793,14 @@ function drawLandmarks(time) {
    way over: its copy in neon, a ring of chasing bulbs, and a neon arrow pointing the way the lane runs on the far side
    (where to land). Drawn with the strip's own billboards' look. */
 let GAP_SIGN = null;
-const GAP_SIGN_H = -0.62, GAP_SIGN_W = 104, GAP_SIGN_HT = 40;
+const GAP_SIGN_H = -0.62, GAP_SIGN_W = 240, GAP_SIGN_HT = 92;
+// (the open space round it, where no other scenery is put and drifting boards fade out, so it is the one thing to see)
+function gapSignZone() {
+  const G = TRACK && TRACK.gapSign;
+  if (!G || !T.gaps.length) return null;
+  const g = T.gaps[Math.min(G.gap || 0, T.gaps.length - 1)], mid = (g.a + (g.n >> 1)) % T.N;
+  return { x: T.x[mid], y: T.y[mid], r: 560 };
+}
 function buildGapSign() {
   GAP_SIGN = null;
   const G = TRACK.gapSign;
@@ -9822,7 +9832,7 @@ function drawGapSign(time) {
   lc.drawImage(S.cv, Math.round(x0), Math.round(y0), Math.round(cw), Math.round(ch));
   const px = x0 + S.o * f, py = y0 + S.o * f;   // (the panel's corner)
   // the copy, in neon: steady, with a blink now and then
-  const blink = ((time * 1.3) % 6) > 5.6, size = Math.max(6, Math.round(9 * f));
+  const blink = ((time * 1.3) % 6) > 5.6, size = Math.max(8, Math.round(21 * f));
   const tx = px + (GAP_SIGN_HT + (GAP_SIGN_W - GAP_SIGN_HT) / 2 - 2) * f, ty = py + H2 / 2 + 1;
   lc.font = 'bold ' + size + 'px monospace'; lc.textAlign = 'center'; lc.textBaseline = 'middle';
   const words = S.text.split(' ');
@@ -9834,29 +9844,29 @@ function drawGapSign(time) {
   });
   lc.textAlign = 'left'; lc.textBaseline = 'alphabetic';
   // the arrow, pointing the way the lane runs where you land: a neon outline that pulses toward its tip
-  const ax = px + (GAP_SIGN_HT / 2) * f, ay = py + H2 / 2, r = (GAP_SIGN_HT / 2 - 7) * f, pulse = (time * 2.2) % 1;
+  const ax = px + (GAP_SIGN_HT / 2) * f, ay = py + H2 / 2, r = (GAP_SIGN_HT / 2 - 12) * f, pulse = (time * 2.2) % 1;
   const shape = [[1, 0], [0.1, -0.75], [0.1, -0.32], [-0.9, -0.32], [-0.9, 0.32], [0.1, 0.32], [0.1, 0.75]];
   const ca = Math.cos(S.ang), sa = Math.sin(S.ang);
   const path = (k) => { const P = new Path2D(); shape.forEach(([u, v], i) => { const X = ax + (u * ca - v * sa) * r * k, Y = ay + (u * sa + v * ca) * r * k; i ? P.lineTo(X, Y) : P.moveTo(X, Y); }); P.closePath(); return P; };
   const P1 = path(1);
   lc.fillStyle = 'rgba(95,244,255,0.22)'; lc.fill(P1);
-  for (const [ctx, lw, al] of [[lc, 1.2, 1], [ec, 3, 0.7]]) { ctx.globalAlpha = al; ctx.strokeStyle = S.col; ctx.lineWidth = lw * Math.max(1, f); ctx.stroke(P1); }
+  for (const [ctx, lw, al] of [[lc, 2.2, 1], [ec, 5, 0.7]]) { ctx.globalAlpha = al; ctx.strokeStyle = S.col; ctx.lineWidth = lw * Math.max(1, f); ctx.stroke(P1); }
   lc.globalAlpha = 1; ec.globalAlpha = 1;
   glow(ec, S.col, r * 1.6, ax + ca * r * (pulse - 0.3), ay + sa * r * (pulse - 0.3), 0.45 * (1 - pulse));
   // a ring of bulbs round the panel, chasing
-  const n = 26, per = 2 * (W2 + H2), step = per / n, ph = Math.floor(time * 10);
+  const n = 52, per = 2 * (W2 + H2), step = per / n, ph = Math.floor(time * 10);
   for (let k = 0; k < n; k++) {
     let d = k * step, bxk, byk;
     if (d < W2) { bxk = px + d; byk = py; } else if ((d -= W2) < H2) { bxk = px + W2; byk = py + d; } else if ((d -= H2) < W2) { bxk = px + W2 - d; byk = py + H2; } else { d -= W2; bxk = px; byk = py + H2 - d; }
     const on = (k + ph) % 3 === 0;
-    lc.fillStyle = on ? '#fff3c0' : '#7a5a3a'; lc.fillRect(Math.round(bxk) - 1, Math.round(byk) - 1, 2, 2);
-    if (on) glow(ec, '#ffd54a', 4 * f, bxk, byk, 0.5);
+    lc.fillStyle = on ? '#fff3c0' : '#7a5a3a'; lc.fillRect(Math.round(bxk) - 1, Math.round(byk) - 1, 3, 3);
+    if (on) glow(ec, '#ffd54a', 6 * f, bxk, byk, 0.5);
   }
 }
 function drawDrifters(time) {
   if (!DRIFT) return;
   if (DRIFT.marks && DRIFT.marks.length) drawLandmarks(time);
-  const D = SET.drifters, dr0 = D.drift || [10, 3];
+  const D = SET.drifters, dr0 = D.drift || [10, 3], GSZ = GAP_SIGN && gapSignZone();
   for (const o of DRIFT.list) {
     // (where it has drifted to by now, wrapped round the field; nearest copy to the camera)
     const dr = o.dir === -1 ? [-dr0[0], -dr0[1]] : dr0;
@@ -9867,6 +9877,9 @@ function drawDrifters(time) {
     if (f <= 0.12) continue;
     const hq = Math.round(o.h * 5) / 5, art = drifterArt(o.v, hq), S = art.top.width;
     if (Math.abs(VW / 2 + (x - CX) * f - VW / 2) > VW / 2 + S * f || Math.abs(VH / 2 + (y - CY) * f - VH / 2) > VH / 2 + S * f) continue;
+    const fade = GSZ ? clamp((Math.hypot(x - GSZ.x, y - GSZ.y) - GSZ.r) / 200, 0, 1) : 1;   // (fading out round the sign over a gap)
+    if (fade <= 0) continue;
+    lc.globalAlpha = fade;
     const put = (cv, hh) => {
       const ff = fscale(hh), sx = VW / 2 + (x - CX) * ff, sy = VH / 2 + (y - CY) * ff;
       lc.setTransform(ff * Math.cos(o.rot), ff * Math.sin(o.rot), -ff * Math.sin(o.rot), ff * Math.cos(o.rot), sx, sy);
@@ -9878,9 +9891,10 @@ function drawDrifters(time) {
       const sx = VW / 2 + (x - CX) * f, sy = VH / 2 + (y - CY) * f, gx = art.glow[0] - S / 2, gy = art.glow[1] - S / 2;
       const c = Math.cos(o.rot), s = Math.sin(o.rot);
       ec.setTransform(1, 0, 0, 1, 0, 0);
-      glow(ec, D.glowColour || '#7ef0e0', 14 * f, sx + (gx * c - gy * s) * f, sy + (gx * s + gy * c) * f, 0.35 + 0.15 * Math.sin(time * 2 + o.ph));
+      glow(ec, D.glowColour || '#7ef0e0', 14 * f, sx + (gx * c - gy * s) * f, sy + (gx * s + gy * c) * f, (0.35 + 0.15 * Math.sin(time * 2 + o.ph)) * fade);
     }
   }
+  lc.globalAlpha = 1;
   setScale(1);
 }
 function drawMidRocks() {
