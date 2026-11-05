@@ -3270,6 +3270,9 @@ function aiGamble(s, a, g) {
   if (!memo[g.id] || memo[g.id].n !== g.shutN) memo[g.id] = { n: g.shutN, yes: Math.random() < gambleChance(a) };
   return memo[g.id].yes;
 }
+/* a racer giving up on a shortcut door: not that door again for a while (it has left it behind by then) */
+function scMissed(a, g) { a.sc = null; a.scNo = g; a.scNoT = 5; }
+
 function aiThink(s, dt) {
   const a = s.ai, inp = s.input, N = T.N;
   const sty = a.style || (a.style = aiStyle(s.st));
@@ -3396,9 +3399,11 @@ function aiThink(s, dt) {
   let tx = T.x[ti] + T.nx[ti] * lane, ty = T.y[ti] + T.ny[ti] * lane;
 
   // shortcut through an open door
+  if (a.scNoT > 0) a.scNoT -= dt;
   if (!a.sc && !cruise) {
     for (const g of W.gates) {
       if (g.kind !== 'door' || !gateOpenFor(s, g)) continue;
+      if (g === a.scNo && a.scNoT > 0) continue;                  // (one it has just given up on)
       if (gateShared(g) && g.openBy !== s.id && !aiTail(s, a, g)) continue;   // (someone else's: tail them in, or not)
       // (still short of the door itself, and close to it: a gently curving corridor can run alongside the lane a fair
       //  way before its door, so this goes by the door, not by where the corridor leaves the lane)
@@ -3408,14 +3413,14 @@ function aiThink(s, dt) {
       // (and only coming up the lane to it: just out of the corridor's far end, a corridor that curves back can leave
       //  the racer 'in front of' its own door again, and turning round for it would spin it on the spot)
       const upLane = wrapIdx(c0.a - s.idx) <= 60 || wrapIdx(s.idx - c0.a) <= c0.doorS / T.step + 6;
-      if (upLane && !s.inCorr && toDoor < -20 && toDoor > -520) a.sc = { g, c: g.chord, phase: 0, t: 0, stall: 0 };
+      if (upLane && !s.inCorr && toDoor < -20 && toDoor > -Math.max(520, c0.doorS + 260)) a.sc = { g, c: g.chord, phase: 0, t: 0, stall: 0 };
     }
   }
   // shooting a door open: already move over onto the corridor's line (before its door it still runs inside the lane),
   // so that once the door opens it is lined up to go straight through rather than swinging across into the frame
-  if (!a.sc && !cruise && a.door && a.door.kind === 'door') {
+  if (!a.sc && !cruise && a.door && a.door.kind === 'door' && !(a.door === a.scNo && a.scNoT > 0)) {
     const c = a.door.chord, toDoor = (s.x - c.doorX) * c.dx + (s.y - c.doorY) * c.dy;
-    if (toDoor < -20 && toDoor > -450) {
+    if (toDoor < -20 && toDoor > -Math.max(450, c.doorS + 200)) {
       chordDist(c, s.x, s.y);
       const p = chordAt(c, Math.min(_cs + 70 + sp * 0.12, c.doorS - 10));
       tx = p[0]; ty = p[1];
@@ -3428,11 +3433,14 @@ function aiThink(s, dt) {
   }
   if (a.sc) {
     const c = a.sc.c, g = a.sc.g;
-    // (lining up for the door takes a moment. Caught on the door frame, it backs out in front of the door to line up
-    //  again, twice at most; one that is taking far too long, or still stuck, gives up)
+    // (a shortcut missed is a shortcut let go: turning round or backing up for it costs more than it saves. So one
+    //  caught on the door frame, sliding back down the lane, or taking far too long gives up and races on)
     a.sc.t += dt; a.sc.stall = sp < 50 ? a.sc.stall + dt : 0;
-    if (a.sc.phase === 0 && a.sc.stall > 0.5 && !(a.sc.back > 0) && (a.sc.tries || 0) < 2) { a.sc.back = 0.8; a.sc.tries = (a.sc.tries || 0) + 1; a.sc.stall = 0; }
-    if (a.sc.phase === 0 && (a.sc.t > 7 || a.sc.stall > 1.2)) a.sc = null;
+    if (a.sc.phase === 0) {
+      if (a.sc.far == null || (wrapIdx(s.idx - a.sc.far) > 0 && wrapIdx(s.idx - a.sc.far) < 60)) a.sc.far = s.idx;
+      const back = wrapIdx(a.sc.far - s.idx);
+      if (a.sc.t > 7 || a.sc.stall > 0.4 || (back > 2 && back < 60)) scMissed(a, g);
+    }
   }
   if (a.sc) {
     const c = a.sc.c, g = a.sc.g;
@@ -3441,10 +3449,12 @@ function aiThink(s, dt) {
       chordDist(c, s.x, s.y);
       const p = chordAt(c, Math.min(_cs + 70 + sp * 0.12, c.doorS + 34));
       tx = p[0]; ty = p[1];
-      if (a.sc.back > 0) { a.sc.back -= dt; tx = c.doorX - c.dx * 90; ty = c.doorY - c.dy * 90; }   // (backing out to line up)
       const side = (s.x - c.doorX) * c.dx + (s.y - c.doorY) * c.dy;
       if (s.inCorr === c) a.sc.phase = 1;                         // through the door
-      else if (side > 30 || !(gateOpenFor(s, g) || aiGamble(s, a, g))) a.sc = null;   // (shut on it: gamble on the glass, or give up)   // missed it, or the pass ran out
+      else if (side > 30 || !(gateOpenFor(s, g) || aiGamble(s, a, g))) scMissed(a, g);   // (missed it, or the pass ran out: shut on it, it gambles on the glass or gives up)
+      // (or the way in now lies behind it: past the corridor's mouth, the corridor's line runs on beside the lane
+      //  behind a wall, and getting back to the mouth means turning round)
+      else if (sp > 60 && (tx - s.x) * T.tx[s.idx] + (ty - s.y) * T.ty[s.idx] < -0.2 * Math.hypot(tx - s.x, ty - s.y)) scMissed(a, g);
     }
     if (a.sc && a.sc.phase === 1) {
       // follow the corridor, aiming a little way ahead along it (it may curve)
