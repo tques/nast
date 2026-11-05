@@ -243,6 +243,10 @@ kbd { display: inline-block; min-width: 24px; padding: 3px 7px; margin-right: 4p
 .btn:active { transform: translateY(2px); border-bottom-width: 2px; }
 .btn.alt { color: var(--ink); background: transparent; border: 1px solid var(--edge); border-bottom-width: 1px; font-size: 15px; }   /* (buttons in the subtitle's lettering: bold condensed capitals, spaced out) */
 .btn.alt:hover { background: rgba(255, 255, 255, 0.07); }
+.allBtn { display: inline-flex; align-items: center; gap: 8px; }
+.allBtn canvas { width: 24px; height: 24px; padding: 3px; margin: -7px 0; image-rendering: pixelated; background: #2a1a3e; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5); }
+.allBtn small { font: 600 11px/1 var(--display); letter-spacing: 0.08em; opacity: 0.75; }
+.allBtn:disabled { opacity: 0.5; cursor: default; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .foot { margin: 0; font-size: 14px; color: var(--mute); }
@@ -581,6 +585,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
     <div class="setup">
       <button class="btn" type="button" id="startBtn">Single Race</button>
       <button class="btn" type="button" id="cupBtn">Tournament</button>
+      <button class="btn allBtn" type="button" id="allBtn"><canvas id="allStar" width="16" height="16" aria-hidden="true"></canvas><span>Race All</span><small id="allDiff">Normal</small></button>
       <button class="btn" type="button" id="trialBtn">Time trial</button>
       <button class="btn alt" type="button" id="helpBtn">How to play</button>
       <button class="btn alt" type="button" id="optionsBtn">Options</button>
@@ -13264,7 +13269,7 @@ function startRace() {
 /* the menu shows one of the tracks, picked at random each time (the race tracks, not the player's own) */
 function randomTrack() { return Math.floor(Math.random() * BUILTIN_N); }
 function toMenu() {
-  mode = 'menu'; hud.hidden = true; showScreen('menu');
+  mode = 'menu'; hud.hidden = true; showScreen('menu'); syncRaceAll();
   layout();
   const r = randomTrack();
   if (r !== trackIx) { setTrack(r); trackGfx(); layout(); syncTrackCards(); }
@@ -13454,8 +13459,56 @@ function applyCupPace() {
 }
 function startTournament() {
   if (!cupOpen(cupSel)) return;
-  pickRivals();   // (the five this cup is raced against, all four races)
-  TOUR = { round: 0, pts: {}, places: {}, gain: null, done: false, contenders: [], list: cupRaces(cupSel), cup: CUPS[cupSel].name, diff: DIFF, restarts: CUP_RESTARTS[DIFF], rivals: RIVALS.slice() };
+  beginTour(cupRaces(cupSel), CUPS[cupSel].name, DIFF, CUP_RESTARTS[DIFF], false);
+}
+/* Race All: every track in the game (cup by cup, in race order) as one long tournament. No difficulty to pick: it
+   starts on Normal, and each gold moves it up one (Hard, then Very Hard, where it stays). Twice a cup's restarts.
+   Opens once every cup is open. Its medals are kept with the cups' (as 'Race All'); the menu button's star shows the
+   best of them: empty, bronze, silver, or gold, the gold fainter for a win on Normal and solid for one on Very Hard. */
+const RACE_ALL = 'Race All';
+const raceAllTracks = () => CUPS.flatMap((C) => C.tracks).map(trackOf).filter((i) => i >= 0);
+const raceAllOpen = () => CUPS.every((C, c) => cupOpen(c));
+function raceAllDiff() { const m = loadMedals()[RACE_ALL] || {}; return m.hard === 'gold' || m.vhard ? 'vhard' : m.normal === 'gold' || m.hard ? 'hard' : 'normal'; }
+function startRaceAll() {
+  if (!raceAllOpen()) return;
+  const d = raceAllDiff();
+  beginTour(raceAllTracks(), RACE_ALL, d, CUP_RESTARTS[d] * 2, true);
+}
+// the star: its medal (the best won on any difficulty) and, for gold, how solid (by the hardest difficulty won on)
+function raceAllStar() {
+  const m = loadMedals()[RACE_ALL] || {};
+  let best = null;
+  for (const d of ['normal', 'hard', 'vhard']) if (m[d] && (!best || MEDAL_RANK[m[d]] > MEDAL_RANK[best])) best = m[d];
+  const a = best !== 'gold' ? 1 : m.vhard === 'gold' ? 1 : m.hard === 'gold' ? 0.75 : 0.5;
+  return { best, a };
+}
+const STAR_PX = (() => {   // a five-pointed star in a 16 x 16 grid: which pixels are in it
+  const P = []; for (let k = 0; k < 10; k++) { const r = k % 2 ? 3.1 : 7.6, t = -Math.PI / 2 + k * Math.PI / 5; P.push([8 + r * Math.cos(t), 8.6 + r * Math.sin(t)]); }
+  const inside = (x, y) => { let c = false; for (let i = 0, j = 9; i < 10; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+  const g = []; for (let y = 0; y < 16; y++) { g.push([]); for (let x = 0; x < 16; x++) g[y].push(inside(x + 0.5, y + 0.5)); }
+  return g;
+})();
+function drawStar(cv, best, a) {
+  cv.width = 16; cv.height = 16;
+  const g = cv.getContext('2d'), on = (x, y) => x >= 0 && y >= 0 && x < 16 && y < 16 && STAR_PX[y][x];
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    if (!on(x, y)) continue;
+    const edge = !on(x - 1, y) || !on(x + 1, y) || !on(x, y - 1) || !on(x, y + 1);
+    if (!best) { if (edge) { g.fillStyle = 'rgba(216,210,244,0.6)'; g.fillRect(x, y, 1, 1); } continue; }   // (empty: just its outline)
+    const [base, hi, lo] = MEDAL_ART[best];
+    g.globalAlpha = a; g.fillStyle = edge ? lo : (x + y < 13 ? hi : base); g.fillRect(x, y, 1, 1); g.globalAlpha = 1;
+  }
+}
+function syncRaceAll() {
+  const open = raceAllOpen(), st = raceAllStar(), b = $('allBtn');
+  drawStar($('allStar'), st.best, st.a);
+  b.disabled = !open;
+  $('allDiff').textContent = open ? DIFFS[raceAllDiff()].name : 'Locked';
+  b.title = open ? 'Every track in the game, one after another' : 'Locked: open every cup first';
+}
+function beginTour(list, name, diff, restarts, all) {
+  pickRivals();   // (the five this tournament is raced against, every race)
+  TOUR = { round: 0, pts: {}, places: {}, gain: null, done: false, contenders: [], list, cup: name, all, diff, restarts, rivals: RIVALS.slice() };
   for (const r of RACERS) { TOUR.pts[r.name] = 0; TOUR.places[r.name] = []; }
   const pool = RACERS.slice(1).map((r) => r.name);
   while (TOUR.contenders.length < CUP_TUNE.contenders && pool.length) TOUR.contenders.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
@@ -13511,15 +13564,19 @@ function showFinal() {
   if (opened) syncDiffChips();
   const newCups = CUPS.filter((C, c) => !cupsBefore[c] && cupOpen(c)).map((C) => C.name);
   if (newCups.length) { syncTrackCards(); cupListRefresh(); }
-  mc.hidden = false; drawCupBadge(mc, CUPS.findIndex((C) => C.name === TOUR.cup), loadMedals()[TOUR.cup], 3, TOUR.diff);
+  mc.hidden = false;
+  if (TOUR.all) { const st = raceAllStar(); drawStar(mc, st.best, st.a); mc.style.width = mc.style.height = '72px'; }
+  else { mc.style.width = mc.style.height = ''; drawCupBadge(mc, CUPS.findIndex((C) => C.name === TOUR.cup), loadMedals()[TOUR.cup], 3, TOUR.diff); }
+  const upTo = TOUR.all && medal === 'gold' && raceAllDiff() !== TOUR.diff ? DIFFS[raceAllDiff()].name : '';
   $('resPlace').textContent = ord(at);
-  $('resNote').textContent = (at === 1 ? 'You win the cup with ' : champ + ' wins the cup with ') + TOUR.pts[champ] + ' points over ' + TOUR.list.length + ' races.' +
+  $('resNote').textContent = (at === 1 ? 'You win the ' + (TOUR.all ? 'event' : 'cup') + ' with ' : champ + ' wins the ' + (TOUR.all ? 'event' : 'cup') + ' with ') + TOUR.pts[champ] + ' points over ' + TOUR.list.length + ' races.' +
     (at === 1 ? '' : ' You scored ' + TOUR.pts[me] + '.') + (medal ? ' ' + medal[0].toUpperCase() + medal.slice(1) + ' medal on ' + DIFFS[TOUR.diff].name + '!' : ' No medal this time.') + ' Race wins: ' + TOUR.places[me].filter((p) => p === 1).length + '.' + (opened ? ' Every cup won on Hard: Very Hard is unlocked!' : '') +
-    (newCups.length ? ' Unlocked: the ' + newCups.join(' and the ') + ', and ' + (newCups.length > 1 ? 'their' : 'its') + ' tracks!' : '');
+    (newCups.length ? ' Unlocked: the ' + newCups.join(' and the ') + ', and ' + (newCups.length > 1 ? 'their' : 'its') + ' tracks!' : '') +
+    (upTo ? ' Race All moves up to ' + upTo + '.' : '');
   $('board').hidden = true;
   $('tourHead').textContent = 'Final standings';
   renderStandings(); $('tourBox').hidden = false;
-  $('againBtn').textContent = 'New tournament'; $('backBtn').textContent = 'Menu';
+  $('againBtn').textContent = TOUR.all ? 'Race All again' : 'New tournament'; $('backBtn').textContent = 'Menu';
   $('againBtn').focus();
 }
 
@@ -14971,7 +15028,7 @@ window.addEventListener('keydown', (e) => {
   const on = !unlockAll();
   try { if (on) localStorage.setItem(UNLOCK_KEY, '1'); else localStorage.removeItem(UNLOCK_KEY); } catch (e2) { /* this visit only */ }
   toast(on ? 'Testing: every cup and track unlocked' : 'Testing: unlocks back to normal');
-  syncTrackCards(); if (!screens.cup.hidden) { cupListRefresh(); renderCup(cupView); }
+  syncTrackCards(); syncRaceAll(); if (!screens.cup.hidden) { cupListRefresh(); renderCup(cupView); }
 });
 
 /* ---------- boot ---------- */
@@ -15047,12 +15104,14 @@ $('quitNo').addEventListener('click', () => { $('quitConfirm').hidden = true; $(
 $('quitYes').addEventListener('click', () => { $('quitConfirm').hidden = true; $('quitBtn').hidden = false; TOUR = null; toMenu(); });
 $('againBtn').addEventListener('click', () => {
   if (!TOUR) startRace();
+  else if (TOUR.done && TOUR.all) { TOUR = null; startRaceAll(); }   // (Race All again, on whatever difficulty it has reached)
   else if (TOUR.done) { TOUR = null; toMenu(); showCup(); }   // (back to the cup screen, to pick the next cup and difficulty)
   else if (TOUR.round >= TOUR.list.length) showFinal();
   else nextRound();
 });
 $('backBtn').addEventListener('click', () => { TOUR = null; toMenu(); });
 $('cupBtn').addEventListener('click', () => showCup());
+$('allBtn').addEventListener('click', startRaceAll);
 /* how to play: from the menu or the pause screen, and back to it */
 let helpFrom = 'menu';
 function openHelp(from) { helpFrom = from; showScreen('help'); $('helpBack').focus(); howtoStart(); }
@@ -15183,6 +15242,7 @@ if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) $('touc
 
 BUILTIN_N = TRACKS.length;
 buildTrackCards();
+syncRaceAll();
 for (const code of loadCustom()) { try { addCustomTrack(code, true); } catch (e) { /* a saved track that no longer builds is skipped */ } }
 setTrack(randomTrack());
 startAttract();
