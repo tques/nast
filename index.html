@@ -13300,16 +13300,22 @@ const CUPS = [
 let cupSel = 0;
 const trackOf = (id) => TRACKS.findIndex((t) => t.id === id);
 function cupRaces(c) { return CUPS[c].tracks.map(trackOf).filter((i) => i >= 0); }
-function renderCup() {
-  const C = CUPS[cupSel], medals = loadMedals();
+/* the cup screen shows the picked cup, or the one the selector is on (pad or keyboard) while it moves over the cups */
+let cupView = 0;
+function renderCup(view) {
+  cupView = view == null ? cupSel : view;
+  const C = CUPS[cupView], medals = loadMedals();
   $('cupTitle').textContent = C.name;
-  drawCupBadge($('cupLogo'), cupSel, medals[C.name], 2, DIFF);
+  drawCupBadge($('cupLogo'), cupView, medals[C.name], 2, DIFF);
   { const n = CUP_RESTARTS[DIFF]; $('cupRestarts').textContent = n === Infinity ? 'Unlimited restarts on Easy.' : (n === 0 ? 'No restarts' : n + (n === 1 ? ' restart' : ' restarts')) + ' for the whole cup on ' + DIFFS[DIFF].name + '.'; }
   document.querySelectorAll('.ccard').forEach((b) => { const c = +b.dataset.cup; b.setAttribute('aria-pressed', c === cupSel ? 'true' : 'false'); drawCupBadge(b.querySelector('canvas'), c, medals[CUPS[c].name], 2, DIFF, true); });
-  // the cup's tracks as map cards (the track screen's maps); the one under the pointer plays its reel
+  // the cup's tracks as map cards (the track screen's maps). Their reels play one after another, in race order; the
+  // one under the pointer plays its own, over and over, until the pointer leaves it
   const ol = $('cupList');
-  ol.textContent = '';
-  cupRaces(cupSel).forEach((ix, k) => {
+  if (ol.dataset.cup === String(cupView) && cupCards.length) return;   // (the same cup's tracks already up: leave their reels running)
+  ol.dataset.cup = cupView;
+  cupReel(null); ol.textContent = ''; cupCards.length = 0;
+  cupRaces(cupView).forEach((ix, k) => {
     const card = document.createElement('div'), cv = document.createElement('canvas'), name = document.createElement('span');
     card.className = 'ctrack'; card.setAttribute('role', 'listitem');
     cv.width = 320; cv.height = 180;
@@ -13318,31 +13324,58 @@ function renderCup() {
     const world = document.createElement('i'); world.textContent = (SETTINGS[TRACKS[ix].setting] || SETTINGS.space).name; name.append(' ', world);
     card.append(cv, name);
     const id = TRACKS[ix].id;
-    card.addEventListener('pointerenter', () => cupReel(card, cv, id));
-    card.addEventListener('pointerleave', () => cupReel(null));
+    const c = { card, cv, id };
+    card.addEventListener('pointerenter', () => { cupHover = true; cupAt = cupCards.indexOf(c); cupReel(c, true); });
+    card.addEventListener('pointerleave', () => { cupHover = false; if (cupVid) cupVid.loop = false; });   // (it plays out, then on to the next)
+    cupCards.push(c);
     ol.appendChild(card);
   });
+  cupHover = false;
+  if (!screens.cup.hidden) cupStartRound();
 }
-let cupVid = null;
-function cupReel(card, cv, id) {
-  if (!card || !(REELS && REELS[id])) { if (cupVid) { cupVid.pause(); cupVid.hidden = true; if (cupVid.previousSibling) cupVid.previousSibling.hidden = false; } return; }
-  if (!cupVid) { cupVid = document.createElement('video'); cupVid.muted = true; cupVid.loop = true; cupVid.playsInline = true; cupVid.setAttribute('aria-hidden', 'true'); }
-  if (cupVid.previousSibling && cupVid.previousSibling !== cv) cupVid.previousSibling.hidden = false;
-  if (cupVid.dataset.id !== id) { cupVid.src = REELS[id]; cupVid.dataset.id = id; }
-  cv.after(cupVid); cv.hidden = true; cupVid.hidden = false;
+let cupVid = null, cupAt = 0, cupHover = false, cupT0 = 0;
+const cupCards = [], CUP_REEL_MAX = 6;   // (each reel in the round plays at most this many seconds)
+function cupReel(c, loop) {
+  if (!c || !(REELS && REELS[c.id])) { if (cupVid) { cupVid.pause(); cupVid.hidden = true; if (cupVid.previousSibling) cupVid.previousSibling.hidden = false; } return; }
+  if (!cupVid) {
+    cupVid = document.createElement('video'); cupVid.muted = true; cupVid.playsInline = true; cupVid.setAttribute('aria-hidden', 'true');
+    cupVid.addEventListener('ended', cupNext);
+    cupVid.addEventListener('timeupdate', () => {
+      if (screens.cup.hidden) { cupReel(null); return; }   // (the screen has gone: stop)
+      if (!cupVid.loop && cupVid.currentTime > CUP_REEL_MAX && performance.now() - cupT0 > 500) cupNext();   // (not on a late tick from the reel before)
+    });
+  }
+  if (cupVid.previousSibling && cupVid.previousSibling !== c.cv) cupVid.previousSibling.hidden = false;
+  if (cupVid.dataset.id !== c.id) { cupVid.src = REELS[c.id]; cupVid.dataset.id = c.id; }
+  cupVid.loop = !!loop; cupT0 = performance.now();
+  c.cv.after(cupVid); c.cv.hidden = true; cupVid.hidden = false;
   cupVid.currentTime = 0; cupVid.play().catch(() => {});
+}
+function cupStartRound() { cupAt = -1; cupNext(); }
+// the next track's reel in the round (not while the pointer holds one; a track with no reel is passed over)
+function cupNext() {
+  if (cupHover || screens.cup.hidden || !cupCards.length) return;
+  for (let i = 0; i < cupCards.length; i++) {
+    cupAt = (cupAt + 1) % cupCards.length;
+    if (REELS && REELS[cupCards[cupAt].id]) { cupReel(cupCards[cupAt], false); return; }
+  }
 }
 function showCup() {
   const pick = $('cupPick');
+  if (!pick.children.length) pick.addEventListener('focusout', (e) => {   // (the selector off the cups without picking one: back to the picked cup)
+    if (!pick.contains(e.relatedTarget) && cupView !== cupSel) renderCup();
+  });
   if (!pick.children.length) CUPS.forEach((C, c) => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'ccard'; b.dataset.cup = c;
     const cv = document.createElement('canvas'), n = document.createElement('span'); n.textContent = C.name;
     b.append(cv, n);
     b.addEventListener('click', () => { cupSel = c; renderCup(); });
+    b.addEventListener('focus', () => { if (cupView !== c) renderCup(c); });   // (the selector on a cup: its tracks)
     pick.appendChild(b);
   });
   renderCup();
   showScreen('cup'); placeHangar('cup'); $('cupGo').focus({ preventScroll: true });
+  cupStartRound();   // (the reels' round, from the first race)
   padScreenOpened();
 }
 /* Keeping a cup close (nothing is shown: the player just finds a title race on their hands). Each cup, two rivals
