@@ -8997,9 +8997,10 @@ function drawGate(g, time, f) {
     if (offscreen(s.x1, s.y1, f, 240)) return;
     if (gateSoftFor(v, g)) { glassGate(g, time); return; }
     const has = gateOpenFor(v, g), pass = v.passT[g.id] > 0 ? v.passT[g.id] : gateShared(g) && g.st === 1 ? (g.closeT >= 0 ? g.closeT : g.openT) : 0;
-    const warn = has && pass < 1.5 && ((time * 8) | 0) % 2 === 0;
-    if (!has || warn) {
-      const a = has ? 0.55 : 1;
+    // (about to shut: the open doorway flashes red, but never looks shut while it is open and shots still fly through it)
+    const warn = has && pass < 1.5, on = ((time * 8) | 0) % 2 === 0;
+    if (!has) {
+      const a = 1;
       ln(lc, s.x1, s.y1, s.x2, s.y2, 6, g.catchup ? '#33285a' : '#5b2f1e', a);
       ln(lc, s.x1, s.y1, s.x2, s.y2, 3, col, a);
       lc.setLineDash([5, 9]); lc.lineDashOffset = -time * 46;
@@ -9026,10 +9027,14 @@ function drawGate(g, time, f) {
         lc.fillStyle = '#ff8a7a'; lc.font = "700 8px 'Saira Condensed', sans-serif"; lc.textAlign = 'center'; lc.textBaseline = 'middle';
         lc.fillText('LAP 2', Math.round(mx), Math.round(my + 12)); lc.textAlign = 'left'; lc.textBaseline = 'alphabetic';
       }
+    } else if (warn) {
+      lc.setLineDash([3, 5]); lc.lineDashOffset = 0; ln(lc, s.x1, s.y1, s.x2, s.y2, 2, on ? '#ff5a4a' : col, on ? 1 : 0.45); lc.setLineDash([]);
+      if (on) ln(ec, s.x1, s.y1, s.x2, s.y2, 7, '#ff3a2a', 0.6);
     } else {
       lc.setLineDash([2, 6]); ln(lc, s.x1, s.y1, s.x2, s.y2, 1, col, 0.4); lc.setLineDash([]);
     }
-    pylon(s.x1, s.y1, col); pylon(s.x2, s.y2, col);
+    const pc = warn && on ? '#ff5a4a' : col;
+    pylon(s.x1, s.y1, pc); pylon(s.x2, s.y2, pc);
   } else {
     const s = g.segs[g.side], o = g.segs[1 - g.side];
     if (offscreen(s.x1, s.y1, f, 240)) return;
