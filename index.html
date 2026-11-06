@@ -9413,27 +9413,60 @@ function drawSwipeHints(s, x, y, time) {
   }
   lc.globalAlpha = 1;
 }
-/* a jump pad: lime chevrons running up a dark plate across the lane (or across one half of it) */
+/* a jump ramp: a steel wedge rising across the lane (or one half of it) to a hazard-striped lip at the take-off
+   point, drawn in the scene's perspective (each corner scaled by its own height, as the pit walls are) and lit from
+   the upper left: side and front faces first, then the sloped deck over them */
+const JRAMP = { L: 40, LIP: 3, H: 0.24, deck: ['#363b48', '#454c5c', '#586073', '#6e7890'], side: ['#1b1e25', '#262a33', '#343945', '#464c5b'], rib: '#23262f', yel: '#ffc93a', blk: '#17130c' };
 function drawJump(j, time, f) {
   const i = j.i, x = T.x[i], y = T.y[i];
   if (offscreen(x, y, f, 120)) return;
-  const tx = T.tx[i], ty = T.ty[i], nx = T.nx[i], ny = T.ny[i], lo = j.lo + 6, hi = j.hi - 6, A = 15;
-  const P = (a, l) => [x + tx * a + nx * l, y + ty * a + ny * l];
-  const quad = (ctx, p) => { ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1]); for (let k = 1; k < p.length; k++) ctx.lineTo(p[k][0], p[k][1]); ctx.closePath(); };
-  quad(lc, [P(-A - 2, lo - 2), P(-A - 2, hi + 2), P(A + 2, hi + 2), P(A + 2, lo - 2)]); lc.fillStyle = '#0b1a14'; lc.fill();
-  quad(lc, [P(-A, lo), P(-A, hi), P(A, hi), P(A, lo)]); lc.fillStyle = '#16402a'; lc.fill();
-  lc.strokeStyle = '#b6ff6a'; lc.lineWidth = 2; lc.stroke();
-  const mid = (lo + hi) / 2, half = (hi - lo) / 2;
-  lc.lineWidth = 3; lc.lineJoin = 'miter';
-  for (let k = 0; k < 3; k++) {
-    const u = (k / 3 + time * 1.6) % 1, a = -A + 5 + u * (2 * A - 12);
-    lc.globalAlpha = Math.sin(u * Math.PI);
-    lc.strokeStyle = '#e6ffb0';
-    lc.beginPath(); const p0 = P(a - 5, mid - half + 4), p1 = P(a + 4, mid), p2 = P(a - 5, mid + half - 4);
-    lc.moveTo(p0[0], p0[1]); lc.lineTo(p1[0], p1[1]); lc.lineTo(p2[0], p2[1]); lc.stroke();
+  const tx = T.tx[i], ty = T.ty[i], nx = T.nx[i], ny = T.ny[i], lo = j.lo + 5, hi = j.hi - 5, h = T.h[i];
+  const A0 = -JRAMP.L, A1 = JRAMP.LIP;
+  const S = (a, l, z) => { const g = fscale(h + z), px = x + tx * a + nx * l, py = y + ty * a + ny * l; return [VW / 2 + (px - CX) * g, VH / 2 + (py - CY) * g]; };
+  const zAt = (a) => JRAMP.H * clamp((a - A0) / (A1 - A0), 0, 1);
+  const poly = (ctx, p) => { ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1]); for (let k = 1; k < p.length; k++) ctx.lineTo(p[k][0], p[k][1]); ctx.closePath(); };
+  const tone = (pal, lit) => pal[clamp(Math.round((lit + 1) * 1.5), 0, 3)];
+  const fill = (p, c) => { poly(lc, p); lc.fillStyle = c; lc.fill(); lc.strokeStyle = c; lc.lineWidth = 1; lc.stroke(); };
+  lc.setTransform(1, 0, 0, 1, 0, 0); ec.setTransform(1, 0, 0, 1, 0, 0);
+  // (its shadow, cast down and to the right on the deck)
+  lc.globalAlpha = 0.4;
+  fill([S(A0, lo, 0), S(A1, lo, 0), S(A1 + 14, lo + 4, 0), S(A1 + 14, hi + 4, 0), S(A1, hi, 0), S(A0, hi, 0)], '#000');
+  lc.globalAlpha = 1;
+  // (the sides and the front: whichever face away from the camera are covered by the deck drawn after them)
+  const H = JRAMP.H;
+  fill([S(A0, lo, 0), S(A1, lo, 0), S(A1, lo, H)], tone(JRAMP.side, -(nx * -0.6 + ny * -0.8)));
+  fill([S(A0, hi, 0), S(A1, hi, 0), S(A1, hi, H)], tone(JRAMP.side, nx * -0.6 + ny * -0.8));
+  fill([S(A1, lo, 0), S(A1, hi, 0), S(A1, hi, H), S(A1, lo, H)], tone(JRAMP.side, tx * -0.6 + ty * -0.8));
+  // (the sloped deck: it faces back down the track, toward whoever is coming)
+  const deckLit = clamp(-(tx * -0.6 + ty * -0.8) * 0.8 + 0.25, -1, 1);
+  fill([S(A0, lo, 0), S(A1, lo, H), S(A1, hi, H), S(A0, hi, 0)], tone(JRAMP.deck, deckLit));
+  // (light catching the upper half of the slope, darker where it meets the deck: it reads as rising)
+  for (let b = 0; b < 3; b++) {
+    const a0 = A0 + (A1 - A0) * (b + 1) / 4, z0 = zAt(a0);
+    lc.globalAlpha = 0.18 + 0.1 * b;
+    fill([S(a0, lo, z0), S(A1, lo, H), S(A1, hi, H), S(a0, hi, z0)], tone(JRAMP.deck, deckLit + 0.7 + b * 0.3));
   }
-  lc.globalAlpha = 1; lc.lineJoin = 'round';
-  quad(ec, [P(-A, lo), P(-A, hi), P(A, hi), P(A, lo)]); ec.globalAlpha = 0.28 + 0.1 * Math.sin(time * 5); ec.fillStyle = '#b6ff6a'; ec.fill(); ec.globalAlpha = 1;
+  lc.globalAlpha = 0.45; fill([S(A0, lo, 0), S(A0 + 5, lo, zAt(A0 + 5)), S(A0 + 5, hi, zAt(A0 + 5)), S(A0, hi, 0)], '#0d0f14'); lc.globalAlpha = 1;
+  // (ribs across it, a lit edge on each rail)
+  lc.strokeStyle = JRAMP.rib; lc.lineWidth = 1;
+  for (let a = A0 + 8; a < A1 - 7; a += 8) { const z = zAt(a), p = S(a, lo + 1, z), q = S(a, hi - 1, z); lc.beginPath(); lc.moveTo(p[0], p[1]); lc.lineTo(q[0], q[1]); lc.stroke(); }
+  lc.strokeStyle = tone(JRAMP.deck, 1); lc.lineWidth = 2;
+  for (const l of [lo + 1, hi - 1]) { const p = S(A0, l, 0), q = S(A1, l, H); lc.beginPath(); lc.moveTo(p[0], p[1]); lc.lineTo(q[0], q[1]); lc.stroke(); }
+  // (the lip: a yellow and black band at the top, and a lamp at each end)
+  const B0 = A1 - 6, zb = zAt(B0);
+  fill([S(B0, lo, zb), S(A1, lo, H), S(A1, hi, H), S(B0, hi, zb)], JRAMP.blk);
+  const w = hi - lo, n = Math.max(3, Math.round(w / 8));
+  lc.fillStyle = JRAMP.yel;
+  for (let k = 0; k < n; k += 2) {
+    const l0 = lo + (w * k) / n, l1 = lo + (w * (k + 1)) / n;
+    poly(lc, [S(B0, l0, zb), S(A1, l0 + 3, H), S(A1, Math.min(hi, l1 + 3), H), S(B0, l1, zb)]); lc.fill();
+  }
+  const blink = 0.55 + 0.45 * Math.sin(time * 6);
+  for (const l of [lo + 1.5, hi - 1.5]) {
+    const p = S(A1, l, H);
+    lc.fillStyle = '#ffe9a8'; lc.fillRect(Math.round(p[0]) - 1, Math.round(p[1]) - 1, 2, 2);
+    glow(ec, JRAMP.yel, 7, p[0], p[1], 0.35 * blink);
+  }
 }
 /* a hole in the deck: on solid ground its walls going down (lit from the upper left, in the scene's perspective, so a
    hole off to the side shows its far wall) to a dark floor; in a deck of dots (space, gale, the neon strip) simply open,
