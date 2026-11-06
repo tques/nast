@@ -2024,6 +2024,24 @@ function trackLayout() {
       pickups.push([i, lat[k % 3], k % 3 === 2 ? 'sting' : 'cell']);
     }
   }
+  // every shortcut's long way round has a Stinger on it, for whoever missed the shortcut: one is added near its middle
+  // (somewhere clear, away from the other pickups) where none fell there already
+  for (const c of T.chords) {
+    const span = wrapIdx(c.b - c.a), inLong = (i) => { const q = wrapIdx(i - c.a); return q > 0 && q < span; };
+    if (span < 40 || pickups.some((p) => p[2] === 'sting' && inLong(p[0]))) continue;
+    const mid = wrapIdx(c.a + (span >> 1)), clear = (i) => !busy[i] && !air[i] && !pickups.some((p) => Math.min(wrapIdx(p[0] - i), wrapIdx(i - p[0])) < 18);
+    let put = false;
+    for (let k = 0; k < span >> 1 && !put; k++) {
+      const i = [wrapIdx(mid + k), wrapIdx(mid - k)].find((q) => inLong(q) && wrapIdx(q - c.a) > 20 && wrapIdx(c.b - q) > 20 && clear(q));
+      if (i !== undefined) { pickups.push([i, 0, 'sting']); put = true; }
+    }
+    // (no room for another: the power cell nearest its middle becomes a Stinger instead)
+    if (!put) {
+      let best = null;
+      for (const p of pickups) if (inLong(p[0]) && (!best || Math.abs(wrapIdx(p[0] - c.a) - (span >> 1)) < Math.abs(wrapIdx(best[0] - c.a) - (span >> 1)))) best = p;
+      if (best) best[2] = 'sting';
+    }
+  }
   // (never on a loop, its run-up or its way out: an asteroid can't sit on the ring)
   const onLoop = (i) => T.loops.some((L) => wrapIdx(i - (L.i - 50)) <= L.M + 90);
   if (d.asteroids) slots = d.asteroids.map((f) => { const i = at(f); return onLoop(i) ? near(i) : i; });
