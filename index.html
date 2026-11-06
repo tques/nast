@@ -1739,7 +1739,7 @@ const CFG = {
   fallTime: 1.5, fallCost: 8,   // falling off: time out, power lost
   // guns: a magazine of shots that refills one at a time; shields take two hits, and come back after a moment without
   // one; the hit after that slows the racer. Guns (and with them shortcuts and barricades) are live from lap 2.
-  magMax: 5, magRegen: 3.5, shieldMax: 2, shieldReset: 3, armLap: 1,
+  magMax: 5, magRegen: 5, shieldMax: 2, shieldReset: 3, armLap: 1,
   blastFuse: 0.25, blastLen: 64,   // the backfire as a racer is slowed: a beat later, a blast out the back that slows whoever is on its tail
   // sideswipes: a quick shunt sideways that hits a rival alongside (like a shot), costing the swiper a shield pip
   // (or power, with the shield down) when it connects
@@ -2698,7 +2698,7 @@ function hitTarget(t, shooter) {
       return;
     }
     t.coolBy[shooter.id] = CFG.passCd; t.flash = 0.45; g.flash = 0.5;
-    shooter.energy = Math.min(CFG.energyMax, shooter.energy + CFG.targetPower); shooter.hits++;
+    shooter.hits++;   // (no power for a door: the shortcut is its own reward)
     burst(t.x, t.y, 16, 150, g.catchup ? '#c9b6ff' : '#ffb070', 0.5, true);
     if (gateShared(g)) openGate(g, shooter);   // (open for everyone)
     else { shooter.passT[g.id] = CFG.passDur; emit('pass', g, shooter); }
@@ -2980,7 +2980,7 @@ function stepParts(dt) {
    twisty one suits the raptor, a flowing one the needle): that is the point. */
 const HULL_BASE = {
   top: 1, acc: 1, turn: 1, grip: 1, boost: 1, boostCost: 18, mass: 1,
-  mag: 5, magRegen: 3.5, shieldReset: 3, slowTime: 2.5
+  mag: 5, magRegen: 5, shieldReset: 3, slowTime: 2.5
 };
 const HULL_STATS = {
   arrow:  {},                                                                  // the all-rounder: the baseline
@@ -2993,8 +2993,8 @@ const HULL_STATS = {
   flare:  { boost: 1.15, boostCost: 15, top: 0.975, grip: 0.95 },              // a hard, cheap boost; slower and looser without it
   manta:  { grip: 1.12, mass: 1.1, acc: 0.9, top: 0.99 },                      // glued to the deck round the bends; slow to get going
   lancer: { top: 1.025, acc: 1.04, mass: 0.85, turn: 0.95, shieldReset: 3.6, slowTime: 3 },   // the fastest of all, and fragile: knocked about, slow to recover
-  bastion: { mass: 1.25, mag: 6, magRegen: 3, top: 0.985, turn: 0.95, acc: 0.95 },            // an armoured gunship: heavy, two turrets' worth of shots; ponderous
-  wraith: { magRegen: 2.8, slowTime: 1.9, top: 1.02, turn: 0.96, grip: 0.96, boost: 0.94 }     // reloads fast and shrugs off a slowdown; a weak boost, a little loose
+  bastion: { mass: 1.25, mag: 6, magRegen: 4.3, top: 0.985, turn: 0.95, acc: 0.95 },            // an armoured gunship: heavy, two turrets' worth of shots; ponderous
+  wraith: { magRegen: 4, slowTime: 1.9, top: 1.02, turn: 0.96, grip: 0.96, boost: 0.94 }     // reloads fast and shrugs off a slowdown; a weak boost, a little loose
 };
 /* the machines as the hangar shows them (in the order they appear there) */
 const HULL_INFO = [
