@@ -747,7 +747,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
         <li><i class="sw cyan"></i><span><b>Cyan targets</b>: shoot to slide a blockade's gap and get +10 power.</span></li>
         <li><i class="sw amber"></i><span><b>Shortcuts</b> (from lap 2): shoot the door to get in, then the gate at the far end to get out: each opens for you alone. Ram a shut gate and you wipe out. Walls hit harder with your shield down. Nothing can hurt you inside a shortcut.</span></li>
         <li><i class="sw lime"></i><span><b>Jump pads</b>: clear gaps, or cut across with enough speed.</span></li>
-        <li><i class="sw rose"></i><span><b>Pink pickups</b>: Stingers that spin a rival speeder out.</span></li>
+        <li><i class="sw rose"></i><span><b>Pink pickups</b>: a Stinger round. It crashes the rival it hits, unless their shield is full (then it takes the whole shield). None on the last lap.</span></li>
       </ul>
     </div>
     <div>
@@ -1726,7 +1726,7 @@ const CFG = {
   top: 300, acc: 780, turn: 5,   // turn: how fast the nose comes round (rad/s); you thrust along the nose, so this is steering
   cornerG: 340, cornerBoost: 0.75,   // cornering: how hard a racer can pull its path round (px/s^2, times grip x sqrt(turn)); less while boosting
   boostCost: 18, boostTime: 0.55, energyMax: 100,   // power is boost and hull in one: it never recharges on its own
-  cellPower: 30, cellCd: 12, targetPower: 10, wreckTime: 2.4, respawnPower: 40,
+  cellPower: 30, cellCd: 12, targetPower: 10, wreckTime: 2.4, respawnPower: 60,
   fireCd: 0.17, bulletV: 720, bulletLife: 0.5,   // (a shot reaches about 400 px: roughly the edge of the view)
   shipR: 6, targetR: 10, shiftDur: 8, targetCd: 5,
   softDur: 1.5, shatterSlow: 0.72, shatterDmg: 4,   // a barricade that has just moved is glass for a moment: smash through it at a cost
@@ -1823,6 +1823,8 @@ function puff(x, y, vx, vy, life, col, r0, r1) {
 }
 /* can this racer shoot right now? (guns go live on its second lap, and are knocked out while it is slowed) */
 function gunsUp(s) { return weaponsLive(s) && s.slowT <= 0; }
+/* gone again for the last lap (once the leader is on it): none to be taken there */
+function stingersGone() { return W.laps > 1 && W.ships.some((s) => s.lapsDone >= W.laps - 1); }
 /* are the stinger pickups out yet? (once the leader is on lap 2) */
 function stingersOut() { return W.laps <= 1 || W.ships.some((s) => s.lapsDone >= CFG.armLap); }
 /* the backfire: a cone of fire out the back of a racer that has just been slowed. Whoever is in it is slowed too,
@@ -2202,6 +2204,7 @@ function respawn(s) {
   s.ang = Math.atan2(T.ty[s.idx], T.tx[s.idx]); s.input.aim = s.ang;
   s.h = T.h[s.idx]; s.floorH = s.h; s.safe = CFG.respawnSafe;
   s.energy = s.fell ? Math.max(s.energy - CFG.fallCost, 20) : CFG.respawnPower;
+  s.mag = s.st.mag;   // (back with a full magazine: able to fight back from the off)
   s.fell = false;
   burst(s.x, s.y, 16, 120, '#8ff3ff', 0.5, true);
   emit('respawn', s);
@@ -2808,13 +2811,13 @@ function stepBullets(dt) {
         dead = true;
         if (s.safe > 0 || s.inCorr) { burst(b.x, b.y, 4, 60, '#bff8ff', 0.2, true); break; }   // (just back in the race, or in a shortcut: shots glance off)
         s.shieldT = 0;
-        if (b.hostile) {   // a stinger: through the shield, which it takes down; it spins the racer out and does some damage
-          s.shield = 0; s.shieldFlash = 0.35;
-          hurt(s, 10);
-          if (s.wreck > 0) break;
-          s.stun = 1.1; s.boostT = 0; s.vx *= 0.45; s.vy *= 0.45;
+        if (b.hostile) {   // a stinger: it crashes the racer it hits, unless its shield is full: then it takes the whole shield
+          if (s.finished || s.wreck > 0) break;
           burst(s.x, s.y, 16, 160, '#ff7ac0', 0.5, true);
+          s.stingShield = s.shield >= CFG.shieldMax;
           emit('stun', s, b.owner);
+          if (s.stingShield) { s.shield = 0; s.shieldT = 0; s.shieldFlash = 0.45; }
+          else { s.wipedBy = b.owner; s.stungOut = true; wreck(s); }
         } else knock(s, b.owner, b.x, b.y);
         break;
       }
@@ -2926,7 +2929,11 @@ function stepRocks(dt) {
 /* Power cells are shared: every racer can take each one (then it is spent for that racer for a while).
    Stinger pickups go to whoever gets there first. */
 function stepPickups(dt) {
-  const stingOut = stingersOut();
+  const stingOut = stingersOut() && !stingersGone();
+  if (stingersGone() && W.stingOut && !W.stingGone) {   // the last lap: the stingers go (no being 'blue-shelled' at the line)
+    W.stingGone = true;
+    for (const p of W.pickups) if (p.type === 'sting') { CURH = p.h; burst(p.x, p.y, 10, 90, '#ff7ac0', 0.4, true); }
+  }
   if (stingOut && !W.stingOut) {   // the stingers arrive: a flash at each one
     W.stingOut = true;
     for (const p of W.pickups) if (p.type === 'sting') { CURH = p.h; burst(p.x, p.y, 16, 120, '#ff7ac0', 0.5, true); }
@@ -2942,7 +2949,7 @@ function stepPickups(dt) {
       if (s.wreck <= 0 && Math.abs(s.h - p.h) <= CFG.levelTol && Math.hypot(s.x - p.x, s.y - p.y) < 15) {
         CURH = p.h;
         if (p.type === 'cell') { p.cdBy[s.id] = CFG.cellCd; s.energy = Math.min(CFG.energyMax, s.energy + CFG.cellPower); }
-        else { p.cd = 9; s.ammo = 4; }
+        else { p.cd = 9; s.ammo = 1; }   // (a single Stinger round)
         burst(p.x, p.y, 12, 110, p.type === 'cell' ? '#ffd27a' : '#ff7ac0', 0.45, true);
         emit('pickup', s, p.type);
         if (p.type !== 'cell') break;
@@ -3687,6 +3694,7 @@ function aiThink(s, dt) {
     for (const o of W.ships) {
       if (o === s || o.prog <= s.prog || Math.abs(o.h - s.h) > CFG.levelTol) continue;
       if (o.isPlayer && unseen) continue;
+      if (o.wreck > 0 || o.safe > 0 || o.inCorr || o.finished || o.shield >= CFG.shieldMax) continue;   // (its one round: for a rival it will crash)
       const ox = o.x - s.x, oy = o.y - s.y, d = Math.hypot(ox, oy);
       if (d > 250 || d < 20) continue;
       const dir = Math.atan2(oy, ox);
@@ -9149,7 +9157,7 @@ function drawTarget(t, time, f) {
   if (t.flash > 0) glow(ec, col, 44, x, y, t.flash * 1.4);
 }
 function drawPickup(p, time, f) {
-  if (offscreen(p.x, p.y, f, 20) || (p.type === 'sting' && !W.stingOut)) return;
+  if (offscreen(p.x, p.y, f, 20) || (p.type === 'sting' && (!W.stingOut || W.stingGone))) return;
   const x = Math.round(p.x), y = Math.round(p.y + Math.sin(time * 3 + p.x) * 1.3);
   const col = p.type === 'cell' ? '#ffcf70' : '#ff7ac0';
   // a cell you have just taken shows as spent for you, even though rivals can still take it
@@ -14551,7 +14559,8 @@ function handleEvents() {
       case 'wreck':
         if (!e.a.isPlayer) chat(e.a, 'crash');
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.wreck();
-        if (e.a.isPlayer && mode === 'race') { W.shake = 1.4; if (!e.a.gateCrash) toast(e.a.wipedBy ? 'Wiped out by ' + e.a.wipedBy.name : 'Wrecked! Out of power'); }
+        if (e.a.isPlayer && mode === 'race') { W.shake = 1.4; if (!e.a.gateCrash) toast(e.a.wipedBy ? 'Wiped out by ' + e.a.wipedBy.name + (e.a.stungOut ? "'s Stinger" : '') : 'Wrecked! Out of power'); }
+        e.a.stungOut = false;
         e.a.gateCrash = false;
         e.a.wipedBy = null;
         break;
@@ -14611,7 +14620,7 @@ function handleEvents() {
         break;
       case 'stun':
         if (e.b && e.a.isPlayer && !e.b.isPlayer) chat(e.b, 'stingYou'); else if (e.b && e.b.isPlayer && !e.a.isPlayer) chat(e.a, 'stung');
-        if (e.a.isPlayer && live) { SFX.stun(); W.shake = 1; toast('Stinger! Spun out by ' + (e.b ? e.b.name : 'a rival')); }
+        if (e.a.isPlayer && live) { SFX.stun(); W.shake = 1; if (e.a.stingShield) toast('Stinger! Your shield took it'); }   // (otherwise it crashed you: the wreck's own message says who)
         else if (e.b && e.b.isPlayer && live) SFX.target();
         break;
       case 'rock': if (live && near(e.a.x, e.a.y)) SFX.rock(); break;
