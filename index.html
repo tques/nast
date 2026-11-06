@@ -3737,7 +3737,14 @@ function aiThink(s, dt) {
   // boost down the straights
   // power is also the hull, so keep a healthy reserve before spending any on boost
   // (the reserve shrinks the further behind it is, and it will boost into gentler bends)
-  const reserve = 42 + sty.reserve - 27 * a.behind;
+  let reserve = 42 + sty.reserve - 27 * a.behind;
+  // (with the race nearly run, power left at the line is wasted: the reserve melts away over the last lap, down to
+  //  a couple of knocks' worth at the line, and one boost's worth kept while a jump that needs a boost is still ahead)
+  const left = W.laps * T.N - s.u;
+  if (left < T.N) {
+    reserve = Math.min(reserve, Math.max(20, reserve * clamp(left / (T.N * 0.85), 0, 1)));   // (never below a couple of knocks' worth: power is the hull)
+    for (const g of T.aiGaps) if (g.jump && g.need > CFG.top * s.st.top && wrapIdx(g.jump.i - s.idx) < left) { reserve = Math.max(reserve, s.st.boostCost); break; }
+  }
   if (!a.tgt && !a.sc && !(zone && a.flub) && s.energy >= s.st.boostCost + reserve && s.boostCd <= 0 && s.align > 0.9 && sp > 170 &&   // (nor into a gap it has misjudged)
       aiCornerSpeed(s, sty, true) > CFG.top * s.st.top * 1.35) {
     const j = wrapIdx(s.idx + 26);
