@@ -747,7 +747,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
         <li><i class="sw cyan"></i><span><b>Cyan targets</b>: shoot to slide a blockade's gap and get +10 power.</span></li>
         <li><i class="sw amber"></i><span><b>Shortcuts</b> (from lap 2): shoot the door to get in, then the gate at the far end to get out: each opens for you alone. Ram a shut gate and you wipe out. Walls hit harder with your shield down. Nothing can hurt you inside a shortcut.</span></li>
         <li><i class="sw lime"></i><span><b>Jump pads</b>: clear gaps, or cut across with enough speed.</span></li>
-        <li><i class="sw rose"></i><span><b>Pink pickups</b>: two Stinger rounds. Hold fire to charge one (a pink beam shows where it'll go, so rivals can see it coming) and it fires itself; a tap is still a normal shot. Each goes through any shield and crashes the rival it hits. None on the last lap.</span></li>
+        <li><i class="sw rose"></i><span><b>Pink pickups</b>: two Stinger rounds. Hold fire to charge one (a pink beam shows where it'll go, so rivals can see it coming) and it fires itself; a tap is still a normal shot. Each goes through any shield and crashes the rival it hits, in a blast that slows anyone close by: you too, if you fired from too near. None on the last lap.</span></li>
       </ul>
     </div>
     <div>
@@ -1740,7 +1740,7 @@ const CFG = {
   // guns: a magazine of shots that refills one at a time; shields take two hits, and come back after a moment without
   // one; the hit after that slows the racer. Guns (and with them shortcuts and barricades) are live from lap 2.
   magMax: 5, magRegen: 5, shieldMax: 2, shieldReset: 3, armLap: 1,
-  blastFuse: 0.25, blastLen: 64,   // the backfire as a racer is slowed: a beat later, a blast out the back that slows whoever is on its tail
+  blastFuse: 0.25, blastLen: 64, stingBlast: 75,   // stingBlast: the radius of a Stinger hit's explosion   // the backfire as a racer is slowed: a beat later, a blast out the back that slows whoever is on its tail
   // sideswipes: a quick shunt sideways that hits a rival alongside (like a shot), costing the swiper a shield pip
   // (or power, with the shield down) when it connects
   swipeCd: 1.5, swipeDur: 0.18, swipeKick: 240, swipeSelf: 8,
@@ -1918,6 +1918,22 @@ function dropMine(s) {
   const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
   W.mines.push({ x: s.x - fx * 13, y: s.y - fy * 13, h: s.h, idx: s.idx, owner: s, arm: CFG.mineArm, life: CFG.mineLife, t: 0 });
   emit('mine', s);
+}
+/* a Stinger hit: the racer it crashes goes up in a ring of fire, and anyone caught in it (its shooter too, if it fired
+   from too close) gets what a backfire gives: slowed, shield or not, boost cut. So a Stinger is fired from a distance */
+function stingBlast(v, by) {
+  CURH = v.h;
+  burst(v.x, v.y, 34, 220, '#ff7ac0', 0.55, true); burst(v.x, v.y, 20, 140, '#fff1c4', 0.4, true);
+  for (let i = 0; i < 8; i++) puff(v.x, v.y, (Math.random() - 0.5) * 90, -10 - Math.random() * 40, 0.9, '#3a2a40', 3, 10);
+  W.blasts.push({ x: v.x, y: v.y, h: v.h, idx: v.idx, ang: 0, t: 0, round: true, r: CFG.stingBlast });
+  for (const o of W.ships) {
+    if (o === v || o.wreck > 0 || o.finished || o.loop || o.safe > 0 || o.slowT > 0 || o.inCorr || Math.abs(o.h - v.h) > CFG.levelTol) continue;
+    if (Math.hypot(o.x - v.x, o.y - v.y) > CFG.stingBlast) continue;
+    o.slowT = o.st.slowTime; o.boostT = 0; o.shieldT = 0; o.shieldFlash = 0.3;
+    o.vx *= 0.8; o.vy *= 0.8;
+    burst(o.x, o.y, 14, 120, '#ffb45a', 0.45, true);
+    emit('backfire', o, v); o.stingBlasted = true;
+  }
 }
 function mineBlast(m) {
   CURH = m.h;
@@ -2845,7 +2861,7 @@ function stepBullets(dt) {
           if (s.finished || s.wreck > 0) break;
           burst(s.x, s.y, 16, 160, '#ff7ac0', 0.5, true);
           emit('stun', s, b.owner);
-          s.wipedBy = b.owner; s.stungOut = true; wreck(s);
+          s.wipedBy = b.owner; s.stungOut = true; wreck(s); stingBlast(s, b.owner);
         } else knock(s, b.owner, b.x, b.y);
         break;
       }
@@ -3724,7 +3740,7 @@ function aiThink(s, dt) {
       if (o.isPlayer && unseen) continue;
       if (o.wreck > 0 || o.safe > 0 || o.inCorr || o.finished) continue;   // (its one round: for a rival it will crash, not one shots glance off)
       const ox = o.x - s.x, oy = o.y - s.y, d = Math.hypot(ox, oy);
-      if (d > 250 || d < 20) continue;
+      if (d > 250 || d < CFG.stingBlast + 25) continue;   // (never from inside its blast)
       const dir = Math.atan2(oy, ox);
       if (Math.abs(angDiff(inp.aim, dir)) > 0.45) continue;
       inp.aim = dir;
@@ -9236,16 +9252,16 @@ function drawMine(m, time, f) {
 }
 /* the backfire's flash: a bright cone out the back, fading fast */
 function drawBlast(bl, f) {
-  if (bl.round) {   // a mine going off: a ball of fire, a ring of billows round it, a shock ring
-    const u = bl.t / 0.4, a = 1 - u;
-    glow(ec, '#ff7a30', 30 + 30 * u, bl.x, bl.y, a); glow(ec, '#fff1c4', 16, bl.x, bl.y, a * a);
-    for (let k = 0; k < 7; k++) {
-      const ang = k / 7 * TAU + bl.x, d = 4 + 14 * Math.min(1, u * 3), r = (5 + 3 * Math.sin(k * 2.1)) * (0.8 + 0.6 * u);
+  if (bl.round) {   // a mine going off: a ball of fire, a ring of billows round it, a shock ring (a Stinger's: as wide as its reach, bl.r)
+    const u = bl.t / 0.4, a = 1 - u, S = bl.r ? bl.r / 34 : 1;
+    glow(ec, bl.r ? '#ff5ab0' : '#ff7a30', (30 + 30 * u) * S, bl.x, bl.y, a); glow(ec, '#fff1c4', 16 * S, bl.x, bl.y, a * a);
+    for (let k = 0; k < 7 * (bl.r ? 2 : 1); k++) {
+      const n7 = 7 * (bl.r ? 2 : 1), ang = k / n7 * TAU + bl.x, d = (4 + 14 * Math.min(1, u * 3)) * S, r = (5 + 3 * Math.sin(k * 2.1)) * (0.8 + 0.6 * u) * Math.sqrt(S);
       lc.globalAlpha = 0.8 * a; lc.fillStyle = u < 0.25 ? '#fff1c4' : u < 0.55 ? '#ffb45a' : '#ff6a3a';
       lc.beginPath(); lc.arc(bl.x + Math.cos(ang) * d, bl.y + Math.sin(ang) * d * 0.8, r, 0, TAU); lc.fill();
     }
     lc.globalAlpha = 0.6 * a; lc.strokeStyle = '#ffd9a0'; lc.lineWidth = 1.5;
-    lc.beginPath(); lc.arc(bl.x, bl.y, 6 + u * 28, 0, TAU); lc.stroke(); lc.globalAlpha = 1;
+    lc.beginPath(); lc.arc(bl.x, bl.y, (6 + u * 28) * S, 0, TAU); lc.stroke(); lc.globalAlpha = 1;
     return;
   }
   const u = bl.t / 0.4, a = 1 - u, bx = -Math.cos(bl.ang), by = -Math.sin(bl.ang), px = -by, py = bx;
@@ -14614,7 +14630,8 @@ function handleEvents() {
         break;
       case 'blast': if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) { SFX.blast(); if (near(e.a.x, e.a.y)) W.shake = Math.max(W.shake, 0.6); } break;
       case 'backfire':
-        if (e.a.isPlayer && mode === 'race') { W.shake = 1; toast('Backfire! Slowed down! Weapons offline!'); }
+        if (e.a.isPlayer && mode === 'race') { W.shake = 1; toast((e.a.stingBlasted ? 'Caught in the Stinger blast!' : 'Backfire!') + ' Slowed down! Weapons offline!'); }
+        e.a.stingBlasted = false;
         break;
       case 'slowed':
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.stun();
