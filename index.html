@@ -3647,7 +3647,10 @@ function aiThink(s, dt) {
         //  door shut and stay on the lane)
         const tGate = (d + Math.max(0, c.exitS - 160 - c.doorS)) / Math.max(250, sp);
         const exitShot = Math.min(s.st.mag, s.mag - 1 + tGate / s.st.magRegen) + s.ammo >= 2;   // (the exit's shot, and a spare in case it misses)
-        if (exitShot && !(a.shotWait > 0) && d < CFG.bulletV * CFG.bulletLife * 0.95 && Math.abs(angDiff(s.ang, dir)) < 0.08) { inp.fire = true; a.shotWait = d / CFG.bulletV + 0.12; }
+        // (and only close in, about 0.6 s short of it: shot open from far back, it would stand open
+        //  for everyone behind until the shooter got there. Close enough still leaves time for a second shot)
+        const fireD = Math.min(CFG.bulletV * CFG.bulletLife * 0.95, Math.max(130, sp * 0.6));
+        if (exitShot && !(a.shotWait > 0) && d < fireD && Math.abs(angDiff(s.ang, dir)) < 0.08) { inp.fire = true; a.shotWait = d / CFG.bulletV + 0.12; }
       }
     }
   }
