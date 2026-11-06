@@ -2670,7 +2670,7 @@ function stepShip(s, dt, locked) {
   if (live && (ml > 0.01 || boosting) && Math.random() < (boosting ? 1 : 0.75)) {
     part(s.x - fx * 7 + (Math.random() - 0.5) * 3, s.y - fy * 7 + (Math.random() - 0.5) * 3,
       -fx * 55 + s.vx * 0.15 + (Math.random() - 0.5) * 22, -fy * 55 + s.vy * 0.15 + (Math.random() - 0.5) * 22,
-      boosting ? 0.34 : 0.22, trailCol(s.col, boosting), boosting ? 3 : 2, !plumeCols(s.col).smoke);   // (in the racer's complement; Rook's are smoke)
+      boosting ? 0.34 : 0.22, trailCol(s.col, boosting), boosting ? 3 : 2, !plumeCols(s.col).smoke);   // (in the racer's complement)
   }
 }
 
@@ -9288,7 +9288,7 @@ function drawBlast(bl, f) {
 /* the dots an engine leaves behind: the racer's complement (lighter while boosting); Rook's, grey smoke */
 function trailCol(col, boosting) { const P = plumeCols(col); return P.smoke ? (boosting ? '#2b2933' : '#55525e') : P[boosting ? 1 : 2]; }
 const PLUME_COLS = {};
-const PLUME_SMOKE = { '#d8dde8': ['#ffffff', '#16141c', '#0c0b10', '#000000'] };   // (Rook's silver: a black plume)
+const PLUME_SMOKE = {};   // (a racer colour whose plume is smoke instead: none now. Rook's silver has a faint blue to it, so its plume is orange)
 function plumeCols(col) {
   if (PLUME_COLS[col]) return PLUME_COLS[col];
   if (PLUME_SMOKE[col]) { const c = PLUME_SMOKE[col].slice(); c.smoke = true; return (PLUME_COLS[col] = c); }
