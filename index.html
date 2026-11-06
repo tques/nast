@@ -1053,7 +1053,7 @@ function jumpNeed(D, hFrom, hTo) {
 const LOOP = { R: 220, G: 232, ACC: 0.2, KZ: 0.75, NEAR: 0, SHIFT: 164, EASE: 30, GRIP: 0.25, ROLL_C: -0.42, MIN_R: 160, MAX_R: 300 };
 const TRACKS = [
   {
-    id: 'kessler-loop', name: 'Kessler Loop', seed: 11, tilt: 40,   // (tilt: a try-out of a camera leaning forward, see TILT)
+    id: 'kessler-loop', name: 'Kessler Loop', seed: 11,
     points: [
       [300, 0], [560, 0], [715, -25], [790, -110], [808, -240], [868, -338], [1025, -338], [1092, -240],
       [1100, -110], [1170, -10], [1310, 30], [1580, 10], [1860, 80], [2080, 340], [2020, 570], [1730, 715],
@@ -9476,7 +9476,7 @@ function updateCamera(dt, mouse, follow, snap) {
     fx = cx + (follow.loop.px - cx) * 0.35; fy = cy + (follow.loop.py - cy) * 0.35; mk = 0.06;
   }
   const tx = fx + (m.x - VW / 2) * mk;
-  const ty = fy + (m.y - VH / 2) * mk - (TILT.deg ? VH * 0.17 : 0);   // (a tilted view looks on ahead, up the screen: the racer sits low in it)
+  const ty = fy + (m.y - VH / 2) * mk;
   const k = snap ? 1 : 1 - Math.exp(-7 * dt);
   CAM.x += (tx - CAM.x) * k; CAM.y += (ty - CAM.y) * k;
   CAM.h = 0;   // the camera stays at ground height: the ground is always drawn 1:1, raised things come closer, sunken ones recede
@@ -10109,7 +10109,6 @@ function drawShade(cx, cy, time) {
   for (let x = -ox; x < VW; x += w) for (let y = -oy; y < VH; y += h) lc.drawImage(S, Math.round(x), Math.round(y));
 }
 function renderFrame(time) {
-  if (tiltWanted() !== TILT.deg || (TILT.deg && (stage.clientWidth !== TILT.w || stage.clientHeight !== TILT.h))) syncTilt();
   const cx = Math.round(CAM.x + CAM.shx), cy = Math.round(CAM.y + CAM.shy);
   CX = cx; CY = cy;
   lc.setTransform(1, 0, 0, 1, 0, 0); ec.setTransform(1, 0, 0, 1, 0, 0);
@@ -13347,40 +13346,6 @@ function layout() {
   mini.width = Math.round(MINI.w * Math.min(dpr, 2)); mini.height = Math.round(MINI.h * Math.min(dpr, 2));
 }
 
-/* ---------- a tilted view (a track's tilt, in degrees: Kessler Loop's 40, a try-out) ----------
-   In a race the finished picture is laid back like a camera leaning forward (a 3D transform on the view canvas,
-   enlarged so it still fills the frame), and the pointer is mapped back through the same tilt (TILT.Hi, a
-   homography from the stage's pixels to the scene's), so the mouse aims where it seems to. The menus stay flat. */
-const TILT = { deg: 0, w: 0, h: 0, Hi: null };
-function tiltWanted() { return mode !== 'menu' && TRACK && TRACK.tilt ? TRACK.tilt : 0; }
-function syncTilt() {
-  const deg = tiltWanted(), w = stage.clientWidth, h = stage.clientHeight;
-  TILT.deg = deg; TILT.w = w; TILT.h = h; TILT.Hi = null;
-  if (!deg) { view.style.transform = ''; return; }
-  const t = deg / 40, ox = w * 0.5, oy = h * 0.62;
-  const M = new DOMMatrix().translate(ox, oy).multiply(new DOMMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -1 / 1000, 0, 0, 0, 1]))
-    .rotate(deg, 0, 0).scale(1 + 0.62 * t).translate(0, -0.09 * t * h).translate(-ox, -oy);
-  view.style.transformOrigin = '0 0'; view.style.transform = M.toString(); stage.style.overflow = 'hidden';
-  // (where the view's corners show, so as to map a point on screen back to the scene)
-  const S = [[0, 0], [w, 0], [w, h], [0, h]].map(([x, y]) => { const p = M.transformPoint(new DOMPoint(x, y, 0, 1)); return [p.x / p.w, p.y / p.w]; });
-  TILT.Hi = homFrom(S, [[0, 0], [VW, 0], [VW, VH], [0, VH]]);
-}
-// the homography taking four points to four others (solved as eight equations), and applying one
-function homFrom(P, Q) {
-  const A = [];
-  for (let k = 0; k < 4; k++) {
-    const [x, y] = P[k], [u, v] = Q[k];
-    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y, u]); A.push([0, 0, 0, x, y, 1, -v * x, -v * y, v]);
-  }
-  for (let c = 0; c < 8; c++) {
-    let p = c; for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
-    [A[c], A[p]] = [A[p], A[c]];
-    for (let r = 0; r < 8; r++) if (r !== c) { const f = A[r][c] / A[c][c]; for (let k = c; k < 9; k++) A[r][k] -= f * A[c][k]; }
-  }
-  return A.map((row, k) => row[8] / row[k]).concat([1]);
-}
-function homApply(H, x, y) { const d = H[6] * x + H[7] * y + H[8]; return [(H[0] * x + H[1] * y + H[2]) / d, (H[3] * x + H[4] * y + H[5]) / d]; }
-
 /* ---------- game flow ---------- */
 function startAttract() {
   pickRivals();
@@ -13776,11 +13741,6 @@ window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 window.addEventListener('blur', () => { keys = {}; mouse.d0 = false; mouse.d2 = false; if (mode === 'race') pauseGame(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'race') pauseGame(); });
 window.addEventListener('mousemove', (e) => {
-  if (TILT.deg && TILT.Hi) {   // (a tilted view: back through the tilt to the scene's own pixels)
-    const r = stage.getBoundingClientRect(), q = homApply(TILT.Hi, e.clientX - r.left, e.clientY - r.top);
-    mouse.x = clamp(q[0], 0, VW); mouse.y = clamp(q[1], 0, VH);
-    return;
-  }
   const r = view.getBoundingClientRect();
   mouse.x = clamp((e.clientX - r.left) / r.width * VW, 0, VW);
   mouse.y = clamp((e.clientY - r.top) / r.height * VH, 0, VH);
