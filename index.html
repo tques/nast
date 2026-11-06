@@ -747,7 +747,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
         <li><i class="sw cyan"></i><span><b>Cyan targets</b>: shoot to slide a blockade's gap and get +10 power.</span></li>
         <li><i class="sw amber"></i><span><b>Shortcuts</b> (from lap 2): shoot the door to get in, then the gate at the far end to get out: each opens for you alone. Ram a shut gate and you wipe out. Walls hit harder with your shield down. Nothing can hurt you inside a shortcut.</span></li>
         <li><i class="sw lime"></i><span><b>Jump pads</b>: clear gaps, or cut across with enough speed.</span></li>
-        <li><i class="sw rose"></i><span><b>Pink pickups</b>: a Stinger round. It goes through any shield and crashes the rival it hits. None on the last lap.</span></li>
+        <li><i class="sw rose"></i><span><b>Pink pickups</b>: a Stinger round. Hold fire to charge it (a pink beam shows where it'll go, so rivals can see it coming) and it fires itself; a tap is still a normal shot. It goes through any shield and crashes the rival it hits. None on the last lap.</span></li>
       </ul>
     </div>
     <div>
@@ -1727,7 +1727,7 @@ const CFG = {
   cornerG: 340, cornerBoost: 0.75,   // cornering: how hard a racer can pull its path round (px/s^2, times grip x sqrt(turn)); less while boosting
   boostCost: 18, boostTime: 0.55, energyMax: 100,   // power is boost and hull in one: it never recharges on its own
   cellPower: 30, cellCd: 12, targetPower: 10, wreckTime: 2.4, respawnPower: 60,
-  fireCd: 0.17, bulletV: 720, bulletLife: 0.5,   // (a shot reaches about 400 px: roughly the edge of the view)
+  fireCd: 0.17, bulletV: 720, bulletLife: 0.5, stingCharge: 0.8,   // (a shot reaches about 400 px: roughly the edge of the view)
   shipR: 6, targetR: 10, shiftDur: 8, targetCd: 5,
   softDur: 1.5, shatterSlow: 0.72, shatterDmg: 4,   // a barricade that has just moved is glass for a moment: smash through it at a cost
   slopeK: 0.17, levelTol: 0.6,   // climbing costs speed, descending gains it; things interact within this height gap
@@ -2391,10 +2391,9 @@ function tryBoost(s) {
   for (let i = 0; i < 12; i++) part(s.x - dx * 6, s.y - dy * 6, -dx * (60 + Math.random() * 120) + (Math.random() - 0.5) * 80, -dy * (60 + Math.random() * 120) + (Math.random() - 0.5) * 80, 0.35, '#fff1c4', 2, true);
   emit('boost', s);
 }
-function fireShot(s) {
+function fireShot(s, hostile) {
   s.shotCd = CFG.fireCd;
-  const hostile = s.ammo > 0;
-  if (hostile) s.ammo--; else s.mag -= 1;   // (stinger rounds first; then the magazine)
+  if (hostile) s.ammo--; else s.mag -= 1;   // (a charged Stinger, or a shot from the magazine)
   const dx = Math.cos(s.ang), dy = Math.sin(s.ang);
   W.bullets.push({ x: s.x + dx * 9, y: s.y + dy * 9, vx: dx * CFG.bulletV + s.vx * 0.5, vy: dy * CFG.bulletV + s.vy * 0.5, life: CFG.bulletLife, owner: s, hostile, idx: s.idx, h: s.h, air: s.air > 0 && s.h - T.h[s.idx] > 0.3 });
   part(s.x + dx * 10, s.y + dy * 10, dx * 30, dy * 30, 0.08, hostile ? '#ff7ac0' : '#bff8ff', 3, true);
@@ -2502,13 +2501,26 @@ function stepShip(s, dt, locked) {
     if (inp.boostPress) { inp.boostPress = false; tryBoost(s); }
     if (inp.swipe) { trySwipe(s, inp.swipe); inp.swipe = 0; }
     if (inp.mine) { dropMine(s); inp.mine = false; }
-    if (inp.fire && s.shotCd <= 0 && !s.loop) {
-      if (!weaponsLive(s)) { s.shotCd = 0.5; emit('dry', s, 'lap'); }
-      else if (s.slowT > 0) { s.shotCd = 0.5; emit('dry', s, 'slowed'); }
-      else if (s.ammo > 0 || s.mag >= 1) fireShot(s);
-      else { s.shotCd = 0.3; emit('dry', s, 'empty'); }
+    // a Stinger fires only charged: hold fire for CFG.stingCharge (the charge shows, a pink beam on where it is aimed),
+    // and it goes; let go sooner and that was a normal shot from the magazine. Then fire must be let go of once.
+    if (!inp.fire) s.fireLatch = false;
+    if (s.ammo > 0 && !s.loop && weaponsLive(s) && s.slowT <= 0) {
+      if (inp.fire && !s.fireLatch) {
+        if ((s.charge = (s.charge || 0) + dt) >= CFG.stingCharge) { s.charge = 0; s.fireLatch = true; fireShot(s, true); }
+      } else {
+        if (s.charge > 0 && s.shotCd <= 0) { if (s.mag >= 1) fireShot(s, false); else { s.shotCd = 0.3; emit('dry', s, 'empty'); } }
+        s.charge = 0;
+      }
+    } else {
+      s.charge = 0;
+      if (inp.fire && !s.fireLatch && s.shotCd <= 0 && !s.loop) {
+        if (!weaponsLive(s)) { s.shotCd = 0.5; emit('dry', s, 'lap'); }
+        else if (s.slowT > 0) { s.shotCd = 0.5; emit('dry', s, 'slowed'); }
+        else if (s.mag >= 1) fireShot(s, false);
+        else { s.shotCd = 0.3; emit('dry', s, 'empty'); }
+      }
     }
-  } else { inp.boostPress = false; inp.swipe = 0; inp.mine = false; }
+  } else { inp.boostPress = false; inp.swipe = 0; inp.mine = false; s.charge = 0; }
   if (s.loop) { stepLoop(s, dt, live); return; }
 
   // hills: uphill costs speed, downhill gives some back (relative to the way you are travelling along the lane)
@@ -3716,7 +3728,7 @@ function aiThink(s, dt) {
       const dir = Math.atan2(oy, ox);
       if (Math.abs(angDiff(inp.aim, dir)) > 0.45) continue;
       inp.aim = dir;
-      if (Math.abs(angDiff(s.ang, dir)) < 0.1) inp.fire = true;
+      if (Math.abs(angDiff(s.ang, dir)) < (s.charge > 0 ? 0.3 : 0.1)) inp.fire = true;   // (charging: holds it while still roughly on)
       break;
     }
   }
@@ -9191,6 +9203,20 @@ function drawPickup(p, time, f) {
   }
   glow(ec, col, 22, x, y, 0.32);
 }
+/* a Stinger charging: a pink glow swelling at the nose and a dashed beam out along where it will go, brighter and
+   flickering faster as it fills, so whoever is in front sees it coming */
+function drawCharge(s, time) {
+  const k = clamp(s.charge / CFG.stingCharge, 0, 1), fx = Math.cos(s.ang), fy = Math.sin(s.ang);
+  const nx = s.x + fx * 11, ny = s.y + fy * 11, L = CFG.bulletV * CFG.bulletLife * (0.35 + 0.65 * k);
+  const fl = 0.7 + 0.3 * Math.sin(time * (14 + 40 * k));
+  lc.save(); lc.setLineDash([4, 5]); lc.lineDashOffset = -time * 90;
+  lc.globalAlpha = (0.25 + 0.6 * k) * fl; lc.strokeStyle = '#ff7ac0'; lc.lineWidth = 1 + k;
+  lc.beginPath(); lc.moveTo(nx, ny); lc.lineTo(nx + fx * L, ny + fy * L); lc.stroke(); lc.restore();
+  ec.save(); ec.globalAlpha = 0.35 * k * fl; ec.strokeStyle = '#ff5ab0'; ec.lineWidth = 4;
+  ec.beginPath(); ec.moveTo(nx, ny); ec.lineTo(nx + fx * L, ny + fy * L); ec.stroke(); ec.restore();
+  glow(lc, '#ff7ac0', 5 + 9 * k, nx, ny, 0.5 + 0.4 * k * fl); glow(ec, '#ff5ab0', 8 + 14 * k, nx, ny, 0.6 * k * fl);
+  lc.fillStyle = '#ffe0f0'; const r = Math.round(1 + 2 * k); lc.fillRect(Math.round(nx) - r, Math.round(ny) - r, r * 2, r * 2);
+}
 /* a mine: a dark spiked disc with a light in its owner's colour, blinking faster once armed (dim until then) */
 function drawMine(m, time, f) {
   if (offscreen(m.x, m.y, f, 20)) return;
@@ -9263,6 +9289,7 @@ function plumeCols(col) {
 }
 function drawShip(s, time, f) {
   if (s.wreck > 0 || offscreen(s.x, s.y, f, 30)) return;
+  if (s.charge > 0) drawCharge(s, time);
   const spr = shipSprites(s.col, s.hull), fi = shipFrameIndex(s.ang);
   const x = Math.round(s.x), y = Math.round(s.y), bob = Math.round(Math.sin(time * 4 + s.x * 0.02));
   const fx = Math.cos(s.ang), fy = Math.sin(s.ang);
