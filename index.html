@@ -747,7 +747,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
         <li><i class="sw cyan"></i><span><b>Cyan targets</b>: shoot to slide a blockade's gap and get +10 power.</span></li>
         <li><i class="sw amber"></i><span><b>Shortcuts</b> (from lap 2): shoot the door to get in, then the gate at the far end to get out: each opens for you alone. Ram a shut gate and you wipe out. Walls hit harder with your shield down. Nothing can hurt you inside a shortcut.</span></li>
         <li><i class="sw lime"></i><span><b>Jump pads</b>: clear gaps, or cut across with enough speed.</span></li>
-        <li><i class="sw rose"></i><span><b>Pink pickups</b>: a Stinger round. Hold fire to charge it (a pink beam shows where it'll go, so rivals can see it coming) and it fires itself; a tap is still a normal shot. It goes through any shield and crashes the rival it hits. None on the last lap.</span></li>
+        <li><i class="sw rose"></i><span><b>Pink pickups</b>: two Stinger rounds. Hold fire to charge one (a pink beam shows where it'll go, so rivals can see it coming) and it fires itself; a tap is still a normal shot. Each goes through any shield and crashes the rival it hits. None on the last lap.</span></li>
       </ul>
     </div>
     <div>
@@ -2977,7 +2977,7 @@ function stepPickups(dt) {
       if (s.wreck <= 0 && Math.abs(s.h - p.h) <= CFG.levelTol && Math.hypot(s.x - p.x, s.y - p.y) < 15) {
         CURH = p.h;
         if (p.type === 'cell') { p.cdBy[s.id] = CFG.cellCd; s.energy = Math.min(CFG.energyMax, s.energy + CFG.cellPower); }
-        else { p.cd = 9; s.ammo = 1; }   // (a single Stinger round)
+        else { p.cd = 9; s.ammo = 2; }   // (two Stinger rounds)
         burst(p.x, p.y, 12, 110, p.type === 'cell' ? '#ffd27a' : '#ff7ac0', 0.45, true);
         emit('pickup', s, p.type);
         if (p.type !== 'cell') break;
