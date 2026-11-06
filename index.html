@@ -747,7 +747,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
         <li><i class="sw cyan"></i><span><b>Cyan targets</b>: shoot to slide a blockade's gap and get +10 power.</span></li>
         <li><i class="sw amber"></i><span><b>Shortcuts</b> (from lap 2): shoot the door to get in, then the gate at the far end to get out: each opens for you alone. Ram a shut gate and you wipe out. Walls hit harder with your shield down. Nothing can hurt you inside a shortcut.</span></li>
         <li><i class="sw lime"></i><span><b>Jump pads</b>: clear gaps, or cut across with enough speed.</span></li>
-        <li><i class="sw rose"></i><span><b>Pink pickups</b>: a Stinger round. It crashes the rival it hits, unless their shield is full (then it takes the whole shield). None on the last lap.</span></li>
+        <li><i class="sw rose"></i><span><b>Pink pickups</b>: a Stinger round. It goes through any shield and crashes the rival it hits. None on the last lap.</span></li>
       </ul>
     </div>
     <div>
@@ -2811,13 +2811,11 @@ function stepBullets(dt) {
         dead = true;
         if (s.safe > 0 || s.inCorr) { burst(b.x, b.y, 4, 60, '#bff8ff', 0.2, true); break; }   // (just back in the race, or in a shortcut: shots glance off)
         s.shieldT = 0;
-        if (b.hostile) {   // a stinger: it crashes the racer it hits, unless its shield is full: then it takes the whole shield
+        if (b.hostile) {   // a stinger: straight through any shield, it crashes the racer it hits
           if (s.finished || s.wreck > 0) break;
           burst(s.x, s.y, 16, 160, '#ff7ac0', 0.5, true);
-          s.stingShield = s.shield >= CFG.shieldMax;
           emit('stun', s, b.owner);
-          if (s.stingShield) { s.shield = 0; s.shieldT = 0; s.shieldFlash = 0.45; }
-          else { s.wipedBy = b.owner; s.stungOut = true; wreck(s); }
+          s.wipedBy = b.owner; s.stungOut = true; wreck(s);
         } else knock(s, b.owner, b.x, b.y);
         break;
       }
@@ -3694,7 +3692,7 @@ function aiThink(s, dt) {
     for (const o of W.ships) {
       if (o === s || o.prog <= s.prog || Math.abs(o.h - s.h) > CFG.levelTol) continue;
       if (o.isPlayer && unseen) continue;
-      if (o.wreck > 0 || o.safe > 0 || o.inCorr || o.finished || o.shield >= CFG.shieldMax) continue;   // (its one round: for a rival it will crash)
+      if (o.wreck > 0 || o.safe > 0 || o.inCorr || o.finished) continue;   // (its one round: for a rival it will crash, not one shots glance off)
       const ox = o.x - s.x, oy = o.y - s.y, d = Math.hypot(ox, oy);
       if (d > 250 || d < 20) continue;
       const dir = Math.atan2(oy, ox);
@@ -14620,7 +14618,7 @@ function handleEvents() {
         break;
       case 'stun':
         if (e.b && e.a.isPlayer && !e.b.isPlayer) chat(e.b, 'stingYou'); else if (e.b && e.b.isPlayer && !e.a.isPlayer) chat(e.a, 'stung');
-        if (e.a.isPlayer && live) { SFX.stun(); W.shake = 1; if (e.a.stingShield) toast('Stinger! Your shield took it'); }   // (otherwise it crashed you: the wreck's own message says who)
+        if (e.a.isPlayer && live) { SFX.stun(); W.shake = 1; }   // (it crashed you: the wreck's own message says who)
         else if (e.b && e.b.isPlayer && live) SFX.target();
         break;
       case 'rock': if (live && near(e.a.x, e.a.y)) SFX.rock(); break;
