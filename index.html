@@ -744,7 +744,7 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       <h2>On the track</h2>
       <ul class="rules">
         <li><i class="sw gold"></i><span><b>Yellow cells</b>: fly through for +30 power. Each one recharges for you after 12 seconds.</span></li>
-        <li><i class="sw cyan"></i><span><b>Cyan targets</b>: shoot to slide a blockade's gap and get +10 power.</span></li>
+        <li><i class="sw cyan"></i><span><b>Cyan targets</b>: shoot one to raise a glass barricade across the lane behind you (+10 power). Smashing through glass costs speed: aim for its gap.</span></li>
         <li><i class="sw amber"></i><span><b>Shortcuts</b> (from lap 2): shoot the door to get in, then the gate at the far end to get out: each opens for you alone. Ram a shut gate and you wipe out. Walls hit harder with your shield down. Nothing can hurt you inside a shortcut.</span></li>
         <li><i class="sw lime"></i><span><b>Jump pads</b>: clear gaps, or cut across with enough speed.</span></li>
         <li><i class="sw rose"></i><span><b>Pink pickups</b>: two Stinger rounds. Hold fire to charge one (a pink beam shows where it'll go, so rivals can see it coming) and it fires itself; a tap is still a normal shot. Each goes through any shield and crashes the rival it hits, in a blast that slows anyone close by: you too, if you fired from too near. None on the last lap.</span></li>
@@ -1737,8 +1737,8 @@ const CFG = {
   boostCost: 18, boostTime: 0.55, energyMax: 100,   // power is boost and hull in one: it never recharges on its own
   cellPower: 30, cellCd: 12, targetPower: 10, wreckTime: 2.4, respawnPower: 60,
   fireCd: 0.17, bulletV: 720, bulletLife: 0.5, stingCharge: 0.8,   // (a shot reaches about 400 px: roughly the edge of the view)
-  shipR: 6, targetR: 10, shiftDur: 8, targetCd: 5,
-  softDur: 1.5, shatterSlow: 0.72, shatterDmg: 4,   // a barricade that has just moved is glass for a moment: smash through it at a cost
+  shipR: 6, targetR: 10,
+  shatterSlow: 0.72, shatterDmg: 4,   // a shut shortcut gate is glass for a moment: smash through it at a cost
   slopeK: 0.17, levelTol: 0.6,   // climbing costs speed, descending gains it; things interact within this height gap
   bareWall: 2,   // walls and gates hit this much harder with no shield up
   gateOpen: 3, gateClose: 0.5, gateSoft: 1,   // shortcut gates: open for everyone this long if nobody goes through; shut this
@@ -2102,13 +2102,13 @@ function buildCourse() {
       seg: { x1: c.exitX + enx * h, y1: c.exitY + eny * h, x2: c.exitX - enx * h, y2: c.exitY - eny * h } });
   });
   const L = trackLayout();
-  // sliding blockades: a wall with a gap; a hit moves the gap to the other side
+  // barricades: down, until someone shoots the target before one; then a pane of glass rises across the lane behind
+  // them, with a wide gap that never moves (see BAR)
   L.bars.forEach((d, k) => {
     const gi = d.g, cx = T.x[gi], cy = T.y[gi], nx = T.nx[gi], ny = T.ny[gi];
-    const half = T.hw, cover = T.hw * 1.24;
+    const half = T.hw, cover = T.hw * BAR.COVER;
     const A = { x1: cx + nx * half, y1: cy + ny * half, x2: cx + nx * (half - cover), y2: cy + ny * (half - cover) };
-    const B = { x1: cx - nx * half, y1: cy - ny * half, x2: cx - nx * (half - cover), y2: cy - ny * (half - cover) };
-    const g = { kind: 'shift', id: 10 + k, segs: [A, B], side: 0, t: 0, dur: CFG.shiftDur, flash: 0, gi, h: T.h[gi], soft: 0, broke: {} };
+    const g = { kind: 'shift', id: 10 + k, segs: [A], side: 0, st: 0, t: 0, flash: 0, gi, h: T.h[gi], owner: -1, broke: {} };
     W.gates.push(g);
     const ti = wrapIdx(gi - 18), p = ptAt(ti, d.ts * (T.hw - 13));
     W.targets.push({ id: W.targets.length, x: p[0], y: p[1], idx: ti, h: T.h[ti], gate: g, cool: 0, coolBy: [0, 0, 0, 0, 0, 0], denied: 0, flash: 0 });
@@ -2202,6 +2202,12 @@ function openGate(g, by) {
   g.st = 1; g.openT = CFG.gateOpen; g.closeT = -1; g.soft = 0; g.broke = {}; g.flash = 0.5; g.openBy = by ? by.id : -1; g.openN = (g.openN || 0) + 1;
   emit(g.kind === 'door' ? 'pass' : 'exitopen', g, by);
 }
+/* barricades. Down until the target before one is shot; then it rises (RISE seconds: passable while it does, a warning
+   for whoever is close behind), stands up for UP seconds (the last FLICK of them flickering) and drops again. Up, it is
+   a pane of glass across the lane, COVER x the half-width of it, from one side: the gap on the other side never moves.
+   Glass: a racer that meets it smashes through, losing SLOW of its speed and a little power, never a crash. Whoever
+   raised it goes through its own for free. The target is ready again CD seconds after it drops. */
+const BAR = { RISE: 0.5, UP: 4, FLICK: 1, CD: 4, COVER: 1.1, SLOW: 0.6 };
 function gateEntered(g) { if (gateShared(g) && g.st === 1 && g.closeT < 0) g.closeT = CFG.gateClose; }
 /* a racer meets a shut shortcut gate: through a soft one at the cost of its shield (a crash with none left), a crash
    into a hard one. Only head on: a racer brushing past a door's edge along the lane just slides off it */
@@ -2221,7 +2227,7 @@ function gateRam(s, g, inward) {
 }
 function gateSegs(g) {
   if (g.kind === 'door' || g.kind === 'exit') return gateShared(g) && g.st === 1 ? null : [g.seg];   // (open: shots fly through)
-  return [g.segs[g.side]];
+  return g.st === 2 ? [g.segs[0]] : null;   // (a barricade: only once it is up)
 }
 /* a knock against a wall or a gate costs more with the shield down (CFG.bareWall times as much) */
 function bareWall(s) { return s.shield > 0 ? 1 : CFG.bareWall; }
@@ -2698,18 +2704,16 @@ function stepShip(s, dt, locked) {
         gateRam(s, g, s.vx * c.ex + s.vy * c.ey);
         continue;
       }
-      // just moved, still soft: a ship that meets it smashes its own way through (slowed and knocked a little);
-      // the hole is its own: everyone else still has to smash through, or find the gap. Whoever moved it breaks
-      // its own glass for free (but once it hardens, it has to use the gap like everyone else)
-      if (g.kind === 'shift' && g.soft > 0) {
-        if (g.broke[s.id]) continue;
-        const sg = g.segs[g.side];
+      // a barricade, up: glass. A ship that meets it smashes its own way through, losing a good part of its speed and
+      // a little power (never a crash); the hole is its own. Whoever raised it goes through its own for free
+      if (g.kind === 'shift') {
+        if (g.st !== 2 || g.broke[s.id] || g.owner === s.id) continue;
+        const sg = g.segs[0];
         if (segDist(s.x, s.y, sg.x1, sg.y1, sg.x2, sg.y2) < CFG.shipR + 3) {
           g.broke[s.id] = true;
-          const own = g.owner === s.id;
-          if (!own) { s.vx *= CFG.shatterSlow; s.vy *= CFG.shatterSlow; hurt(s, CFG.shatterDmg); }
-          burst(s.x, s.y, 22, 160, '#d8ffff', 0.55, true);
-          emit('shatter', s, own);
+          s.vx *= BAR.SLOW; s.vy *= BAR.SLOW; hurt(s, CFG.shatterDmg);
+          burst(s.x, s.y, 30, 180, '#d8ffff', 0.6, true);
+          emit('shatter', s, false);
         }
         continue;
       }
@@ -2845,7 +2849,7 @@ function targetReady(t, s) {
     if (t.coolBy[s.id] > 0 || gateOpenFor(s, g)) return false;
     return !g.catchup || catchEligible(s, g.chord);
   }
-  return t.cool <= 0 && g.side === 0;
+  return t.cool <= 0 && !g.st;
 }
 /* a pass is spent once the ship is clear of the door on the far side */
 function tryUsePass(s, g) {
@@ -2872,9 +2876,9 @@ function hitTarget(t, shooter) {
     emit('target', t, shooter);
     return;
   }
-  if (t.cool > 0) { burst(t.x, t.y, 3, 40, '#667', 0.3, false); return; }
-  t.cool = CFG.targetCd; t.flash = 0.45; g.flash = 0.5;
-  g.side ^= 1; g.t = g.dur; g.soft = CFG.softDur; g.broke = {}; g.owner = shooter ? shooter.id : -1; emit('shift', g, shooter);
+  if (t.cool > 0 || g.st) { burst(t.x, t.y, 3, 40, '#667', 0.3, false); return; }
+  t.cool = BAR.RISE + BAR.UP + BAR.CD; t.flash = 0.45; g.flash = 0.5;
+  g.st = 1; g.t = BAR.RISE; g.broke = {}; g.owner = shooter ? shooter.id : -1; emit('shift', g, shooter);
   if (shooter) { shooter.energy = Math.min(CFG.energyMax, shooter.energy + CFG.targetPower); shooter.hits++; }
   burst(t.x, t.y, 16, 150, '#9ff', 0.5, true);
   emit('target', t, shooter);
@@ -2995,13 +2999,16 @@ function stepGates(dt) {
     for (const sh of W.ships) {
       if (sh.finished || sh.wreck > 0 || !weaponsLive(sh) || Math.abs(sh.h - t.h) > CFG.levelTol || Math.hypot(sh.x - t.x, sh.y - t.y) > CFG.targetR + CFG.shipR) continue;
       CURH = t.h;
-      if (t.gate.kind === 'door' ? targetReady(t, sh) : t.cool <= 0) hitTarget(t, sh);
+      if (t.gate.kind === 'door' ? targetReady(t, sh) : t.cool <= 0 && !t.gate.st) hitTarget(t, sh);
     }
   }
   for (const g of W.gates) {
     if (g.flash > 0) g.flash -= dt;
-    if (g.kind === 'shift' && g.side === 1) { g.t -= dt; if (g.t <= 0) { g.side = 0; g.soft = CFG.softDur; g.broke = {}; g.owner = -1; emit('shiftback', g); } }
-    if (g.kind === 'shift' && g.soft > 0) { g.soft -= dt; if (g.soft <= 0) { g.soft = 0; g.flash = 0.35; emit('harden', g); } }
+    // (a barricade: rising, then up, then down again)
+    if (g.kind === 'shift' && g.st && (g.t -= dt) <= 0) {
+      if (g.st === 1) { g.st = 2; g.t = BAR.UP; g.flash = 0.35; emit('harden', g); }
+      else { g.st = 0; g.owner = -1; g.broke = {}; emit('shiftback', g); }
+    }
     if (gateShared(g)) {
       if (g.st === 1) {   // open: shuts half a second after the first racer through, or after 3 s with nobody
         if (g.closeT >= 0 ? (g.closeT -= dt) <= 0 : (g.openT -= dt) <= 0) { g.st = 2; g.soft = CFG.gateSoft; g.broke = {}; g.flash = 0.4; g.shutN = (g.shutN || 0) + 1; emit('gateshut', g); }
@@ -3586,10 +3593,11 @@ function aiThink(s, dt) {
   // blockades: aim for the middle of the gap
   let gateClose = false;
   for (const g of W.gates) {
-    if (g.kind !== 'shift' || !weaponsLive(s) || (g.soft > 0 && g.owner === s.id)) continue;   // (its own glass: straight through)
+    if (g.kind !== 'shift' || !weaponsLive(s) || !g.st || g.owner === s.id) continue;   // (down, or its own glass: straight through)
     const ahead = wrapIdx(g.gi - s.idx);
-    if (ahead <= look + 3) { ti = wrapIdx(g.gi + 4); lane = g.side === 0 ? -T.hw * 0.62 : T.hw * 0.62; gateClose = true; }
-    else if (ahead <= 45) lane = g.side === 0 ? -T.hw * 0.62 : T.hw * 0.62;
+    const gapMid = -T.hw * (1 - (2 - BAR.COVER) / 2);   // (the middle of the gap, on the side the glass does not cover)
+    if (ahead <= look + 3) { ti = wrapIdx(g.gi + 4); lane = gapMid; gateClose = true; }
+    else if (ahead <= 45) lane = gapMid;
   }
   // on for a jump shortcut: onto the pad (this outranks everything else on the run-up)
   if (a.jp && !s.air) {
@@ -3794,8 +3802,13 @@ function aiThink(s, dt) {
       if (a.tgtDone[key]) continue;
       const dir = Math.atan2(ddy, ddx), tang = Math.atan2(T.ty[s.idx], T.tx[s.idx]);
       if (Math.abs(angDiff(tang, dir)) > 0.9) continue;
+      // (a barricade only to trap someone: a rival close behind, but not so close it gets through while the glass rises)
+      if (g.kind === 'shift') {
+        const chaser = W.ships.some((o) => o !== s && !o.finished && o.wreck <= 0 && weaponsLive(o) && (s.u - o.u) > 8 && (s.u - o.u) < 70);
+        if (!chaser) continue;
+      }
       a.tgtDone[key] = 1;
-      if (Math.random() < Math.min(0.97, (g.kind === 'door' ? (g.catchup ? 0.85 : 0.6) : 0.18) * a.skill * a.smart)) { a.tgt = t; a.tgtT = 1.2; break; }
+      if (Math.random() < Math.min(0.97, (g.kind === 'door' ? (g.catchup ? 0.85 : 0.6) : 0.55) * a.skill * a.smart)) { a.tgt = t; a.tgtT = 1.2; break; }
     }
   }
   // a shortcut door coming up: now and then, shoot it open (it takes CFG.doorShots shots, from the lane side)
@@ -3822,7 +3835,7 @@ function aiThink(s, dt) {
       const near = wrapIdx(c.a - s.idx) < 24;   // (close in, it turns harder for the door: it is heading there anyway)
       // (it lines up on the door from well back, but fires only once its shots can reach)
       // (and not while threading a blockade's gap just ahead: the nose has to point down the gap, not at the door)
-      const threading = W.gates.some((q) => q.kind === 'shift' && weaponsLive(s) && wrapIdx(q.gi - s.idx) <= 30 && !(q.soft > 0 && q.owner === s.id));
+      const threading = W.gates.some((q) => q.kind === 'shift' && weaponsLive(s) && q.st && wrapIdx(q.gi - s.idx) <= 30 && q.owner !== s.id);
       if (!threading && d < 620 && Math.abs(angDiff(Math.atan2(T.ty[s.idx], T.tx[s.idx]), dir)) < (near ? 1.05 : 0.75)) {
         inp.aim = dir;
         // (a shot at the door only if, after it, there will still be a shot for the exit gate by the time the gate is in
@@ -9274,13 +9287,12 @@ function drawGateStanding(g, time) {
   if (g.kind === 'exit' || g.kind === 'door') {
     const s = g.seg; posts.push([s.x1, s.y1], [s.x2, s.y2]);
     if (!gateOpenFor(v, g) && !(gateShared(g) && g.st === 2)) body.push(s);   // (soft: glass, drawn by drawGate)
-  } else if (weaponsLive(v)) {
-    const s = g.segs[g.side], o = g.segs[1 - g.side];
-    const rise = v.armAt === undefined ? 0 : clamp((W.time - v.armAt) / 0.7, 0, 1);
+  } else if (weaponsLive(v) && g.st) {   // (a barricade: standing only while it rises and is up; glass, drawn by drawGate)
+    const s = g.segs[0], rise = g.st === 1 ? 1 - g.t / BAR.RISE : 1;
     H *= rise * rise * (3 - 2 * rise);
-    posts.push([s.x1, s.y1], [s.x2, s.y2], [o.x2, o.y2]);
-    if (g.soft > 0) glass = !g.broke[v.id]; else body.push(s);
-  } else H = 0;   // (down through the first lap: only a slot in the deck)
+    posts.push([s.x1, s.y1], [s.x2, s.y2]);
+    glass = !g.broke[v.id] && g.owner !== v.id;
+  } else H = 0;   // (down: only a slot in the deck)
   const P0 = posts[0];
   if (H > 0.002 && P0 && !offscreen(P0[0], P0[1], f0, 240)) {
     const shade = mixHex(col, '#150f2a', 0.55), n = RAIL.n;
@@ -9294,7 +9306,7 @@ function drawGateStanding(g, time) {
       const f = fscale(g.h + H * k / n);
       setScale(f);
       for (const s of body) ln(lc, s.x1, s.y1, s.x2, s.y2, 5, k === 1 ? '#150f2a' : shade);
-      if (glass) { const s = g.segs[g.side]; ln(lc, s.x1, s.y1, s.x2, s.y2, 12, '#9fe9ff', 0.08); }
+      if (glass) { const s = g.segs[0]; ln(lc, s.x1, s.y1, s.x2, s.y2, 12, '#9fe9ff', 0.08); }
       setScale(1);
       for (const p of posts) {   // (pixel posts: placed by their level, never drawn at a fractional scale)
         const x = Math.round(CX + (p[0] - CX) * f), y = Math.round(CY + (p[1] - CY) * f);
@@ -9373,12 +9385,13 @@ function drawGate(g, time, f) {
     const pc = warn && on ? '#ff5a4a' : col;
     pylon(s.x1, s.y1, pc); pylon(s.x2, s.y2, pc);
   } else {
-    const s = g.segs[g.side], o = g.segs[1 - g.side];
+    const s = g.segs[0];
     if (offscreen(s.x1, s.y1, f, 240)) return;
-    // down through your first lap: just a slot in the deck between its pylons, marked with the lap it rises on;
-    // then it rises out of the slot
+    // (the slot in the deck it rises from, right across the glass's width, and the gap's post)
+    const slot = (alpha) => { lc.setLineDash([2, 5]); ln(lc, s.x1, s.y1, s.x2, s.y2, 2, '#0d1a24', 0.9 * alpha); ln(lc, s.x1, s.y1, s.x2, s.y2, 1, col, 0.3 * alpha); lc.setLineDash([]); };
+    // down through your first lap: just the slot, marked with the lap its target goes live on
     if (!weaponsLive(v)) {
-      lc.setLineDash([2, 5]); ln(lc, s.x1, s.y1, s.x2, s.y2, 2, '#0d1a24', 0.9); ln(lc, s.x1, s.y1, s.x2, s.y2, 1, col, 0.3); lc.setLineDash([]);
+      slot(1);
       pylon(s.x1, s.y1, '#41707a'); pylon(s.x2, s.y2, '#41707a');
       const mx = (s.x1 + s.x2) / 2, my = (s.y1 + s.y2) / 2;
       lc.fillStyle = '#0a1a22'; lc.fillRect(Math.round(mx - 14), Math.round(my - 4), 28, 9);
@@ -9386,51 +9399,39 @@ function drawGate(g, time, f) {
       lc.fillText('LAP 2', Math.round(mx), Math.round(my + 1)); lc.textAlign = 'left'; lc.textBaseline = 'alphabetic';
       return;
     }
-    if (v.armAt === undefined) v.armAt = W.time;
-    const rise = clamp((W.time - v.armAt) / 0.7, 0, 1);
-    if (rise < 1) {   // rising: grows out of its slot, bright
-      const k = rise * rise * (3 - 2 * rise);
-      ln(lc, s.x1, s.y1, s.x2, s.y2, 2 + 4 * k, '#1d4a58', k);
-      ln(lc, s.x1, s.y1, s.x2, s.y2, 1 + 2 * k, col, 0.4 + 0.6 * k);
-      ln(ec, s.x1, s.y1, s.x2, s.y2, 10, '#bff6ff', 0.9 * (1 - k) + 0.3);
+    if (!g.st) { slot(0.8); pylon(s.x1, s.y1, '#41707a'); pylon(s.x2, s.y2, '#41707a'); return; }   // (down: nothing in the way)
+    const mine = g.owner === v.id;
+    if (g.st === 1) {   // rising: a glow climbing out of its slot (passable still)
+      const k = 1 - g.t / BAR.RISE, e = k * k * (3 - 2 * k);
+      slot(1 - e);
+      ln(lc, s.x1, s.y1, s.x2, s.y2, 2 + 10 * e, '#9fe9ff', 0.1 + 0.2 * e);
+      ln(lc, s.x1, s.y1, s.x2, s.y2, 1, '#ffffff', 0.4 + 0.5 * e);
+      ln(ec, s.x1, s.y1, s.x2, s.y2, 14, '#bff6ff', 0.25 + 0.5 * (1 - e));
       pylon(s.x1, s.y1, col); pylon(s.x2, s.y2, col);
       return;
     }
-    const warn = g.side === 1 && g.t < 2 && ((time * 8) | 0) % 2 === 0;
-    lc.setLineDash([3, 7]); ln(lc, o.x1, o.y1, o.x2, o.y2, 1, col, 0.16); lc.setLineDash([]);
-    if (g.soft > 0) {
-      // soft: a pane of glass, cracked, clouding over as it hardens; smashed (for you) once you have gone through it
-      const k = 1 - g.soft / CFG.softDur;
-      if (g.broke[v.id]) { lc.setLineDash([3, 9, 1, 7]); ln(lc, s.x1, s.y1, s.x2, s.y2, 2, '#d8ffff', 0.35); lc.setLineDash([]); }
-      else {
-        // a thick pane, pale and see-through, with zigzag cracks running along it
-        ln(lc, s.x1, s.y1, s.x2, s.y2, 14, '#9fe9ff', 0.16 + 0.3 * k);
-        ln(lc, s.x1, s.y1, s.x2, s.y2, 14, '#ffffff', 0.12);
-        const dx = s.x2 - s.x1, dy = s.y2 - s.y1, L = Math.hypot(dx, dy), px = -dy / L, py = dx / L, n = Math.max(4, Math.round(L / 9));
-        lc.globalAlpha = 0.9; lc.strokeStyle = '#ffffff'; lc.lineWidth = 1;
-        for (const off of [-3, 3]) {
-          lc.beginPath();
-          for (let q = 0; q <= n; q++) {
-            const t = q / n, j = (q === 0 || q === n) ? 0 : (((q * 7 + (off > 0 ? 3 : 0)) % 5) - 2) * 1.6 + off;
-            const X = s.x1 + dx * t + px * j, Y = s.y1 + dy * t + py * j;
-            if (q) lc.lineTo(X, Y); else lc.moveTo(X, Y);
-          }
-          lc.stroke();
+    // up: a pane of glass, cracked; smashed (for you) once you have gone through it, or yours to pass; flickering as it
+    // is about to drop
+    const going = g.t < BAR.FLICK, blink = going && ((time * 10) | 0) % 2 === 0;
+    if (g.broke[v.id] || mine) { lc.setLineDash([3, 9, 1, 7]); ln(lc, s.x1, s.y1, s.x2, s.y2, 2, '#d8ffff', mine ? 0.5 : 0.35); lc.setLineDash([]); }
+    else if (!blink) {
+      ln(lc, s.x1, s.y1, s.x2, s.y2, 14, '#9fe9ff', 0.4);
+      ln(lc, s.x1, s.y1, s.x2, s.y2, 14, '#ffffff', 0.12);
+      const dx = s.x2 - s.x1, dy = s.y2 - s.y1, L = Math.hypot(dx, dy), px = -dy / L, py = dx / L, n = Math.max(4, Math.round(L / 9));
+      lc.globalAlpha = 0.9; lc.strokeStyle = '#ffffff'; lc.lineWidth = 1;
+      for (const off of [-3, 3]) {
+        lc.beginPath();
+        for (let q = 0; q <= n; q++) {
+          const t = q / n, j = (q === 0 || q === n) ? 0 : (((q * 7 + (off > 0 ? 3 : 0)) % 5) - 2) * 1.6 + off;
+          const X = s.x1 + dx * t + px * j, Y = s.y1 + dy * t + py * j;
+          if (q) lc.lineTo(X, Y); else lc.moveTo(X, Y);
         }
-        lc.globalAlpha = 1;
-        ln(ec, s.x1, s.y1, s.x2, s.y2, 12, '#bff6ff', 0.1 + 0.12 * Math.sin(time * 14) ** 2);
+        lc.stroke();
       }
+      lc.globalAlpha = 1;
+      ln(ec, s.x1, s.y1, s.x2, s.y2, 12, '#bff6ff', 0.12 + 0.12 * Math.sin(time * 14) ** 2 + (g.flash > 0 ? g.flash : 0));
     }
-    else if (!warn) {
-      ln(lc, s.x1, s.y1, s.x2, s.y2, 6, '#1d4a58');
-      ln(lc, s.x1, s.y1, s.x2, s.y2, 3, col);
-      lc.setLineDash([5, 9]); lc.lineDashOffset = time * 46;
-      ln(lc, s.x1, s.y1, s.x2, s.y2, 1, '#ffffff');
-      lc.setLineDash([]);
-      ln(ec, s.x1, s.y1, s.x2, s.y2, 6, col, Math.min(1, 0.55 + (g.flash > 0 ? g.flash * 1.3 : 0)));
-    }
-    pylon(s.x1, s.y1, col); pylon(s.x2, s.y2, col);
-    pylon(o.x2, o.y2, '#41707a');
+    pylon(s.x1, s.y1, col); pylon(s.x2, s.y2, going ? '#ff5a4a' : col);
   }
 }
 function drawTarget(t, time, f) {
@@ -9448,7 +9449,7 @@ function drawTarget(t, time, f) {
     const has = gateOpenFor(v, g);
     locked = g.catchup && !has && cd <= 0 && !catchEligible(v, g.chord);
     ready = cd <= 0 && !has && !locked;
-  } else { cd = t.cool; cdMax = CFG.targetCd; ready = cd <= 0; }
+  } else { cd = t.cool; cdMax = BAR.RISE + BAR.UP + BAR.CD; ready = cd <= 0 && !g.st; }
   const bob = Math.sin(time * 2.4 + t.id) * 1.6;
   const x = Math.round(t.x), y = Math.round(t.y + bob);
   lc.fillStyle = 'rgba(6,4,20,0.4)';
@@ -10741,9 +10742,9 @@ function drawMinimap(cv, ctx2) {
     ctx2.lineWidth = 26; ctx2.strokeStyle = 'rgba(' + base + ',' + (has ? 0.95 : 0.28) + ')'; ctx2.stroke(p);
   });
   for (const g of W.gates) {
-    if (g.kind !== 'shift' || !weaponsLive(W.ships[0])) continue;
-    const s = g.segs[g.side];
-    ctx2.lineWidth = 18; ctx2.strokeStyle = g.side ? '#8ff3ff' : 'rgba(143,243,255,0.65)';
+    if (g.kind !== 'shift' || !weaponsLive(W.ships[0]) || !g.st) continue;
+    const s = g.segs[0];
+    ctx2.lineWidth = 18; ctx2.strokeStyle = g.st === 2 ? '#8ff3ff' : 'rgba(143,243,255,0.5)';
     ctx2.beginPath(); ctx2.moveTo(s.x1, s.y1); ctx2.lineTo(s.x2, s.y2); ctx2.stroke();
   }
   // asteroids
@@ -15309,7 +15310,7 @@ function trackFromCode(text) {
   let hsh = 7; for (const ch of JSON.stringify(d.points) + name) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0;
   const def = { id: '', name, custom: true, seed: (hsh >>> 0) % 997 + 3, points: d.points };
   if (d.setting && SETTINGS[d.setting]) def.setting = d.setting;
-  for (const k of ['shortcuts', 'elevation', 'barricades', 'jumps', 'gaps', 'holes', 'loops', 'landmarks']) if (Array.isArray(d[k]) && d[k].length) def[k] = d[k];   // (landmarks come without art: not drawn)
+  for (const k of ['shortcuts', 'elevation', 'barricades', 'jumps', 'gaps', 'holes', 'loops', 'slingshots', 'landmarks']) if (Array.isArray(d[k]) && d[k].length) def[k] = d[k];   // (landmarks come without art: not drawn)
   // (its id comes from everything in it, not just its shape: a track edited in the editor and pasted again is a new
   //  track to the caches, best times and ghosts, never the old one under the same name)
   let full = 7; for (const ch of JSON.stringify(def)) full = (full * 31 + ch.charCodeAt(0)) | 0;
