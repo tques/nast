@@ -1630,15 +1630,15 @@ TRACKS.push(
   },
   {
     id: 'perihelion', name: 'Perihelion', setting: 'vegas', seed: 52,
-    points: [[155, 1685], [-65, 1685], [-405, 1815], [-650, 1495], [-1000, 1620], [-1255, 1365], [-1010, 1095], [-1170, 870], [-1520, 925], [-1800, 1225], [-1945, 1250], [-2235, 1170], [-2530, 990], [-2565, 635], [-2280, 380], [-2230, 70], [-2505, -125], [-2470, -375], [-2370, -545], [-2220, -730], [-2020, -940], [-2090, -1435], [-1610, -1700], [-1250, -1445], [-985, -1515], [-820, -1640], [-755, -2114], [-659, -2293], [-492, -2409], [-292, -2438], [-99, -2374], [44, -2231], [108, -2038], [260, -1710], [655, -1650], [735, -1105], [945, -870], [1250, -1075], [1455, -1225], [1715, -1100], [1980, -990], [2245, -870], [2495, -730], [2715, -540], [2830, -280], [2770, 0], [2590, 225], [2370, 410], [2135, 585], [1930, 785], [1775, 1030], [1620, 1275], [1415, 1475], [920, 1020], [670, 995], [540, 1190], [755, 1415], [750, 1645], [450, 1685]],
-    shortcuts: [{from: [1972, -993], to: [2124, 595], via: [[2325, -250]], target: [0.68742, -57]}],
-    elevation: [{from: 0.83227, to: 0.88945, level: 1, rocks: true}, {from: 0.17789, to: 0.34562, level: 1}],
-    barricades: [0.72872],
-    jumps: [{at: 0.60864}],
-    gaps: [{from: 0.61499, to: 0.64104}],
-    slingshots: [{from: 0.47268, to: 0.53812, at: [-330, -2000]}],   // (round the star: hug the inside, come out flung)
+    points: [[155, 1685], [-65, 1685], [-405, 1815], [-650, 1495], [-1000, 1620], [-1255, 1365], [-1010, 1095], [-1170, 870], [-1520, 925], [-1800, 1225], [-1945, 1250], [-2235, 1170], [-2530, 990], [-2565, 635], [-2280, 380], [-2230, 70], [-2505, -125], [-2470, -375], [-2370, -545], [-2220, -730], [-2020, -940], [-2090, -1435], [-1610, -1700], [-1250, -1445], [-985, -1515], [-820, -1640], [-755, -2114], [-659, -2293], [-492, -2409], [-292, -2438], [-99, -2374], [44, -2231], [108, -2038], [118, -1800], [128, -1500], [140, -1180], [260, -960], [560, -880], [945, -870], [1250, -1075], [1455, -1225], [1715, -1100], [1980, -990], [2245, -870], [2495, -730], [2715, -540], [2830, -280], [2770, 0], [2590, 225], [2370, 410], [2135, 585], [1930, 785], [1775, 1030], [1620, 1275], [1415, 1475], [920, 1020], [670, 995], [540, 1190], [755, 1415], [750, 1645], [450, 1685]],
+    shortcuts: [{from: [1972, -993], to: [2124, 595], via: [[2325, -250]], target: [0.68979, -57]}],
+    elevation: [{from: 0.83354, to: 0.89029, level: 1, rocks: true}, {from: 0.17654, to: 0.343, level: 1}],
+    barricades: [0.73077],
+    jumps: [{at: 0.54161}],
+    gaps: [{from: 0.54792, to: 0.5744}],
+    slingshots: [{from: 0.4691, to: 0.53405, at: [-330, -2000]}],   // (round the star: hug the inside, come out flung)
     landmarks: [{at: [-330, -2000], r: 120, desc: 'The star the track swings round at perihelion: a small, fierce sun, white-hot at the heart, flaring gold and orange', art: 'perihelion-sun'}],
-    gapSign: {text: 'GOOD LUCK'}   // (a billboard down in the gap, its arrow pointing to the landing)
+    gapSign: {text: 'GOOD LUCK'}   // (a billboard down in the gap, its arrow pointing to the landing: the gap a slingshot's fling clears)
   },
   {
     id: 'slag-run', name: 'Slag Run', setting: 'gale', seed: 59,
@@ -2482,7 +2482,7 @@ function slingIn(s) {
 function stepSling(s, dt) {
   const c = slingIn(s);
   s.slingC = c;
-  s.sling = 1 + ((s.sling || 1) - 1) * Math.exp(-dt / SLING.HOLD);
+  if (!s.air) s.sling = 1 + ((s.sling || 1) - 1) * Math.exp(-dt / SLING.HOLD);   // (in the air it holds: flung off a jump, it carries its speed over)
   if (s.slingZone) {
     s.slingCharge = (s.slingCharge || 0) + c * dt;
     // (the star's pull: sideways, toward the open edge)
