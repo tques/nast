@@ -1010,9 +1010,10 @@ function segDist(px, py, ax, ay, bx, by) {
      loops       loop-de-loops, {at: fraction, r?: radius in metres (LOOP.R if left out), side?: 'left' | 'right'}.
                  The loop is spliced into the lap at that point of a straight: the lane edges over, climbs a full ring
                  of track, comes back down beside where it went up (on the given side) and edges back onto its line.
-     slingshots  {from, to: fraction, at: [x, y]}: a long bend round a heavy body standing at [x, y] (its art is a
+     slingshots  {from, to: fraction, at: [x, y], fall?}: a long bend round a heavy body standing at [x, y] (its art is a
                  landmark there). Through it, the body's pull holds a racer into the bend and charges it up the closer
                  it keeps to the inside edge, which has no wall; out of the bend it is flung, a moment's extra speed (SLING).
+                 fall: what a racer that goes off the edge is told it went into ('Into the star!' if left out).
      setting     the world around the track (see "settings: the world around the track"): 'space' if left out. A sunken stretch's canopy
                  names one of that setting's overhead types.
      landmarks   one-off pieces of scenery beside the track, from the editor's Landmark tool: {at: [x, y], r, desc,
@@ -1210,7 +1211,7 @@ function buildTrack(def) {
   T.gaps.forEach((g) => Object.assign(g, gapNeed(g)));
   pitZones();
   T.loops = S.loops.map(makeLoop);
-  T.slings = (TRACK.slingshots || []).map((q) => ({ a: atF(q.from), b: atF(q.to), cx: q.at[0], cy: q.at[1] }));
+  T.slings = (TRACK.slingshots || []).map((q) => ({ a: atF(q.from), b: atF(q.to), cx: q.at[0], cy: q.at[1], fall: q.fall || 'Into the star!' }));
 
   T.chords = [];
   for (const def of CHORD_DEFS) {
@@ -1688,12 +1689,13 @@ TRACKS.push(
   },
   {
     id: 'cinder-coil', name: 'Cinder Coil', setting: 'volcano', seed: 101,
-    points: [[-745, 15], [-519, 0], [-247, 0], [40, -165], [296, 0], [640, -175], [839, 0], [1110, 0], [1371, 54], [1529, 267], [1579, 534], [1628, 801], [1520, 1015], [1375, 1125], [1370, 1335], [1620, 1425], [1680, 1640], [1440, 1770], [1155, 1550], [935, 1650], [576, 1745], [305, 1751], [34, 1758], [-238, 1764], [-509, 1771], [-965, 1760], [-1125, 2105], [-1430, 2070], [-1470, 1795], [-1245, 1630], [-1265, 1405], [-1518, 1254], [-1536, 983], [-1489, 723], [-1252, 613], [-981, 604], [-710, 595], [-438, 585], [-167, 576], [104, 567], [376, 557], [638, 600], [765, 830], [776, 1096], [574, 1260], [304, 1277], [33, 1291], [-239, 1306], [-510, 1320], [-779, 1303], [-1048, 1262], [-1316, 1222], [-1585, 1182], [-1853, 1142], [-2113, 1073], [-2256, 851], [-2334, 591], [-2318, 328], [-2113, 159], [-1850, 135], [-1590, 385], [-1165, 345], [-1050, 65]],
-    elevation: [{from: 0.77573, to: 0.84255, level: 1, rocks: true}, {from: 0.62002, to: 0.66546, level: -1, canopy: 'smoke'}],
-    barricades: [0.25017, 0.87931],
-    jumps: [{at: 0.71492}, {at: 0.16617}, {at: 0.91525, side: 'left'}, {at: 0.56837}],
-    gaps: [{from: 0.72427, to: 0.74569}, {from: 0.17553, to: 0.19738}, {from: 0.57453, to: 0.59944}],
-    loops: [{at: 0.33492, r: 220, side: 'right'}]
+    points: [[-745, 15], [-519, 0], [-247, 0], [40, -165], [296, 0], [640, -175], [839, 0], [1110, 0], [1371, 54], [1529, 267], [1579, 534], [1628, 801], [1520, 1015], [1375, 1125], [1370, 1335], [1620, 1425], [1680, 1640], [1440, 1770], [1155, 1550], [935, 1650], [576, 1745], [305, 1751], [34, 1758], [-238, 1764], [-509, 1771], [-771, 1879], [-875, 2150], [-932, 2362], [-1088, 2518], [-1300, 2575], [-1512, 2518], [-1668, 2362], [-1725, 2150], [-1690, 1650], [-1518, 1254], [-1536, 983], [-1489, 723], [-1252, 613], [-981, 604], [-710, 595], [-438, 585], [-167, 576], [104, 567], [376, 557], [638, 600], [765, 830], [776, 1096], [574, 1260], [304, 1277], [33, 1291], [-239, 1306], [-510, 1320], [-779, 1303], [-1048, 1262], [-1316, 1222], [-1585, 1182], [-1853, 1142], [-2113, 1073], [-2256, 851], [-2334, 591], [-2318, 328], [-2113, 159], [-1850, 135], [-1590, 385], [-1165, 345], [-1050, 65]],
+    elevation: [{from: 0.78238, to: 0.84715, level: 1, rocks: true}, {from: 0.63148, to: 0.67552, level: -1, canopy: 'smoke'}],
+    barricades: [0.24288, 0.88277],
+    jumps: [{at: 0.72345}, {at: 0.16127}, {at: 0.91775, side: 'left'}, {at: 0.58161}],
+    gaps: [{from: 0.73251, to: 0.75324}, {from: 0.17034, to: 0.19106}, {from: 0.58744, to: 0.6114}],
+    slingshots: [{from: 0.39184, to: 0.46373, at: [-1300, 2150], fall: 'Into the lava!'}],   // (round the molten core: hug the inside, come out flung)
+    landmarks: [{at: [-1300, 2150], r: 115, desc: 'A molten core hanging over a lava pool in the hairpin: a ball of black crust split by glowing orange cracks, dripping into the pool below', art: 'cinder-core'}]
   },
   {
     id: 'thermal-rise', name: 'Thermal Rise', setting: 'gale', seed: 108,
@@ -1706,11 +1708,12 @@ TRACKS.push(
   },
   {
     id: 'high-roller', name: 'High Roller', setting: 'vegas', seed: 115,
-    points: [[-1451, 0], [-1179, 0], [-906, 0], [-634, 0], [-362, 0], [-90, 0], [182, 0], [454, 0], [726, 0], [998, 0], [1257, -54], [1385, -291], [1493, -541], [1733, -630], [2005, -630], [2256, -562], [2347, -307], [2425, -47], [2484, 217], [2308, 411], [2084, 565], [2073, 815], [2194, 1059], [2277, 1312], [2097, 1502], [1866, 1646], [1616, 1723], [1430, 1534], [1272, 1312], [1058, 1170], [786, 1170], [537, 1242], [457, 1500], [390, 1764], [171, 1890], [-101, 1890], [-372, 1879], [-508, 1659], [-574, 1395], [-714, 1180], [-985, 1170], [-1244, 1220], [-1336, 1472], [-1402, 1736], [-1614, 1871], [-1885, 1841], [-2155, 1808], [-2319, 1610], [-2412, 1354], [-2505, 1098], [-2588, 840], [-2489, 591], [-2356, 354], [-2224, 116], [-1995, 0], [-1723, 0]],
+    points: [[-1451, 0], [-1179, 0], [-906, 0], [-634, 0], [-362, 0], [-90, 0], [182, 0], [352, 433], [396, 663], [554, 836], [780, 900], [1006, 836], [1164, 663], [1208, 433], [1257, -54], [1385, -291], [1493, -541], [1733, -630], [2005, -630], [2256, -562], [2347, -307], [2425, -47], [2484, 217], [2308, 411], [2084, 565], [2073, 815], [2194, 1059], [2277, 1312], [2097, 1502], [1866, 1646], [1616, 1723], [1430, 1534], [1272, 1312], [1058, 1170], [786, 1170], [537, 1242], [457, 1500], [390, 1764], [171, 1890], [-101, 1890], [-372, 1879], [-508, 1659], [-574, 1395], [-714, 1180], [-985, 1170], [-1244, 1220], [-1336, 1472], [-1402, 1736], [-1614, 1871], [-1885, 1841], [-2155, 1808], [-2319, 1610], [-2412, 1354], [-2505, 1098], [-2588, 840], [-2489, 591], [-2356, 354], [-2224, 116], [-1995, 0], [-1723, 0]],
     shortcuts: [{from: [1221, -34], to: [2068, 601], via: [[1650, -230], [2010, -235], [2225, -60], [2125, 295]]}],
-    elevation: [{from: 0.66064, to: 0.76709, level: -1}, {from: 0.46456, to: 0.59293, level: 1}, {from: 0.23117, to: 0.32577, level: -1}],
-    barricades: [0.20651, 0.42653, 0.8332],
-    loops: [{at: 0.11914, r: 200, side: 'right'}]
+    elevation: [{from: 0.68787, to: 0.78582, level: -1}, {from: 0.50731, to: 0.625, level: 1}, {from: 0.2924, to: 0.37939, level: -1}],
+    barricades: [0.26974, 0.47222, 0.84649],
+    slingshots: [{from: 0.12865, to: 0.21491, at: [780, 470], fall: 'Lost in the void!'}],   // (round the jackpot moon: hug the inside, come out flung)
+    landmarks: [{at: [780, 470], r: 125, desc: 'The jackpot moon: a gold planet banded like a casino chip, with a neon pink ring of chasing bulbs and chips orbiting it', art: 'jackpot-moon'}]
   },
   {
     id: 'elevation', name: 'Elevation', setting: 'vegas', seed: 122,
@@ -2520,6 +2523,7 @@ function slingFall(s, g) {
   W.fx.push({ kind: 'loopfall', ship: s, t0: W.time, x: s.x, y: s.y, gx: s.x + (g.cx - s.x) * 0.25, gy: s.y + (g.cy - s.y) * 0.25, col: s.col, hull: s.hull, ang: s.ang });
   burst(s.x, s.y, 14, 90, '#ffb44a', 0.5, true);
   outAt(s, s.idx);
+  s.slingFall = g.fall;
   emit('fall', s, 'sun');
 }
 /* A speeder's own motion for one step: turning has been done; this is thrust (along the nose), the top speed its
@@ -3531,7 +3535,7 @@ function aiThink(s, dt) {
   // a slingshot: right in against the inside edge, where the pull is strongest (as close as its skill dares)
   for (const g of T.slings) if (wrapIdx(ti - g.a) <= wrapIdx(g.b - g.a) + 10) {
     const side = Math.sign((g.cx - T.x[ti]) * T.nx[ti] + (g.cy - T.y[ti]) * T.ny[ti]) || 1;
-    lane = side * T.hw * clamp(0.42 + 0.2 * a.skill, 0.42, 0.62);   // (the edge is open: not so near it that a nudge puts it off)
+    lane = side * T.hw * clamp(0.36 + 0.2 * a.skill, 0.36, 0.55);   // (the edge is open: not so near it that a nudge puts it off)
   }
   // open water (or lava) eating into the lane ahead: keep to the deck that is left, with room to spare
   if (RIVER.hole) for (let j = 0; j <= look + 16; j += 2) {
@@ -8343,6 +8347,105 @@ LANDMARK_ART['perihelion-sun'] = (() => {
       for (let q = 0; q < 6; q++) {
         const a = q * 1.05 + time * 0.1 + Math.sin(time * 0.7 + q) * 0.2, u = (time * 0.3 + q * 0.17) % 1, rr = R * f * (1 + 0.28 * Math.sin(u * Math.PI));
         glow(ec, '#ffa040', Math.round(R * 0.26 * f / 2) * 2, x + Math.cos(a) * rr, y + Math.sin(a) * rr, 0.4 * Math.sin(u * Math.PI));
+      }
+    }
+  };
+})();
+/* Cinder Coil: the molten core its hairpin swings round. A ball of black basalt crust split by glowing orange cracks,
+   hanging just over a pool of lava that fills the inside of the bend (the bottom slice, flat on the ground: its rim of
+   dark rock, crusted plates drifting on bright lava). Lit from the upper left. Its glow and the pool's heat pulse each
+   frame (over). The pool reaches POOL x its radius out, to just short of the lane's open inside edge. */
+LANDMARK_ART['cinder-core'] = (() => {
+  const CORE = [[18, 13, 13], [30, 22, 21], [46, 35, 31], [66, 51, 43]], POOL = 3.0, CRUST = [[34, 26, 24], [52, 40, 35], [74, 58, 48], [98, 78, 62]], LAVA = [[200, 60, 20], [255, 110, 30], [255, 170, 60], [255, 226, 140]];
+  return {
+    height: 0.7, n: 11, sizeK: 2 * POOL + 0.4, lit: true,
+    slice(g, k, n, S, R) {
+      const c0 = S / 2, im = g.createImageData(S, S), d = im.data;
+      const put = (x, y, c) => { const i = (y * S + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; };
+      if (k === 0) {   // the pool
+        const PR = R * POOL;
+        for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+          const dx = x + 0.5 - c0, dy = y + 0.5 - c0, d0 = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+          const lim = PR * (1 - 0.025 * (1 + Math.sin(a * 7) * Math.sin(a * 3 + 1)));
+          if (d0 > lim) continue;
+          if (lim - d0 < 7) { put(x, y, CRUST[(lim - d0 < 3) ? 0 : 1]); continue; }   // (its rim of dark rock)
+          // (dark crusted plates, bright lava welling up in the cracks between them)
+          const h = Math.abs(Math.sin(dx * 0.045 + Math.sin(dy * 0.031) * 2.3) * Math.sin(dy * 0.05 + Math.sin(dx * 0.027 + 1) * 2.1));
+          put(x, y, h < 0.05 ? LAVA[2] : h < 0.12 ? LAVA[1] : h < 0.2 ? LAVA[0] : CRUST[h > 0.75 && (x + y) % 9 === 0 ? 2 : 1]);
+        }
+        g.putImageData(im, 0, 0); return;
+      }
+      const z = (k - 0.5) / (n - 1) * 2 - 1, rr = R * Math.sqrt(Math.max(0, 1 - z * z));
+      if (rr < 2) return;
+      const x0 = Math.max(0, Math.floor(c0 - rr)), x1 = Math.min(S, Math.ceil(c0 + rr));
+      for (let y = x0; y < x1; y++) for (let x = x0; x < x1; x++) {
+        const dx = x + 0.5 - c0, dy = y + 0.5 - c0, d0 = Math.hypot(dx, dy);
+        if (d0 > rr) continue;
+        const nz = Math.sqrt(Math.max(0, 1 - (d0 * d0) / (R * R))), lit = -(dx * 0.6 + dy * 0.8) / R * 0.6 + nz * 0.4 + z * 0.3;
+        const crack = Math.abs(Math.sin(dx * 0.16 + Math.sin(dy * 0.09 + k) * 2.4) * Math.sin(dy * 0.15 + Math.sin(dx * 0.08) * 2.1));
+        if (crack < 0.045) { put(x, y, LAVA[crack < 0.02 ? 3 : 2]); continue; }   // the glowing cracks
+        let b = clamp(Math.round((lit + 0.3) * 1.8), 0, 3);
+        if (rr - d0 < 1.5) b = Math.max(0, b - 1);
+        put(x, y, CORE[b]);
+      }
+      g.putImageData(im, 0, 0);
+    },
+    over(lc, ec, x, y, f, time, R) {
+      const p = 0.5 + 0.5 * Math.sin(time * 1.4);
+      glow(ec, '#ff5a14', Math.round(R * POOL * 1.1 * f / 8) * 8, x, y, 0.16 + 0.05 * p);   // (the pool's heat)
+      glow(ec, '#ffa040', Math.round(R * 0.9 * f / 4) * 4, x, y, 0.1 + 0.08 * p);   // (the core's cracks)
+      for (let q = 0; q < 4; q++) {   // (drips off its underside into the pool)
+        const u = (time * 0.6 + q * 0.27) % 1, a = q * 1.7 + 0.4, rx = Math.cos(a) * R * 0.45 * f, ry = Math.sin(a) * R * 0.45 * f;
+        lc.fillStyle = u < 0.8 ? '#ffb347' : '#ff7a1a'; lc.fillRect(Math.round(x + rx), Math.round(y + ry + u * R * 0.5 * f), 2, 3);
+      }
+    }
+  };
+})();
+/* High Roller: the jackpot moon its bend swings round. A gold planet banded like a casino chip (wide gold bands and
+   cream stripes round it, edge spots like a chip's inlays), lit from the upper left; round it, in neon pink, a ring of
+   chasing bulbs, and a few chips orbiting (over, each frame). Sliced as a sphere. */
+LANDMARK_ART['jackpot-moon'] = (() => {
+  const GOLD = [[120, 72, 20], [176, 116, 30], [228, 168, 52], [255, 214, 110]], CREAM = [[150, 120, 96], [206, 178, 146], [246, 226, 196], [255, 246, 226]], RED = [[110, 20, 40], [168, 34, 60], [214, 60, 86], [240, 104, 124]];
+  return {
+    height: 0.6, n: 12, sizeK: 2.4, lit: true,
+    slice(g, k, n, S, R) {
+      const c0 = S / 2, z = (k + 0.5) / n * 2 - 1, rr = R * Math.sqrt(Math.max(0, 1 - z * z));
+      if (rr < 2) return;
+      const im = g.createImageData(S, S), d = im.data, x0 = Math.max(0, Math.floor(c0 - rr)), x1 = Math.min(S, Math.ceil(c0 + rr));
+      for (let y = x0; y < x1; y++) for (let x = x0; x < x1; x++) {
+        const dx = x + 0.5 - c0, dy = y + 0.5 - c0, d0 = Math.hypot(dx, dy);
+        if (d0 > rr) continue;
+        const nz = Math.sqrt(Math.max(0, 1 - (d0 * d0) / (R * R))), lit = -(dx * 0.6 + dy * 0.8) / R * 0.55 + nz * 0.45 + z * 0.2;
+        let b = clamp(Math.round((lit + 0.35) * 2), 0, 3);
+        if (rr - d0 < 1.5) b = Math.max(0, b - 1);
+        // (bands round it like a chip's edge: gold, then a cream stripe broken into the chip's inlay blocks)
+        const ring = d0 / R, a = Math.atan2(dy, dx);
+        let pal = GOLD;
+        if (ring > 0.42 && ring < 0.56) pal = Math.floor((a / TAU) * 16 + 16) % 2 ? CREAM : RED;
+        else if (ring > 0.78 && ring < 0.86) pal = CREAM;
+        else if (ring < 0.16) pal = RED;
+        const c = pal[b], i = (y * S + x) * 4;
+        d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+      }
+      g.putImageData(im, 0, 0);
+    },
+    over(lc, ec, x, y, f, time, R) {
+      glow(ec, '#ffcf5a', Math.round(R * 1.5 * f / 8) * 8, x, y, 0.2);
+      // the neon ring of chasing bulbs
+      const RB = R * 1.42 * f, NB = 56, step = Math.floor(time * 10);
+      lc.strokeStyle = '#3a1640'; lc.lineWidth = 4; lc.beginPath(); lc.arc(Math.round(x), Math.round(y), RB, 0, TAU); lc.stroke();
+      lc.strokeStyle = '#ff4fd8'; lc.lineWidth = 1; lc.beginPath(); lc.arc(Math.round(x), Math.round(y), RB + 2, 0, TAU); lc.stroke();
+      ec.globalAlpha = 0.5; ec.strokeStyle = '#ff4fd8'; ec.lineWidth = 3; ec.beginPath(); ec.arc(Math.round(x), Math.round(y), RB, 0, TAU); ec.stroke(); ec.globalAlpha = 1;
+      for (let q = 0; q < NB; q++) {
+        const a = (q / NB) * TAU, on = (q + step) % 4 === 0, bx = Math.round(x + Math.cos(a) * RB), by = Math.round(y + Math.sin(a) * RB);
+        lc.fillStyle = on ? '#fff4c2' : '#8a3a7e'; lc.fillRect(bx - 1, by - 1, 3, 3);
+        if (on) glow(ec, '#ffd27a', 6, bx, by, 0.5);
+      }
+      // chips, orbiting
+      for (let q = 0; q < 3; q++) {
+        const a = time * (0.35 + q * 0.07) + q * 2.1, rr = R * (1.62 + q * 0.04) * f, cx = Math.round(x + Math.cos(a) * rr), cy = Math.round(y + Math.sin(a) * rr * 0.98), cr = Math.max(4, Math.round(R * 0.07 * f));
+        lc.fillStyle = ['#d43c56', '#2a7ae0', '#2a2a32'][q]; lc.beginPath(); lc.arc(cx, cy, cr, 0, TAU); lc.fill();
+        lc.strokeStyle = '#f4ecd8'; lc.lineWidth = 1; lc.setLineDash([2, 2]); lc.beginPath(); lc.arc(cx, cy, cr - 1.5, 0, TAU); lc.stroke(); lc.setLineDash([]);
       }
     }
   };
@@ -14937,7 +15040,7 @@ function handleEvents() {
       case 'fall':
         if (!e.a.isPlayer) chat(e.a, 'crash');
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.fall();
-        if (e.a.isPlayer && mode === 'race') toast(e.b === 'pit' ? 'Into a hole! Back on past it' : e.b === 'loop' ? 'Too slow for the loop! Back on past it' : e.b === 'sun' ? 'Into the star! Keep off the edge' : 'Fell off! Back on past the gap');
+        if (e.a.isPlayer && mode === 'race') toast(e.b === 'pit' ? 'Into a hole! Back on past it' : e.b === 'loop' ? 'Too slow for the loop! Back on past it' : e.b === 'sun' ? (e.a.slingFall || 'Into the star!') + ' Keep off the edge' : 'Fell off! Back on past the gap');
         break;
       case 'hurt':
         W.shake = Math.max(W.shake, 0.35);
