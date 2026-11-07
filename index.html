@@ -3077,7 +3077,7 @@ function hullStats(hull) { return Object.assign({}, HULL_BASE, HULL_STATS[hull] 
    on the ring costs speed, which is taken off as it comes out (lp.keep), so a clean line exits faster.
    Nothing on the ring touches anything off it: a racer on a loop is lifted out of reach (LOOP_H). */
 const LOOP_H = 6;
-const LOOP_LAT = { acc: 420, damp: 2.2, wall: 8 };   // steering across the deck: push, drift damping, wall margin
+const LOOP_LAT = { acc: 420, damp: 2.2, wall: 8, dead: 0.26 };   // steering across the deck: push, drift damping, wall margin, dead zone (sine of the aim's angle off, about 15°)
 const LOOP_ALIGN = 140;   // committed: speed lost per second with the nose pointed square to the ring (never below L.need)
 
 /* how far round the ring's way has turned (on screen) from the way in */
@@ -3095,10 +3095,10 @@ function checkLoops(s, prevIdx) {
 }
 function enterLoop(s, L, v) {
   // across the deck: where it is across the lane at the foot (the foot is the lane, edged over toward A's side)
-  const ax = T.x[L.i], ay = T.y[L.i];
+  const ax = T.x[L.i], ay = T.y[L.i], ex = s.x, ey = s.y;
   const l = clamp((s.x - ax) * L.nx + (s.y - ay) * L.ny, -(T.hw - LOOP_LAT.wall), T.hw - LOOP_LAT.wall);
   moveIdx(s, L.i);
-  s.loop = { L, p: 0.5, v, l, vl: 0, roll: false, commit: false, keep: 1, px: s.x, py: s.y, z: 0, th: 0 };
+  s.loop = { L, p: 0.5, v, l, vl: 0, roll: false, commit: false, keep: 1, px: s.x, py: s.y, z: 0, th: 0, ex, ey };
   s.air = 0; s.h = LOOP_H;
   placeOnLoop(s);
   emit('loopin', s);
@@ -3134,7 +3134,10 @@ function stepLoop(s, dt, live) {
       // across the deck: how far the aim is off the ring's way, to the racer's right or left, as on the lane (from
       // the aim, not the nose, which lags a little behind the ring as it turns)
       const off = s.isPlayer ? angDiff(Math.atan2(L.fy, L.fx), inp.aim) : angDiff(Math.atan2(t[1], t[0]), inp.aim);
-      al = LOOP_LAT.acc * Math.min(1, ml) * Math.sin(off);
+      // (a dead zone: a pointer or stick held roughly on keeps the racer's line across the deck; only a clear aim
+      //  to one side moves it over)
+      const so = Math.sin(off), dz = LOOP_LAT.dead;
+      al = LOOP_LAT.acc * Math.min(1, ml) * Math.sign(so) * Math.max(0, Math.abs(so) - dz) / (1 - dz);
     }
   }
   lp.v += a * dt;
@@ -14220,8 +14223,10 @@ function prepInput() {
   else { i.mx = 0; i.my = 0; }
   const w = mouseToWorld(mouse.x, mouse.y);
   // (on a loop the ship is drawn up on the ring, so aim from there)
-  // (on a loop, from a fixed point back down the run-up: the pointer held ahead keeps meaning "on", see loopRot)
-  i.aim = p.loop ? Math.atan2(w.y - (p.loop.L.y - p.loop.L.fy * 160), w.x - (p.loop.L.x - p.loop.L.fx * 160)) : Math.atan2(w.y - p.y, w.x - p.x);
+  // (on a loop, on screen, from where the ship was as it went on: the camera swings over to frame the ring, and a
+  //  pointer held still keeps meaning what it did on the run-up, see loopRot)
+  if (p.loop && !p.loop.ms0) p.loop.ms0 = [VW / 2 + (p.loop.ex - CAM.x), VH / 2 + (p.loop.ey - CAM.y)];
+  i.aim = p.loop ? Math.atan2(mouse.y - p.loop.ms0[1], mouse.x - p.loop.ms0[0]) : Math.atan2(w.y - p.y, w.x - p.x);
   i.fire = !!(keys.KeyW || keys.ArrowUp);
   if (boostQueued) { i.boostPress = true; boostQueued = false; }
   if (swipeQueued) { i.swipe = swipeQueued; swipeQueued = 0; }
