@@ -1010,6 +1010,9 @@ function segDist(px, py, ax, ay, bx, by) {
      loops       loop-de-loops, {at: fraction, r?: radius in metres (LOOP.R if left out), side?: 'left' | 'right'}.
                  The loop is spliced into the lap at that point of a straight: the lane edges over, climbs a full ring
                  of track, comes back down beside where it went up (on the given side) and edges back onto its line.
+     slingshots  {from, to: fraction, at: [x, y]}: a long bend round a heavy body standing at [x, y] (its art is a
+                 landmark there). Through it, the body's pull holds a racer into the bend and lets it run faster the
+                 closer it keeps to the inside edge; the extra speed carries on out of the bend for a moment (SLING).
      setting     the world around the track (see "settings: the world around the track"): 'space' if left out. A sunken stretch's canopy
                  names one of that setting's overhead types.
      landmarks   one-off pieces of scenery beside the track, from the editor's Landmark tool: {at: [x, y], r, desc,
@@ -1207,6 +1210,7 @@ function buildTrack(def) {
   T.gaps.forEach((g) => Object.assign(g, gapNeed(g)));
   pitZones();
   T.loops = S.loops.map(makeLoop);
+  T.slings = (TRACK.slingshots || []).map((q) => ({ a: atF(q.from), b: atF(q.to), cx: q.at[0], cy: q.at[1] }));
 
   T.chords = [];
   for (const def of CHORD_DEFS) {
@@ -1556,11 +1560,12 @@ function buildRocks(seed) {
     }
     return true;
   }
-  const GZ = gapSignZone();
+  const GZ = gapSignZone(), SZ = slingZones();
   function add(x, y, r, layer) {
     if (!free(x, y, r)) return;
     const v = Math.floor(R() * 8);
     if (GZ && Math.hypot(x - GZ.x, y - GZ.y) < GZ.r) return;   // (nothing round the sign over a gap: see gapSignZone)
+    for (const z of SZ) if (Math.hypot(x - z.x, y - z.y) < z.r) return;
     const o = { x, y, r, layer, v };
     rocks.push(o);
     const k = key(x, y);
@@ -1624,14 +1629,15 @@ TRACKS.push(
     barricades: [0.09493, 0.76174]
   },
   {
-    id: 'perihelion', name: 'Perihelion', setting: 'vegas', seed: 52, loop3d: true,   // (its loop drawn in real 3D: see drawLoops3D)
-    points: [[155, 1685], [-65, 1685], [-405, 1815], [-650, 1495], [-1000, 1620], [-1255, 1365], [-1010, 1095], [-1170, 870], [-1520, 925], [-1800, 1225], [-1945, 1250], [-2235, 1170], [-2530, 990], [-2565, 635], [-2280, 380], [-2230, 70], [-2505, -125], [-2470, -375], [-2370, -545], [-2220, -730], [-2020, -940], [-2090, -1435], [-1610, -1700], [-1250, -1445], [-985, -1515], [-745, -1610], [-465, -1685], [-175, -1725], [110, -1730], [655, -1650], [735, -1105], [945, -870], [1250, -1075], [1455, -1225], [1715, -1100], [1980, -990], [2245, -870], [2495, -730], [2715, -540], [2830, -280], [2770, 0], [2590, 225], [2370, 410], [2135, 585], [1930, 785], [1775, 1030], [1620, 1275], [1415, 1475], [920, 1020], [670, 995], [540, 1190], [755, 1415], [750, 1645], [450, 1685]],
-    shortcuts: [{from: [1972, -993], to: [2124, 595], via: [[2325, -250]], target: [0.66958, -57]}],
-    elevation: [{from: 0.82287, to: 0.88346, level: 1, rocks: true}, {from: 0.18794, to: 0.36515, level: 1}],
-    barricades: [0.71338],
-    jumps: [{at: 0.58601}],
-    gaps: [{from: 0.5933, to: 0.62028}],
-    loops: [{at: 0.49927, r: 220, side: 'right'}],
+    id: 'perihelion', name: 'Perihelion', setting: 'vegas', seed: 52,
+    points: [[155, 1685], [-65, 1685], [-405, 1815], [-650, 1495], [-1000, 1620], [-1255, 1365], [-1010, 1095], [-1170, 870], [-1520, 925], [-1800, 1225], [-1945, 1250], [-2235, 1170], [-2530, 990], [-2565, 635], [-2280, 380], [-2230, 70], [-2505, -125], [-2470, -375], [-2370, -545], [-2220, -730], [-2020, -940], [-2090, -1435], [-1610, -1700], [-1250, -1445], [-985, -1515], [-820, -1640], [-755, -2114], [-659, -2293], [-492, -2409], [-292, -2438], [-99, -2374], [44, -2231], [108, -2038], [260, -1710], [655, -1650], [735, -1105], [945, -870], [1250, -1075], [1455, -1225], [1715, -1100], [1980, -990], [2245, -870], [2495, -730], [2715, -540], [2830, -280], [2770, 0], [2590, 225], [2370, 410], [2135, 585], [1930, 785], [1775, 1030], [1620, 1275], [1415, 1475], [920, 1020], [670, 995], [540, 1190], [755, 1415], [750, 1645], [450, 1685]],
+    shortcuts: [{from: [1972, -993], to: [2124, 595], via: [[2325, -250]], target: [0.68742, -57]}],
+    elevation: [{from: 0.83227, to: 0.88945, level: 1, rocks: true}, {from: 0.17789, to: 0.34562, level: 1}],
+    barricades: [0.72872],
+    jumps: [{at: 0.60864}],
+    gaps: [{from: 0.61499, to: 0.64104}],
+    slingshots: [{from: 0.47268, to: 0.53812, at: [-330, -2000]}],   // (round the star: hug the inside, come out flung)
+    landmarks: [{at: [-330, -2000], r: 120, desc: 'The star the track swings round at perihelion: a small, fierce sun, white-hot at the heart, flaring gold and orange', art: 'perihelion-sun'}],
     gapSign: {text: 'GOOD LUCK'}   // (a billboard down in the gap, its arrow pointing to the landing)
   },
   {
@@ -2229,7 +2235,7 @@ function wreck(s) {
 function respawn(s) {
   // never over a gap: on past it
   if (T.gap[s.idx]) { let k = 0; while (T.gap[wrapIdx(s.idx + k)] && k < T.N) k++; moveIdx(s, wrapIdx(s.idx + k + 6)); }
-  s.air = 0; s.vh = 0; s.doomed = false; s.loop = null; s.hEase = false; s.shield = CFG.shieldMax; s.shieldT = 0; s.slowT = 0; s.blastT = 0; s.swipeT = 0;
+  s.air = 0; s.vh = 0; s.doomed = false; s.loop = null; s.sling = 1; s.slingPeak = 0; s.hEase = false; s.shield = CFG.shieldMax; s.shieldT = 0; s.slowT = 0; s.blastT = 0; s.swipeT = 0;
   // (and never into open water: on to the middle of what is left of the deck)
   const lat = RIVER.hole && RIVER.hole[s.idx] === 1 ? (RIVER.safe[s.idx * 2] + RIVER.safe[s.idx * 2 + 1]) / 2 : 0;
   s.lava = false;
@@ -2416,6 +2422,62 @@ function fireShot(s, hostile) {
   emit('shot', s, hostile);
 }
 
+/* slingshots. TOP: how much faster than its usual top speed a racer may run, hugging the inside edge (less further
+   out, none on the outer half); GRIP: how much harder the pull lets it corner there; HOLD: seconds over which the extra
+   speed allowed fades once it is out of the bend (it was flung: it carries on fast for a moment) */
+const SLING = { TOP: 0.22, GRIP: 260, HOLD: 1.1 };
+/* a slingshot's pull, drawn on the deck: a warm band along the inside edge, light streaming round it the way the lane
+   runs (brighter toward the inside, where the pull is) */
+function drawSling(g, time) {
+  const N = T.N, len = wrapIdx(g.b - g.a);
+  const side = (i) => Math.sign((g.cx - T.x[i]) * T.nx[i] + (g.cy - T.y[i]) * T.ny[i]) || 1;
+  const P = (i, l) => [T.x[i] + T.nx[i] * l, T.y[i] + T.ny[i] * l];
+  for (let q = 0; q < len; q += 2) {
+    const i = (g.a + q) % N, j = (g.a + Math.min(len, q + 2)) % N, si = side(i), sj = side(j);
+    const fade = Math.min(1, q / 12, (len - q) / 12);   // (eased in and out at its ends)
+    const a = P(i, si * (T.hw - 4)), b = P(j, sj * (T.hw - 4)), c = P(j, sj * T.hw * 0.25), d = P(i, si * T.hw * 0.25);
+    ec.globalAlpha = 0.16 * fade; ec.fillStyle = '#ffb44a';
+    ec.beginPath(); ec.moveTo(a[0], a[1]); ec.lineTo(b[0], b[1]); ec.lineTo(c[0], c[1]); ec.lineTo(d[0], d[1]); ec.closePath(); ec.fill();
+    const e = P(i, si * (T.hw - 4)), h = P(i, si * T.hw * 0.62);
+    ec.globalAlpha = 0.14 * fade; ec.beginPath(); ec.moveTo(e[0], e[1]); ec.lineTo(b[0], b[1]); ec.lineTo(P(j, sj * T.hw * 0.62)[0], P(j, sj * T.hw * 0.62)[1]); ec.lineTo(h[0], h[1]); ec.closePath(); ec.fill();
+  }
+  ec.globalAlpha = 1;
+  // streaks of light, three lanes of them, flowing round (faster nearer the inside)
+  for (const [l, sp, al] of [[0.86, 1.0, 0.9], [0.66, 0.75, 0.6], [0.44, 0.5, 0.35]]) {
+    const n = Math.floor(len / 9);
+    for (let k = 0; k < n; k++) {
+      const u = (k / n + time * 0.09 * sp) % 1, q = Math.floor(u * len), i = (g.a + q) % N, j = (g.a + Math.min(len, q + 3)) % N;
+      const fade = Math.min(1, q / 12, (len - q) / 12);
+      const a = P(i, side(i) * T.hw * l), b = P(j, side(j) * T.hw * l);
+      lc.globalAlpha = al * fade; lc.strokeStyle = '#ffd27a'; lc.lineWidth = 2;
+      lc.beginPath(); lc.moveTo(a[0], a[1]); lc.lineTo(b[0], b[1]); lc.stroke();
+    }
+  }
+  lc.globalAlpha = 1;
+}
+/* how close to the inside edge of a slingshot's bend the racer is: 0 (outer half, or not in one) to 1 */
+function slingIn(s) {
+  s.slingZone = false;
+  if (s.air || s.inCorr || s.loop || s.wreck > 0) return 0;
+  for (const g of T.slings) {
+    if (wrapIdx(s.idx - g.a) > wrapIdx(g.b - g.a)) continue;
+    s.slingZone = true;
+    const i = s.idx, l = (s.x - T.x[i]) * T.nx[i] + (s.y - T.y[i]) * T.ny[i];
+    const side = Math.sign((g.cx - T.x[i]) * T.nx[i] + (g.cy - T.y[i]) * T.ny[i]) || 1;
+    const c = clamp((l * side / T.hw + 0.3) / 1.1, 0, 1);
+    return c * Math.sqrt(c);
+  }
+  return 0;
+}
+function stepSling(s, dt) {
+  const c = slingIn(s), was = s.sling || 1;
+  s.slingC = c;
+  if (c > 0) s.sling = was + (1 + SLING.TOP * c - was) * (1 - Math.exp(-3 * dt));
+  else s.sling = 1 + (was - 1) * Math.exp(-dt / SLING.HOLD);
+  // (out of the bend having kept well in: flung)
+  if (s.slingZone) s.slingPeak = Math.max(s.slingPeak || 0, s.sling);
+  else if (s.slingPeak) { if (s.slingPeak > 1 + SLING.TOP * 0.6) emit('slung', s); s.slingPeak = 0; }
+}
 /* A speeder's own motion for one step: turning has been done; this is thrust (along the nose), the top speed its
    heading allows (and the slope, boosting, a slowed engine), drift pulled into the nose, and the cornering limit (ask
    for more and it slides wide). Shared by the race (stepShip) and the How to play test area, so both handle alike.
@@ -2427,7 +2489,7 @@ function shipMotion(s, dt, live, slope) {
   const align = sp > 8 ? (s.vx * fx + s.vy * fy) / sp : 1;
   s.align = align;
   const k = clamp(align, 0, 1), boosting = s.boostT > 0;
-  const top = CF.top * s.st.top * s.speedMul * (0.38 + 0.62 * k) * (boosting ? (1 + 0.55 * s.st.boost) * (s.boostMul || 1) : 1) * (1 - CF.slopeK * slope) * (s.slowT > 0 ? CF.slowMul : 1);
+  const top = CF.top * s.st.top * s.speedMul * (0.38 + 0.62 * k) * (boosting ? (1 + 0.55 * s.st.boost) * (s.boostMul || 1) : 1) * (1 - CF.slopeK * slope) * (s.slowT > 0 ? CF.slowMul : 1) * (s.sling || 1);
   s.top = top;
   const v0x = s.vx, v0y = s.vy;   // (for the cornering limit, below)
   let ml = 0;
@@ -2456,7 +2518,7 @@ function shipMotion(s, dt, live, slope) {
     if (sp0 > 60 && s.stun <= 0) {
       const ux = v0x / sp0, uy = v0y / sp0, lx = -uy, ly = ux;
       const lat = (s.vx - v0x) * lx + (s.vy - v0y) * ly;
-      const capA = cornerLimit(s, boosting), cap = capA * dt;
+      const capA = cornerLimit(s, boosting) + SLING.GRIP * (s.slingC || 0), cap = capA * dt;   // (a slingshot's pull holds it in)
       if (Math.abs(lat) > cap) {
         const ex = lat - Math.sign(lat) * cap;
         s.vx -= lx * ex; s.vy -= ly * ex;
@@ -2545,6 +2607,7 @@ function stepShip(s, dt, locked) {
   const along = s.vx * T.tx[s.idx] + s.vy * T.ty[s.idx];
   const slope = s.air ? 0 : clamp(T.sl[s.idx] / 0.1, -1.3, 1.3) * (along >= 0 ? 1 : -1);
   s.slope = slope;
+  if (T.slings.length) stepSling(s, dt);
   const ml = shipMotion(s, dt, live, slope), fx = Math.cos(s.ang), fy = Math.sin(s.ang), boosting = s.boostT > 0;
 
   // in the air, a ship clears the lane walls once it is a little above them (or below the deck, falling)
@@ -3418,6 +3481,11 @@ function aiThink(s, dt) {
     const bend = (T.tx[i1] - T.tx[i0]) * T.nx[ti] + (T.ty[i1] - T.ty[i0]) * T.ny[ti];
     const c = clamp(Math.abs(bend) / 0.45, 0, 1);
     lane = lane * (1 - c) + Math.sign(bend) * T.hw * sty.apex * c;
+  }
+  // a slingshot: right in against the inside edge, where the pull is strongest (as close as its skill dares)
+  for (const g of T.slings) if (wrapIdx(ti - g.a) <= wrapIdx(g.b - g.a) + 10) {
+    const side = Math.sign((g.cx - T.x[ti]) * T.nx[ti] + (g.cy - T.y[ti]) * T.ny[ti]) || 1;
+    lane = side * T.hw * clamp(0.5 + 0.22 * a.skill, 0.5, 0.72);   // (off the wall itself: scraping it costs more)
   }
   // open water (or lava) eating into the lane ahead: keep to the deck that is left, with room to spare
   if (RIVER.hole) for (let j = 0; j <= look + 16; j += 2) {
@@ -8195,6 +8263,44 @@ LANDMARK_ART['queen-jelly'] = (() => {
     }
   };
 })();
+/* Perihelion: the star the track swings round. A small, fierce sun hanging just above the deck: white-hot at its
+   heart, then gold and orange to a deep red limb, in flat bands, lit hottest toward the upper left, with a few dark
+   sunspots. Its corona breathes and flares lick off its limb each frame (over). Sliced as a sphere: small at the
+   bottom, widest in the middle, small at the top. */
+LANDMARK_ART['perihelion-sun'] = (() => {
+  const COL = [[255, 251, 232], [255, 230, 128], [255, 190, 70], [248, 128, 40], [200, 66, 32]];
+  const SPOTS = [[-0.28, -0.12, 0.09], [0.22, 0.3, 0.07], [0.05, -0.42, 0.05], [0.38, -0.08, 0.06]];
+  return {
+    height: 0.5, n: 10, sizeK: 3.2, lit: true,
+    slice(g, k, n, S, R) {
+      const c0 = S / 2, z = (k + 0.5) / n * 2 - 1, rr = R * Math.sqrt(Math.max(0, 1 - z * z)), top = k === n - 1;
+      if (rr < 2) return;
+      const im = g.createImageData(S, S), d = im.data, x0 = Math.max(0, Math.floor(c0 - rr)), x1 = Math.min(S, Math.ceil(c0 + rr));
+      for (let y = x0; y < x1; y++) for (let x = x0; x < x1; x++) {
+        const dx = x + 0.5 - c0, dy = y + 0.5 - c0, d0 = Math.hypot(dx, dy);
+        if (d0 > rr) continue;
+        // (on the sphere: hottest at the middle and toward the light, darkening to the limb)
+        const e = d0 / R, lit = 1 - e * e * 0.85 - (dx * 0.6 + dy * 0.8) / R * 0.3 + z * 0.1;
+        let b = lit > 0.86 ? 0 : lit > 0.62 ? 1 : lit > 0.38 ? 2 : lit > 0.16 ? 3 : 4;
+        if (rr - d0 < 1.5) b = Math.min(4, b + 1);   // (each slice's rim, a shade deeper)
+        if (top || k === n - 2) for (const [sx, sy, sr] of SPOTS) { const q = Math.hypot(dx - sx * R, dy - sy * R) / (sr * R); if (q < 1) b = q < 0.55 ? 4 : Math.max(b, 3); }
+        const c = COL[b], i = (y * S + x) * 4;
+        d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+      }
+      g.putImageData(im, 0, 0);
+    },
+    over(lc, ec, x, y, f, time, R) {
+      // its corona, breathing, and a few flares licking off the limb
+      const p = 0.5 + 0.5 * Math.sin(time * 0.9);
+      glow(ec, '#ff7a24', Math.round(R * 2.2 * f / 8) * 8, x, y, 0.42 + 0.1 * p);
+      glow(ec, '#ffd27a', Math.round(R * 1.3 * f / 4) * 4, x, y, 0.16 + 0.06 * p);
+      for (let q = 0; q < 6; q++) {
+        const a = q * 1.05 + time * 0.1 + Math.sin(time * 0.7 + q) * 0.2, u = (time * 0.3 + q * 0.17) % 1, rr = R * f * (1 + 0.28 * Math.sin(u * Math.PI));
+        glow(ec, '#ffa040', Math.round(R * 0.26 * f / 2) * 2, x + Math.cos(a) * rr, y + Math.sin(a) * rr, 0.4 * Math.sin(u * Math.PI));
+      }
+    }
+  };
+})();
 function landmarks() { return (TRACK.landmarks || []).filter((L) => L && L.art && LANDMARK_ART[L.art] && Array.isArray(L.at)); }
 function landmarkSlices(L) {
   const A = LANDMARK_ART[L.art], R = Math.max(8, +L.r || 60), key = L.art + ':' + R;
@@ -8213,9 +8319,9 @@ function drawTrackLandmarks(time) {
     const st = landmarkSlices(L), A = st.A, x = L.at[0], y = L.at[1], H = A.height || 0, n = st.sl.length;
     if (offscreen(x, y, fscale(H), st.S * 0.8)) continue;
     setScale(1);
-    // its shadow, its own outline cast away from the sun: further off the taller it is
+    // its shadow, its own outline cast away from the sun: further off the taller it is (none for one that shines: A.lit)
     const R = Math.max(8, +L.r || 60), off = 4 + 90 * H, w0 = Math.round(st.S * f0);
-    lc.globalAlpha = 0.32;
+    lc.globalAlpha = A.lit ? 0 : 0.32;
     lc.drawImage(st.sh, Math.round(CX + (x + off * 0.6 - CX) * f0 - w0 / 2), Math.round(CY + (y + off * 0.8 - CY) * f0 - w0 / 2), w0, w0);
     lc.globalAlpha = 1;
     // the slices, lowest first
@@ -9969,6 +10075,14 @@ function drawLandmarks(time) {
 let GAP_SIGN = null;
 const GAP_SIGN_H = -0.62, GAP_SIGN_W = 240, GAP_SIGN_HT = 92;
 // (the open space round it, where no other scenery is put and drifting boards fade out, so it is the one thing to see)
+// (and the inside of a slingshot's bend, round the body it swings round: nothing between the racers and it)
+function slingZones() {
+  return (T.slings || []).map((g) => {
+    let r = 1e9;
+    for (let q = 0; q <= wrapIdx(g.b - g.a); q += 4) { const i = (g.a + q) % T.N; r = Math.min(r, Math.hypot(T.x[i] - g.cx, T.y[i] - g.cy)); }
+    return { x: g.cx, y: g.cy, r };
+  });
+}
 function gapSignZone() {
   const G = TRACK && TRACK.gapSign;
   if (!G || !T.gaps.length) return null;
@@ -10040,7 +10154,7 @@ function drawGapSign(time) {
 function drawDrifters(time) {
   if (!DRIFT) return;
   if (DRIFT.marks && DRIFT.marks.length) drawLandmarks(time);
-  const D = SET.drifters, dr0 = D.drift || [10, 3], GSZ = GAP_SIGN && gapSignZone();
+  const D = SET.drifters, dr0 = D.drift || [10, 3], GSZ = GAP_SIGN && gapSignZone(), SZ = slingZones();
   for (const o of DRIFT.list) {
     // (where it has drifted to by now, wrapped round the field; nearest copy to the camera)
     const dr = o.dir === -1 ? [-dr0[0], -dr0[1]] : dr0;
@@ -10051,7 +10165,8 @@ function drawDrifters(time) {
     if (f <= 0.12) continue;
     const hq = Math.round(o.h * 5) / 5, art = drifterArt(o.v, hq), S = art.top.width;
     if (Math.abs(VW / 2 + (x - CX) * f - VW / 2) > VW / 2 + S * f || Math.abs(VH / 2 + (y - CY) * f - VH / 2) > VH / 2 + S * f) continue;
-    const fade = GSZ ? clamp((Math.hypot(x - GSZ.x, y - GSZ.y) - GSZ.r) / 200, 0, 1) : 1;   // (fading out round the sign over a gap)
+    let fade = GSZ ? clamp((Math.hypot(x - GSZ.x, y - GSZ.y) - GSZ.r) / 200, 0, 1) : 1;   // (fading out round the sign over a gap)
+    for (const z of SZ) fade = Math.min(fade, clamp((Math.hypot(x - z.x, y - z.y) - z.r) / 160, 0, 1));   // (and round a slingshot's body)
     if (fade <= 0) continue;
     lc.globalAlpha = fade;
     const put = (cv, hh) => {
@@ -10321,6 +10436,7 @@ function renderFrame(time) {
   for (const t of W.targets) items.push({ k: LKEY(t.h, t.idx, 3), y: t.y, fn: () => atPos(t.h, t.x, t.y, (f) => drawTarget(t, time, f)) });
   for (const j of T.jumps) items.push({ k: LKEY(T.h[j.i], j.i, 0.5), y: 0, fn: () => atLevel(T.h[j.i], (f) => drawJump(j, time, f)) });
   for (const L of T.loops) items.push({ k: LKEY(T.h[L.i], L.i, 0.5), y: 0, fn: () => { drawLoopPaint(L); setScale(1); } });
+  for (const g of T.slings) items.push({ k: LKEY(T.h[g.a], g.a, 0.45), y: 0, fn: () => atLevel(T.h[g.a], () => drawSling(g, time)) });
   for (const p of T.pits) {
     items.push({ k: LKEY(T.h[p.i], p.i, 0.4), y: 0, fn: () => { drawPit(p, time); setScale(1); } });
     items.push({ k: LKEY(T.h[p.i], p.i, 0.42), y: 0, fn: () => { drawPitRim(p, time); setScale(1); } });
@@ -14764,6 +14880,7 @@ function handleEvents() {
         break;
       case 'drop': if (e.a.isPlayer && live) SFX.drop(); break;
       case 'loopin': if (e.a.isPlayer && live) SFX.loop(); break;
+      case 'slung': if (e.a.isPlayer && live) { SFX.loop(); if (mode === 'race') toast('Slingshot!'); } break;
       case 'rollback': if (e.a.isPlayer && mode === 'race') { SFX.denied(); toast('Too slow! Rolling back down'); } break;
       case 'rolledout': if (e.a.isPlayer && mode === 'race') toast('Turn round, build speed and try again'); break;
       case 'fall':
