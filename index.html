@@ -2424,9 +2424,11 @@ function fireShot(s, hostile) {
 
 /* slingshots. Through the bend the pull charges a racer up, the more the closer it keeps to the inside edge (none on
    the outer half); out of the bend it is flung: a burst of speed, up to TOP over its usual top speed after FULL seconds
-   of charge right against the edge (less for less), fading over HOLD seconds. GRIP: how much harder the pull lets it
-   corner, near the edge. The inside edge has no wall: run off it and the star has you (out, then back on where it went) */
-const SLING = { TOP: 0.3, FULL: 3.2, GRIP: 260, HOLD: 1.1 };
+   of charge right against the edge (less for less), fading over HOLD seconds. A full charge flings it faster than a
+   boost does (a boost peaks at about 1.55 x top). GRIP: how much harder the pull lets it corner, near the edge.
+   PULL: the star's gravity, drawing every racer in the bend sideways toward the inside edge (px/s², a little more the
+   nearer it is). The inside edge has no wall: run off it and the star has you (out, then back on where it went) */
+const SLING = { TOP: 0.75, FULL: 3.2, GRIP: 260, HOLD: 1.1, PULL: 40 };
 /* a slingshot's pull, drawn on the deck: a warm band along the inside edge, light streaming round it the way the lane
    runs (brighter toward the inside, where the pull is) */
 function drawSling(g, time) {
@@ -2465,11 +2467,11 @@ function drawSling(g, time) {
 }
 /* how close to the inside edge of a slingshot's bend the racer is: 0 (outer half, or not in one) to 1 */
 function slingIn(s) {
-  s.slingZone = false;
+  s.slingZone = null;
   if (s.air || s.inCorr || s.loop || s.wreck > 0) return 0;
   for (const g of T.slings) {
     if (wrapIdx(s.idx - g.a) > wrapIdx(g.b - g.a)) continue;
-    s.slingZone = true;
+    s.slingZone = g;
     const i = s.idx, l = (s.x - T.x[i]) * T.nx[i] + (s.y - T.y[i]) * T.ny[i];
     const side = Math.sign((g.cx - T.x[i]) * T.nx[i] + (g.cy - T.y[i]) * T.ny[i]) || 1;
     const c = clamp((l * side / T.hw + 0.3) / 1.1, 0, 1);
@@ -2481,7 +2483,14 @@ function stepSling(s, dt) {
   const c = slingIn(s);
   s.slingC = c;
   s.sling = 1 + ((s.sling || 1) - 1) * Math.exp(-dt / SLING.HOLD);
-  if (s.slingZone) { s.slingCharge = (s.slingCharge || 0) + c * dt; return; }
+  if (s.slingZone) {
+    s.slingCharge = (s.slingCharge || 0) + c * dt;
+    // (the star's pull: sideways, toward the open edge)
+    const g = s.slingZone, i = s.idx, side = Math.sign((g.cx - T.x[i]) * T.nx[i] + (g.cy - T.y[i]) * T.ny[i]) || 1;
+    const u = clamp(((s.x - T.x[i]) * T.nx[i] + (s.y - T.y[i]) * T.ny[i]) * side / T.hw, -1, 1), a = SLING.PULL * (0.7 + 0.3 * Math.max(0, u)) * dt * side;
+    s.vx += T.nx[i] * a; s.vy += T.ny[i] * a;
+    return;
+  }
   if (!s.slingCharge) return;
   // out of the bend: flung, as hard as it charged
   const k = Math.min(1, s.slingCharge / SLING.FULL);
