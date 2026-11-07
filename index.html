@@ -2509,7 +2509,9 @@ function stepShip(s, dt, locked) {
     s.stun -= dt; s.ang += 15 * dt;
     const f = Math.exp(-1.5 * dt); s.vx *= f; s.vy *= f;
   } else if (!s.doomed) {
-    const d = angDiff(s.ang, inp.aim), mt = CF.turn * s.st.turn * dt;
+    // (on a loop the player's aim is taken against the way in: held where it pointed on the run-up, the nose follows
+    //  the ring round, as it follows the lane; the computer drivers aim along the ring themselves)
+    const d = angDiff(s.ang, s.loop && s.isPlayer ? inp.aim + loopRot(s.loop) : inp.aim), mt = CF.turn * s.st.turn * dt;
     s.ang += clamp(d, -mt, mt);
   }
   if (live) noseThrust(s);
@@ -3078,6 +3080,8 @@ const LOOP_H = 6;
 const LOOP_LAT = { acc: 420, damp: 2.2, wall: 8 };   // steering across the deck: push, drift damping, wall margin
 const LOOP_ALIGN = 140;   // committed: speed lost per second with the nose pointed square to the ring (never below L.need)
 
+/* how far round the ring's way has turned (on screen) from the way in */
+function loopRot(lp) { const t = loopTan(lp.L, lp.p / lp.L.r); return Math.atan2(t[1], t[0]) - Math.atan2(lp.L.fy, lp.L.fx); }
 /* reaching the foot of a loop going forwards puts the racer on it */
 function checkLoops(s, prevIdx) {
   const span = wrapIdx(s.idx - prevIdx);
@@ -3127,9 +3131,10 @@ function stepLoop(s, dt, live) {
     if (ml > 0.01) {
       const mx = inp.mx / Math.max(1, ml), my = inp.my / Math.max(1, ml);
       if (!lp.commit) a += LOOP.ACC * CFG.acc * s.st.acc * (0.6 + 0.4 * k) * (boosting ? 1.25 : 1) * (mx * t[0] + my * t[1]);
-      // across the deck: the part of the input square to the ring, toward whichever side of the deck that is
-      const c = loopAcross(L, th), px = -t[1], py = t[0], sgn = Math.sign(px * c[0] + py * c[1]) || 1;
-      al = LOOP_LAT.acc * (mx * px + my * py) * sgn;
+      // across the deck: how far the aim is off the ring's way, to the racer's right or left, as on the lane (from
+      // the aim, not the nose, which lags a little behind the ring as it turns)
+      const off = s.isPlayer ? angDiff(Math.atan2(L.fy, L.fx), inp.aim) : angDiff(Math.atan2(t[1], t[0]), inp.aim);
+      al = LOOP_LAT.acc * Math.min(1, ml) * Math.sin(off);
     }
   }
   lp.v += a * dt;
@@ -3151,14 +3156,21 @@ function stepLoop(s, dt, live) {
   if (!lp.commit) {
     // too slow: it loses grip on the climb and rolls back, well before it could be upside down
     const c = Math.cos(th2);
-    if (!lp.roll && (lp.v <= 0 || th2 >= Math.PI / 2 || (th2 > 0.3 && lp.v * lp.v / L.r + LOOP.G * c < LOOP.GRIP * LOOP.G))) {
-      lp.roll = true; s.boostT = 0; emit('rollback', s);
-    }
-    if (lp.roll && lp.v > 0 && th2 > Math.PI * 0.6) lp.v = 0;
+    if (lp.v <= 0 || th2 >= Math.PI / 2 || (th2 > 0.3 && lp.v * lp.v / L.r + LOOP.G * c < LOOP.GRIP * LOOP.G)) { dropOffLoop(s); return; }
   }
   if (lp.p >= L.len) leaveLoop(s, 1);
   else if (lp.p <= 0) leaveLoop(s, -1);
   else placeOnLoop(s);
+}
+/* too slow on the climb: it loses its grip and drops off, as off a missed jump. It is out for the fall, and for as
+   long as the rest of the ring would have taken it at the speed it needs, then back on past the loop */
+function dropOffLoop(s) {
+  const lp = s.loop, L = lp.L, g = loopGround(L, lp.th, lp.l);
+  W.fx.push({ kind: 'loopfall', ship: s, t0: W.time, x: lp.px, y: lp.py, gx: g[0], gy: g[1], col: s.col, hull: s.hull, ang: s.ang });
+  s.loop = null; s.x = g[0]; s.y = g[1]; s.h = T.h[L.j];
+  outAt(s, wrapIdx(L.j + 6));
+  s.wreck += Math.max(0, L.len - lp.p) / L.need;
+  emit('fall', s, 'loop');
 }
 /* back onto the lane: out of the far foot (dir 1, beside where it went in) or rolled back out of the entrance (-1) */
 function leaveLoop(s, dir) {
@@ -9426,17 +9438,18 @@ function jumpNeedOf(j) {
   if (j.need === undefined) { const g = T.aiGaps.find((g) => g.jump === j); j.need = g && isFinite(g.need) ? Math.ceil(g.need) : 0; }
   return j.need;
 }
-function drawJumpPaint(j) {
-  const need = jumpNeedOf(j);
-  if (!need) return;
-  const N = T.N, i = j.i, mid = (j.lo + j.hi) / 2;
+function drawJumpPaint(j) { const need = jumpNeedOf(j); if (need) paintSpeed(j.i, j.lo, j.hi, need, JRAMP.L); }
+/* (a loop's: the speed it takes to get round, before its foot) */
+function drawLoopPaint(L) { paintSpeed(L.i, -T.hw, T.hw, Math.ceil(L.need), 10); }
+function paintSpeed(i, lo, hi, need, foot) {
+  const N = T.N, mid = (lo + hi) / 2;
   // (road paint: each word reads the way the lane runs, its top toward the ramp)
   const word = (str, back, B) => {   // (back: how far before the ramp's foot the word's near edge sits; B: block size)
-    const cols = str.length * 4 - 1, q0 = ((i - Math.round((JRAMP.L + back + 30) / T.step)) % N + N) % N;   // (the road's way where the word lies)
+    const cols = str.length * 4 - 1, q0 = ((i - Math.round((foot + back + 30) / T.step)) % N + N) % N;   // (the road's way where the word lies)
     const ux = T.tx[q0], uy = T.ty[q0];
-    B = Math.min(B, (j.hi - j.lo - 14) / cols);   // (no wider than the ramp)
+    B = Math.min(B, (hi - lo - 14) / cols);   // (no wider than the lane it is on)
     const along = 5 * B;   // (its length down the lane)
-    const q = ((i - Math.round((JRAMP.L + back + along / 2) / T.step)) % N + N) % N;
+    const q = ((i - Math.round((foot + back + along / 2) / T.step)) % N + N) % N;
     const g = fscale(T.h[q]);
     if (offscreen(T.x[q], T.y[q], g, 90)) return;
     const ox = T.x[q] + T.nx[q] * mid, oy = T.y[q] + T.ny[q] * mid, rx = -uy, ry = ux;   // (r: the text's right, a quarter turn from up)
@@ -10304,6 +10317,7 @@ function renderFrame(time) {
   for (const r of W.rocks) items.push({ k: LKEY(r.h, r.idx, 2), y: r.y, fn: () => atPos(r.h, r.x, r.y, (f) => drawRock(r, f)) });
   for (const t of W.targets) items.push({ k: LKEY(t.h, t.idx, 3), y: t.y, fn: () => atPos(t.h, t.x, t.y, (f) => drawTarget(t, time, f)) });
   for (const j of T.jumps) items.push({ k: LKEY(T.h[j.i], j.i, 0.5), y: 0, fn: () => atLevel(T.h[j.i], (f) => drawJump(j, time, f)) });
+  for (const L of T.loops) items.push({ k: LKEY(T.h[L.i], L.i, 0.5), y: 0, fn: () => { drawLoopPaint(L); setScale(1); } });
   for (const p of T.pits) {
     items.push({ k: LKEY(T.h[p.i], p.i, 0.4), y: 0, fn: () => { drawPit(p, time); setScale(1); } });
     items.push({ k: LKEY(T.h[p.i], p.i, 0.42), y: 0, fn: () => { drawPitRim(p, time); setScale(1); } });
@@ -14206,7 +14220,8 @@ function prepInput() {
   else { i.mx = 0; i.my = 0; }
   const w = mouseToWorld(mouse.x, mouse.y);
   // (on a loop the ship is drawn up on the ring, so aim from there)
-  i.aim = p.loop ? Math.atan2(w.y - p.loop.py, w.x - p.loop.px) : Math.atan2(w.y - p.y, w.x - p.x);
+  // (on a loop, from a fixed point back down the run-up: the pointer held ahead keeps meaning "on", see loopRot)
+  i.aim = p.loop ? Math.atan2(w.y - (p.loop.L.y - p.loop.L.fy * 160), w.x - (p.loop.L.x - p.loop.L.fx * 160)) : Math.atan2(w.y - p.y, w.x - p.x);
   i.fire = !!(keys.KeyW || keys.ArrowUp);
   if (boostQueued) { i.boostPress = true; boostQueued = false; }
   if (swipeQueued) { i.swipe = swipeQueued; swipeQueued = 0; }
@@ -14749,7 +14764,7 @@ function handleEvents() {
       case 'fall':
         if (!e.a.isPlayer) chat(e.a, 'crash');
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.fall();
-        if (e.a.isPlayer && mode === 'race') toast(e.b === 'pit' ? 'Into a hole! Back on past it' : 'Fell off! Back on past the gap');
+        if (e.a.isPlayer && mode === 'race') toast(e.b === 'pit' ? 'Into a hole! Back on past it' : e.b === 'loop' ? 'Too slow for the loop! Back on past it' : 'Fell off! Back on past the gap');
         break;
       case 'hurt':
         W.shake = Math.max(W.shake, 0.35);
