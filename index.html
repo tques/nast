@@ -9417,8 +9417,55 @@ function drawSwipeHints(s, x, y, time) {
    point, drawn in the scene's perspective (each corner scaled by its own height, as the pit walls are) and lit from
    the upper left: side and front faces first, then the sloped deck over them */
 const JRAMP = { L: 40, LIP: 3, H: 0.24, deck: ['#363b48', '#454c5c', '#586073', '#6e7890'], side: ['#1b1e25', '#262a33', '#343945', '#464c5b'], rib: '#23262f', yel: '#ffc93a', blk: '#17130c' };
+/* painted on the deck before each ramp: the speed (m/s, as the speedometer reads) it takes to clear the gap past it,
+   and BOOST under it where that is beyond the player's top speed. Road paint: it reads the way the lane runs */
+const PAINT_FONT = { 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001',
+  5: '111100111001111', 6: '111100111101111', 7: '111001010010010', 8: '111101111101111', 9: '111101111001111',
+  B: '110101110101110', O: '111101101101111', S: '111100111001111', T: '111010010010010' };
+function jumpNeedOf(j) {
+  if (j.need === undefined) { const g = T.aiGaps.find((g) => g.jump === j); j.need = g && isFinite(g.need) ? Math.ceil(g.need) : 0; }
+  return j.need;
+}
+function drawJumpPaint(j) {
+  const need = jumpNeedOf(j);
+  if (!need) return;
+  const N = T.N, i = j.i, mid = (j.lo + j.hi) / 2;
+  // (the camera never turns, so each word is laid along the road the way of the four that reads most upright on screen)
+  const word = (str, back, B) => {   // (back: how far before the ramp's foot the word's near edge sits; B: block size)
+    const cols = str.length * 4 - 1, q0 = ((i - Math.round((JRAMP.L + back + 30) / T.step)) % N + N) % N;   // (the road's way where the word lies)
+    let ux = T.tx[q0], uy = T.ty[q0];
+    for (const [vx, vy] of [[T.tx[q0], T.ty[q0]], [-T.ty[q0], T.tx[q0]], [-T.tx[q0], -T.ty[q0]], [T.ty[q0], -T.tx[q0]]]) if (vy < uy) { ux = vx; uy = vy; }
+    const lengthwise = Math.abs(ux * T.tx[q0] + uy * T.ty[q0]) > 0.7;
+    if (lengthwise) B = Math.min(B, (j.hi - j.lo - 14) / cols);   // (across the lane: no wider than the ramp)
+    else B = Math.min(B, (j.hi - j.lo - 14) / 5);
+    const along = lengthwise ? 5 * B : cols * B;   // (its length down the lane)
+    const q = ((i - Math.round((JRAMP.L + back + along / 2) / T.step)) % N + N) % N;
+    const g = fscale(T.h[q]);
+    if (offscreen(T.x[q], T.y[q], g, 90)) return;
+    const ox = T.x[q] + T.nx[q] * mid, oy = T.y[q] + T.ny[q] * mid, rx = -uy, ry = ux;   // (r: the text's right, a quarter turn from up)
+    const S = (X, Y) => { const wx = ox + rx * X - ux * Y, wy = oy + ry * X - uy * Y; return [VW / 2 + (wx - CX) * g, VH / 2 + (wy - CY) * g]; };
+    lc.beginPath();
+    for (let r = 0; r < 5; r++) for (let c = 0; c < str.length; c++) {
+      const G = PAINT_FONT[str[c]];
+      for (let k = 0; k < 3; k++) if (G[r * 3 + k] === '1') {
+        const X = (c * 4 + k - cols / 2) * B, Y = (r - 2.5) * B, e = 0.3;
+        const p = [S(X - e, Y - e), S(X + B + e, Y - e), S(X + B + e, Y + B + e), S(X - e, Y + B + e)];
+        lc.moveTo(p[0][0], p[0][1]); for (let m = 1; m < 4; m++) lc.lineTo(p[m][0], p[m][1]); lc.closePath();
+      }
+    }
+    lc.fill();
+    return along;
+  };
+  lc.setTransform(1, 0, 0, 1, 0, 0);
+  lc.globalAlpha = 0.5; lc.fillStyle = '#eef1f6';
+  const boost = W && W.ships[0] && need > CFG.top * W.ships[0].st.top;
+  const far = word(boost ? 'BOOST' : String(need), 18, boost ? 4 : 6);
+  if (boost && far) word(String(need), 18 + far + 12, 6);
+  lc.globalAlpha = 1;
+}
 function drawJump(j, time, f) {
   const i = j.i, x = T.x[i], y = T.y[i];
+  drawJumpPaint(j);
   if (offscreen(x, y, f, 120)) return;
   const tx = T.tx[i], ty = T.ty[i], nx = T.nx[i], ny = T.ny[i], lo = j.lo + 5, hi = j.hi - 5, h = T.h[i];
   const A0 = -JRAMP.L, A1 = JRAMP.LIP;
