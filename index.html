@@ -2067,11 +2067,14 @@ function trackLayout() {
       if (best) best[2] = 'sting';
     }
   }
-  // (never on a loop, its run-up or its way out: an asteroid can't sit on the ring)
+  // (never on a loop, its run-up or its way out: an asteroid can't sit on the ring; and none on a slingshot's bend,
+  //  its run-in or its way out, where racers hug the open edge and come out flung: see onSling)
   const onLoop = (i) => T.loops.some((L) => wrapIdx(i - (L.i - 50)) <= L.M + 90);
-  if (d.asteroids) slots = d.asteroids.map((f) => { const i = at(f); return onLoop(i) ? near(i) : i; });
+  const slingMask = new Uint8Array(N);
+  for (let i = 0; i < N; i++) if (onSling(i, 80)) slingMask[i] = 1;
+  if (d.asteroids) slots = d.asteroids.map((f) => { const i = at(f); return onLoop(i) || slingMask[i] ? near(i, slingMask) : i; });
   else {
-    const taken = new Uint8Array(N);
+    const taken = slingMask.slice();
     for (const p of pickups) for (let q = -8; q <= 8; q++) taken[wrapIdx(p[0] + q)] = 1;
     slots = [];
     for (let k = 0; k < 7; k++) slots.push(near(Math.round(((k + 0.2) / 7) * N), taken));
@@ -3018,6 +3021,11 @@ function stepGates(dt) {
     for (let i = 0; i < t.coolBy.length; i++) if (t.coolBy[i] > 0) t.coolBy[i] -= dt;
   }
 }
+/* is sample i on a slingshot's bend, or within pad samples of either end of it? */
+function onSling(i, pad) {
+  for (const g of T.slings || []) if (wrapIdx(i - (g.a - pad)) <= wrapIdx(g.b - g.a) + 2 * pad) return true;
+  return false;
+}
 /* asteroids enter from the edge of the lane and drift toward its middle */
 function driftIn(sl) {
   const gi = sl.gi, ox = T.hw - 7;
@@ -3038,7 +3046,7 @@ function stepRocks(dt) {
     r.x += r.vx * dt; r.y += r.vy * dt;
     r.idx = nearestIdx(r.x, r.y, r.idx, 12, 12); r.h = groundH(r.x, r.y, r.idx); CURH = r.h;
     if (T.gap[r.idx] && Math.hypot(r.x - T.x[r.idx], r.y - T.y[r.idx]) < T.hw) { dropRock(r); continue; }
-    if (T.loopOf[r.idx] >= 0) { dropRock(r); continue; }   // none ever drifts onto a loop
+    if (T.loopOf[r.idx] >= 0 || onSling(r.idx, 40)) { dropRock(r); continue; }   // none ever drifts onto a loop, or a slingshot's bend
     if (wallPush(r, r.r * 0.7, 0.9) > 0) { r.idx = _sdIdx; }
     // (and never out through a shortcut's mouth, where the lane has no wall: the lane's edge holds a drifting rock
     //  there all the same, so none drifts into an entrance or an exit)
