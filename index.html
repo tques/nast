@@ -1011,8 +1011,8 @@ function segDist(px, py, ax, ay, bx, by) {
                  The loop is spliced into the lap at that point of a straight: the lane edges over, climbs a full ring
                  of track, comes back down beside where it went up (on the given side) and edges back onto its line.
      slingshots  {from, to: fraction, at: [x, y]}: a long bend round a heavy body standing at [x, y] (its art is a
-                 landmark there). Through it, the body's pull holds a racer into the bend and lets it run faster the
-                 closer it keeps to the inside edge; the extra speed carries on out of the bend for a moment (SLING).
+                 landmark there). Through it, the body's pull holds a racer into the bend and charges it up the closer
+                 it keeps to the inside edge, which has no wall; out of the bend it is flung, a moment's extra speed (SLING).
      setting     the world around the track (see "settings: the world around the track"): 'space' if left out. A sunken stretch's canopy
                  names one of that setting's overhead types.
      landmarks   one-off pieces of scenery beside the track, from the editor's Landmark tool: {at: [x, y], r, desc,
@@ -2235,7 +2235,7 @@ function wreck(s) {
 function respawn(s) {
   // never over a gap: on past it
   if (T.gap[s.idx]) { let k = 0; while (T.gap[wrapIdx(s.idx + k)] && k < T.N) k++; moveIdx(s, wrapIdx(s.idx + k + 6)); }
-  s.air = 0; s.vh = 0; s.doomed = false; s.loop = null; s.sling = 1; s.slingPeak = 0; s.hEase = false; s.shield = CFG.shieldMax; s.shieldT = 0; s.slowT = 0; s.blastT = 0; s.swipeT = 0;
+  s.air = 0; s.vh = 0; s.doomed = false; s.loop = null; s.sling = 1; s.slingCharge = 0; s.hEase = false; s.shield = CFG.shieldMax; s.shieldT = 0; s.slowT = 0; s.blastT = 0; s.swipeT = 0;
   // (and never into open water: on to the middle of what is left of the deck)
   const lat = RIVER.hole && RIVER.hole[s.idx] === 1 ? (RIVER.safe[s.idx * 2] + RIVER.safe[s.idx * 2 + 1]) / 2 : 0;
   s.lava = false;
@@ -2422,10 +2422,11 @@ function fireShot(s, hostile) {
   emit('shot', s, hostile);
 }
 
-/* slingshots. TOP: how much faster than its usual top speed a racer may run, hugging the inside edge (less further
-   out, none on the outer half); GRIP: how much harder the pull lets it corner there; HOLD: seconds over which the extra
-   speed allowed fades once it is out of the bend (it was flung: it carries on fast for a moment) */
-const SLING = { TOP: 0.22, GRIP: 260, HOLD: 1.1 };
+/* slingshots. Through the bend the pull charges a racer up, the more the closer it keeps to the inside edge (none on
+   the outer half); out of the bend it is flung: a burst of speed, up to TOP over its usual top speed after FULL seconds
+   of charge right against the edge (less for less), fading over HOLD seconds. GRIP: how much harder the pull lets it
+   corner, near the edge. The inside edge has no wall: run off it and the star has you (out, then back on where it went) */
+const SLING = { TOP: 0.3, FULL: 3.2, GRIP: 260, HOLD: 1.1 };
 /* a slingshot's pull, drawn on the deck: a warm band along the inside edge, light streaming round it the way the lane
    runs (brighter toward the inside, where the pull is) */
 function drawSling(g, time) {
@@ -2442,6 +2443,13 @@ function drawSling(g, time) {
     ec.globalAlpha = 0.14 * fade; ec.beginPath(); ec.moveTo(e[0], e[1]); ec.lineTo(b[0], b[1]); ec.lineTo(P(j, sj * T.hw * 0.62)[0], P(j, sj * T.hw * 0.62)[1]); ec.lineTo(h[0], h[1]); ec.closePath(); ec.fill();
   }
   ec.globalAlpha = 1;
+  // the open edge (no wall): red and amber hazard dashes along it, chasing round
+  const ph = Math.floor(time * 6);
+  for (let q = 0; q < len; q += 2) {
+    const i = (g.a + q) % N, j = (g.a + Math.min(len, q + 2)) % N, a = P(i, side(i) * (T.hw - 1)), b = P(j, side(j) * (T.hw - 1));
+    lc.strokeStyle = ((q >> 1) + ph) % 3 === 0 ? '#ff5a3a' : '#ffb44a'; lc.lineWidth = 3;
+    lc.beginPath(); lc.moveTo(a[0], a[1]); lc.lineTo(b[0], b[1]); lc.stroke();
+  }
   // streaks of light, three lanes of them, flowing round (faster nearer the inside)
   for (const [l, sp, al] of [[0.86, 1.0, 0.9], [0.66, 0.75, 0.6], [0.44, 0.5, 0.35]]) {
     const n = Math.floor(len / 9);
@@ -2470,13 +2478,36 @@ function slingIn(s) {
   return 0;
 }
 function stepSling(s, dt) {
-  const c = slingIn(s), was = s.sling || 1;
+  const c = slingIn(s);
   s.slingC = c;
-  if (c > 0) s.sling = was + (1 + SLING.TOP * c - was) * (1 - Math.exp(-3 * dt));
-  else s.sling = 1 + (was - 1) * Math.exp(-dt / SLING.HOLD);
-  // (out of the bend having kept well in: flung)
-  if (s.slingZone) s.slingPeak = Math.max(s.slingPeak || 0, s.sling);
-  else if (s.slingPeak) { if (s.slingPeak > 1 + SLING.TOP * 0.6) emit('slung', s); s.slingPeak = 0; }
+  s.sling = 1 + ((s.sling || 1) - 1) * Math.exp(-dt / SLING.HOLD);
+  if (s.slingZone) { s.slingCharge = (s.slingCharge || 0) + c * dt; return; }
+  if (!s.slingCharge) return;
+  // out of the bend: flung, as hard as it charged
+  const k = Math.min(1, s.slingCharge / SLING.FULL);
+  s.slingCharge = 0;
+  if (s.air || s.wreck > 0 || k < 0.05) return;
+  s.sling = 1 + SLING.TOP * k;
+  const sp = Math.hypot(s.vx, s.vy), ns = Math.max(sp, CFG.top * s.st.top * s.sling);
+  if (sp > 1) { s.vx *= ns / sp; s.vy *= ns / sp; }
+  emit('slung', s, k);
+}
+/* off the open inside edge of a slingshot's bend? (its centre past the edge: it goes) */
+function slingEdge(s) {
+  for (const g of T.slings) {
+    if (wrapIdx(s.idx - g.a) > wrapIdx(g.b - g.a)) continue;
+    const i = s.idx, l = (s.x - T.x[i]) * T.nx[i] + (s.y - T.y[i]) * T.ny[i];
+    const side = Math.sign((g.cx - T.x[i]) * T.nx[i] + (g.cy - T.y[i]) * T.ny[i]) || 1;
+    return { g, inner: l * side > 0, out: l * side > T.hw + 2 };
+  }
+  return null;
+}
+/* pulled off the edge into the star: it tumbles in, and is put back on the lane where it went off */
+function slingFall(s, g) {
+  W.fx.push({ kind: 'loopfall', ship: s, t0: W.time, x: s.x, y: s.y, gx: s.x + (g.cx - s.x) * 0.25, gy: s.y + (g.cy - s.y) * 0.25, col: s.col, hull: s.hull, ang: s.ang });
+  burst(s.x, s.y, 14, 90, '#ffb44a', 0.5, true);
+  outAt(s, s.idx);
+  emit('fall', s, 'sun');
 }
 /* A speeder's own motion for one step: turning has been done; this is thrust (along the nose), the top speed its
    heading allows (and the slope, boosting, a slowed engine), drift pulled into the nose, and the cornering limit (ask
@@ -2613,7 +2644,8 @@ function stepShip(s, dt, locked) {
   // in the air, a ship clears the lane walls once it is a little above them (or below the deck, falling)
   // (in the air, the walls hold it in only while it is over the lane: coming down beside the lane, outside them, it
   // clips the edge and bounces off (see stepAir), and out over the infield there is no wall at all)
-  const walls = !s.air || (Math.abs(s.h - T.h[s.idx]) < 0.35 && sd(s.x, s.y, s.idx) < 0);   // (in the air, only from inside the lane: a racer coming down outside it is not pulled back in)
+  const SE = T.slings.length && !s.air ? slingEdge(s) : null;
+  const walls = (!s.air || (Math.abs(s.h - T.h[s.idx]) < 0.35 && sd(s.x, s.y, s.idx) < 0)) && !(SE && SE.inner);   // (in the air, only from inside the lane: a racer coming down outside it is not pulled back in; and no wall on a slingshot's open inside edge)
   const prevIdx = s.idx;
   for (let q = 0; q < 2; q++) {
     s.x += s.vx * dt * 0.5; s.y += s.vy * dt * 0.5;
@@ -2669,6 +2701,7 @@ function stepShip(s, dt, locked) {
       }
     }
   }
+  if (SE) { const e = slingEdge(s); if (e && e.out) { slingFall(s, e.g); s.spd = 0; return; } }   // (off a slingshot's open edge)
   if (!s.air && sd(s.x, s.y, s.idx) > 36) { // lost outside the world: put back on the lane
     const p = ptAt(s.idx, 0); s.x = p[0]; s.y = p[1]; s.vx *= 0.2; s.vy *= 0.2;
   }
@@ -3485,7 +3518,7 @@ function aiThink(s, dt) {
   // a slingshot: right in against the inside edge, where the pull is strongest (as close as its skill dares)
   for (const g of T.slings) if (wrapIdx(ti - g.a) <= wrapIdx(g.b - g.a) + 10) {
     const side = Math.sign((g.cx - T.x[ti]) * T.nx[ti] + (g.cy - T.y[ti]) * T.ny[ti]) || 1;
-    lane = side * T.hw * clamp(0.5 + 0.22 * a.skill, 0.5, 0.72);   // (off the wall itself: scraping it costs more)
+    lane = side * T.hw * clamp(0.42 + 0.2 * a.skill, 0.42, 0.62);   // (the edge is open: not so near it that a nudge puts it off)
   }
   // open water (or lava) eating into the lane ahead: keep to the deck that is left, with room to spare
   if (RIVER.hole) for (let j = 0; j <= look + 16; j += 2) {
@@ -9038,6 +9071,11 @@ function railMouths() {
       if (dx * dx + dy * dy > (T.hw + r + 12) ** 2) continue;
       for (let si = 0; si < 2; si++) { const sd = si ? 1 : -1, ex = T.x[i] + T.nx[i] * w * sd - x, ey = T.y[i] + T.ny[i] * w * sd - y; if (ex * ex + ey * ey < r * r) mouth[si][i] = 1; }
     }
+  }
+  // (and none along a slingshot's open inside edge)
+  for (const g of T.slings || []) for (let q = 0; q <= wrapIdx(g.b - g.a); q++) {
+    const i = (g.a + q) % N, side = Math.sign((g.cx - T.x[i]) * T.nx[i] + (g.cy - T.y[i]) * T.ny[i]) || 1;
+    mouth[side > 0 ? 1 : 0][i] = 1;
   }
   RAIL.mouthKey = key; RAIL.mouths = mouth;
   return mouth;
@@ -14880,13 +14918,13 @@ function handleEvents() {
         break;
       case 'drop': if (e.a.isPlayer && live) SFX.drop(); break;
       case 'loopin': if (e.a.isPlayer && live) SFX.loop(); break;
-      case 'slung': if (e.a.isPlayer && live) { SFX.loop(); if (mode === 'race') toast('Slingshot!'); } break;
+      case 'slung': if (e.a.isPlayer && live && e.b > 0.5) { SFX.loop(); if (mode === 'race') toast(e.b > 0.9 ? 'Full slingshot!' : 'Slingshot!'); } break;
       case 'rollback': if (e.a.isPlayer && mode === 'race') { SFX.denied(); toast('Too slow! Rolling back down'); } break;
       case 'rolledout': if (e.a.isPlayer && mode === 'race') toast('Turn round, build speed and try again'); break;
       case 'fall':
         if (!e.a.isPlayer) chat(e.a, 'crash');
         if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.fall();
-        if (e.a.isPlayer && mode === 'race') toast(e.b === 'pit' ? 'Into a hole! Back on past it' : e.b === 'loop' ? 'Too slow for the loop! Back on past it' : 'Fell off! Back on past the gap');
+        if (e.a.isPlayer && mode === 'race') toast(e.b === 'pit' ? 'Into a hole! Back on past it' : e.b === 'loop' ? 'Too slow for the loop! Back on past it' : e.b === 'sun' ? 'Into the star! Keep off the edge' : 'Fell off! Back on past the gap');
         break;
       case 'hurt':
         W.shake = Math.max(W.shake, 0.35);
