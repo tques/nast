@@ -9430,15 +9430,12 @@ function drawJumpPaint(j) {
   const need = jumpNeedOf(j);
   if (!need) return;
   const N = T.N, i = j.i, mid = (j.lo + j.hi) / 2;
-  // (the camera never turns, so each word is laid along the road the way of the four that reads most upright on screen)
+  // (road paint: each word reads the way the lane runs, its top toward the ramp)
   const word = (str, back, B) => {   // (back: how far before the ramp's foot the word's near edge sits; B: block size)
     const cols = str.length * 4 - 1, q0 = ((i - Math.round((JRAMP.L + back + 30) / T.step)) % N + N) % N;   // (the road's way where the word lies)
-    let ux = T.tx[q0], uy = T.ty[q0];
-    for (const [vx, vy] of [[T.tx[q0], T.ty[q0]], [-T.ty[q0], T.tx[q0]], [-T.tx[q0], -T.ty[q0]], [T.ty[q0], -T.tx[q0]]]) if (vy < uy) { ux = vx; uy = vy; }
-    const lengthwise = Math.abs(ux * T.tx[q0] + uy * T.ty[q0]) > 0.7;
-    if (lengthwise) B = Math.min(B, (j.hi - j.lo - 14) / cols);   // (across the lane: no wider than the ramp)
-    else B = Math.min(B, (j.hi - j.lo - 14) / 5);
-    const along = lengthwise ? 5 * B : cols * B;   // (its length down the lane)
+    const ux = T.tx[q0], uy = T.ty[q0];
+    B = Math.min(B, (j.hi - j.lo - 14) / cols);   // (no wider than the ramp)
+    const along = 5 * B;   // (its length down the lane)
     const q = ((i - Math.round((JRAMP.L + back + along / 2) / T.step)) % N + N) % N;
     const g = fscale(T.h[q]);
     if (offscreen(T.x[q], T.y[q], g, 90)) return;
