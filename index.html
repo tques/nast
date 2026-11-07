@@ -2207,7 +2207,7 @@ function openGate(g, by) {
    a pane of glass across the lane, COVER x the half-width of it, from one side: the gap on the other side never moves.
    Glass: a racer that meets it smashes through, losing SLOW of its speed and a little power, never a crash. Whoever
    raised it goes through its own for free. The target is ready again CD seconds after it drops. */
-const BAR = { RISE: 0.5, UP: 4, FLICK: 1, CD: 4, COVER: 1.1, SLOW: 0.6 };
+const BAR = { RISE: 0.5, UP: 4, FLICK: 1, CD: 4, COVER: 1.1, SLOW: 0.6, REACT: [0.45, 1.05], AIM: 0.6 };   // (REACT: a computer driver's reaction to one rising, s; AIM: how far off the gap's middle it may line up, x the half-width)
 function gateEntered(g) { if (gateShared(g) && g.st === 1 && g.closeT < 0) g.closeT = CFG.gateClose; }
 /* a racer meets a shut shortcut gate: through a soft one at the cost of its shield (a crash with none left), a crash
    into a hard one. Only head on: a racer brushing past a door's edge along the lane just slides off it */
@@ -2878,7 +2878,7 @@ function hitTarget(t, shooter) {
   }
   if (t.cool > 0 || g.st) { burst(t.x, t.y, 3, 40, '#667', 0.3, false); return; }
   t.cool = BAR.RISE + BAR.UP + BAR.CD; t.flash = 0.45; g.flash = 0.5;
-  g.st = 1; g.t = BAR.RISE; g.broke = {}; g.owner = shooter ? shooter.id : -1; emit('shift', g, shooter);
+  g.st = 1; g.t = BAR.RISE; g.broke = {}; g.owner = shooter ? shooter.id : -1; g.raisedAt = W.time; g.raiseN = (g.raiseN || 0) + 1; emit('shift', g, shooter);
   if (shooter) { shooter.energy = Math.min(CFG.energyMax, shooter.energy + CFG.targetPower); shooter.hits++; }
   burst(t.x, t.y, 16, 150, '#9ff', 0.5, true);
   emit('target', t, shooter);
@@ -3594,10 +3594,15 @@ function aiThink(s, dt) {
   let gateClose = false;
   for (const g of W.gates) {
     if (g.kind !== 'shift' || !weaponsLive(s) || !g.st || g.owner === s.id) continue;   // (down, or its own glass: straight through)
+    // (it reacts as a player would: it only sees the glass going up after a moment, quicker the sharper it is, and then
+    //  lines up on the gap a little off: close behind when it rises, it may not get across in time)
+    const seen = a.barSeen || (a.barSeen = {}), key = g.id + ':' + g.raiseN;
+    if (!seen[key]) seen[key] = { at: g.raisedAt + (BAR.REACT[0] + Math.random() * (BAR.REACT[1] - BAR.REACT[0])) / a.smart, err: (Math.random() - 0.5) * BAR.AIM * T.hw / a.smart };
+    if (W.time < seen[key].at) continue;
     const ahead = wrapIdx(g.gi - s.idx);
     const gapMid = -T.hw * (1 - (2 - BAR.COVER) / 2);   // (the middle of the gap, on the side the glass does not cover)
-    if (ahead <= look + 3) { ti = wrapIdx(g.gi + 4); lane = gapMid; gateClose = true; }
-    else if (ahead <= 45) lane = gapMid;
+    if (ahead <= look + 3) { ti = wrapIdx(g.gi + 4); lane = gapMid + seen[key].err; gateClose = true; }
+    else if (ahead <= 45) lane = gapMid + seen[key].err;
   }
   // on for a jump shortcut: onto the pad (this outranks everything else on the run-up)
   if (a.jp && !s.air) {
