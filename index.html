@@ -1048,7 +1048,8 @@ function segDist(px, py, ax, ay, bx, by) {
      look        a variant of that world's look, where it has one (the setting '<world>~<look>'): 'alien' on the forest
                  (Briar Hollow) is the same world with alien plants in violet, red-violet and teal; 'corrupt' on the
                  forest (Rootknot) is the forest half overrun by that alien growth, spreading from corrupt.at to about
-                 corrupt.r units away ({at: [x, y], r}), with a ragged front. Optional.
+                 corrupt.r units away ({at: [x, y], r}), with a ragged front; 'toxic' on the arctic (Frostline) has green-blue
+                 ice, crystal spires and vents spewing green gas. Optional.
      landmarks   one-off pieces of scenery beside the track, from the editor's Landmark tool: {at: [x, y], r, desc,
                  art?}. Drawn only when art names an entry in LANDMARK_ART (see the landmarks section): the
                  description says what it should look like, for whoever draws it.
@@ -1075,6 +1076,9 @@ const CRATER = {
   // (a fissure in the ice, down to dark freezing water with floes on it)
   arctic: { wall: ['#4e6a86', '#6f8ca8', '#94b2cc', '#c2dbee'], back: '#26394e', floor: '#101a26', lip: '#eef8ff', under: '#3c5268', crack: '#1c212c', chunk: ['#434c5e', '#2c3442', '#dfe8f2'],
     fill: { depth: 0.65, base: '#1d3650', deep: '#10223a', ripple: '#5c88ae', shine: '#d8f0ff', bits: 'floe', bit: ['#e6f4ff', '#b8d4ea'], splash: '#d8f0ff' } },
+  // (the toxic arctic: a fissure in green ice, down to green, poisonous water)
+  'arctic~toxic': { wall: ['#3e7068', '#5a9488', '#82bcae', '#b6e6da'], back: '#1e4640', floor: '#0c1e1c', lip: '#eefff8', under: '#2e5a54', crack: '#1c2c2a', chunk: ['#434c5e', '#2c3442', '#dfe8f2'],
+    fill: { depth: 0.65, base: '#1d5a48', deep: '#0f3429', ripple: '#5cbe8c', shine: '#d0ffe6', bits: 'floe', bit: ['#d8fff0', '#a8e6d2'], splash: '#c8ffe0' } },
   // (a cave-in down to dark lava, crusted over in plates, cracks of it glowing; the black rock's own cracks glow too)
   volcano: { wall: ['#1e1818', '#2e2524', '#433634', '#5a4a46'], back: '#140e0e', floor: '#0c0808', lip: '#7a6a62', under: '#120c0c', crack: '#8a2e10', chunk: ['#443c3a', '#2a2424', '#5a4a46'],
     fill: { depth: 0.6, base: '#8a2c0e', deep: '#4a160a', ripple: '#e8742a', shine: '#ffb860', bits: 'crust', bit: ['#2e1a14', '#3e2418'], glow: '#ff5a14', splash: '#ffb347' } }
@@ -1756,7 +1760,7 @@ TRACKS.push(
     holes: [{at: 0.87339, side: 'left'}, {at: 0.90751, side: 'right'}]
   },
   {
-    id: 'frostline', name: 'Frostline', setting: 'arctic', seed: 87,
+    id: 'frostline', name: 'Frostline', setting: 'arctic', look: 'toxic', seed: 87,   // (toxic: green-blue ice, crystal spires, vents of green gas)
     points: [[-255, -56], [13, -50], [505, 50], [980, -5], [1480, 130], [1825, 30], [2100, 150], [1910, 605], [1700, 1080], [1715, 1525], [1845, 1890], [2140, 2115], [2210, 2360], [2095, 2535], [1880, 2635], [1590, 2590], [1375, 2435], [1295, 2245], [1195, 1900], [785, 1970], [675, 2280], [550, 2555], [220, 2455], [-60, 1875], [-1028, 1737], [-1160, 1210], [-1391, 1049], [-1643, 957], [-1896, 868], [-2151, 783], [-2385, 662], [-2448, 411], [-2420, 40], [-2065, -270], [-1750, 120], [-2100, 1355], [-1635, 1535], [-1420, 220], [-1060, -77], [-792, -70], [-524, -63]],
     shortcuts: [{from: [824, 1947], to: [-83, 1863]}],
     elevation: [{from: 0.22192, to: 0.27938, level: 1, rocks: true}, {from: 0.66316, to: 0.90389, level: 1}, {from: 0.50282, to: 0.587, level: -1, canopy: 'blizzard'}],
@@ -5500,7 +5504,7 @@ const GRANITE = {
   strata: [[100, 106, 124], [124, 128, 144], [88, 94, 112], [112, 116, 132]],
   cap: { hi: [255, 255, 255], base: [228, 238, 250], lo: [146, 170, 210], from: 0.55 }
 };
-defineSetting({
+const ARCTIC_DEF = defineSetting({
   id: 'arctic', name: 'Arctic', words: { scenery: 'snowy rocks' },
   palette: {
     dot: '#26324e', dotHi: '#2e3b5c', side: '#0c1424', rim: '#bfe6ff', overDeck: '#1c2a48', overDeckHi: '#22325a', map: '200,230,255',
@@ -5556,7 +5560,7 @@ defineSetting({
     steep: {
       size: [256, 256], from: 1.0, to: 1.12,
       tile(W0, H0) {
-        const R = rng(8080), TW = TAU / W0, TH = TAU / H0, cuts = [];
+        const R = rng(8080), TW = TAU / W0, TH = TAU / H0, cuts = [], K = this.cols || { deep: [26, 56, 98], lip: [228, 244, 255], bubble: [236, 248, 255], ice: [[92, 70], [146, 60], [200, 40]] };   // (cols: another world's colours)
         for (let k = 0; k < 9; k++) {
           const x = R() * W0, y = R() * H0, a = -0.5 + (R() - 0.5) * 0.7, L = 30 + R() * 60;
           cuts.push([x, y, x + Math.cos(a) * L, y + Math.sin(a) * L, 0.8 + R() * 1.4]);
@@ -5572,12 +5576,12 @@ defineSetting({
         return pixelSprite(W0, H0, (px, py) => {
           const fl = Math.sin(px * TW * 3 + py * TH * 8 + 1.8 * Math.sin(px * TW * 2)) * 0.5 + Math.sin(px * TW * 7 + py * TH * 13) * 0.25;
           const c = cutAt(px + 0.5, py + 0.5), cu = cutAt(px + 2.5, py + 2.5);
-          if (c < 1) return [26, 56, 98, 255];                                  // down in a crevasse
-          if (cu < 1) return [228, 244, 255, 255];                              // its lit lip
+          if (c < 1) return [...K.deep, 255];                                  // down in a crevasse
+          if (cu < 1) return [...K.lip, 255];                              // its lit lip
           const nz = hash2(px, py, 31);
-          if (nz > 0.992) return [236, 248, 255, 255];                          // a bubble
+          if (nz > 0.992) return [...K.bubble, 255];                          // a bubble
           const t = clamp(0.5 + fl * 0.35, 0, 1);
-          return [92 + 70 * t, 146 + 60 * t, 200 + 40 * t, 255];
+          return [K.ice[0][0] + K.ice[0][1] * t, K.ice[1][0] + K.ice[1][1] * t, K.ice[2][0] + K.ice[2][1] * t, 255];
         });
       }
     },
@@ -5609,14 +5613,15 @@ defineSetting({
         l.translate(x, y); l.rotate(ang);
         const c = Math.cos(-ang), s = Math.sin(-ang), off = (dx, dy) => [dx * c - dy * s, dx * s + dy * c];   // (screen offsets, turned into the pond's frame)
         // a blue shadow under its far rim, a bright bank on its near one, then the ice
-        let o = off(3, 4); path(1.06, o[0], o[1]); l.fillStyle = 'rgba(120,150,200,0.55)'; l.fill();
+        const PC = this.cols || { shadow: 'rgba(120,150,200,0.55)', ice: '#3f6f9e', clear: '#5a8cba', streak: 'rgba(190,225,250,0.5)', crack: 'rgba(232,246,255,0.8)' };   // (cols: another world's colours)
+        let o = off(3, 4); path(1.06, o[0], o[1]); l.fillStyle = PC.shadow; l.fill();
         o = off(-2, -2.5); path(1.04, o[0], o[1]); l.fillStyle = '#f6faff'; l.fill();
-        path(1, 0, 0); l.fillStyle = '#3f6f9e'; l.fill();
+        path(1, 0, 0); l.fillStyle = PC.ice; l.fill();
         l.save(); path(1, 0, 0); l.clip();
-        l.fillStyle = '#5a8cba'; path(0.7, -rx * 0.12, -ry * 0.12); l.fill();
-        l.fillStyle = 'rgba(190,225,250,0.5)';
+        l.fillStyle = PC.clear; path(0.7, -rx * 0.12, -ry * 0.12); l.fill();
+        l.fillStyle = PC.streak;
         for (let k = 0; k < 3; k++) { l.fillRect(-rx * (0.6 - k * 0.25), -ry * 0.5 + k * ry * 0.3, rx * (0.5 + R() * 0.4), 1); }
-        l.strokeStyle = 'rgba(232,246,255,0.8)'; l.lineWidth = 1;
+        l.strokeStyle = PC.crack; l.lineWidth = 1;
         for (let k = 0; k < 3 + Math.floor(R() * 3); k++) {
           let px = (R() - 0.5) * rx, py = (R() - 0.5) * ry;
           l.beginPath(); l.moveTo(px, py);
@@ -5750,15 +5755,15 @@ function iceStack(r, v, far, PAL) {
 }
 
 /* a cluster of ice crystals: a few slim six-sided prisms of different heights, pale and glassy, their tops bright */
-function crystalStack(r, v, far) {
+function crystalStack(r, v, far, PP) {   // (PP: another kind, { radK, n, tip: [lit, shaded], hi, lo, glow }: the toxic world's spires)
   const R = rng(Math.floor(r * 5) * 43 + v * 157 + (far ? 3 : 0) + 1301), np = 3 + Math.floor(R() * 4), P = [];
   for (let k = 0; k < np; k++) {
     const a = R() * TAU, d = k ? 3 + R() * 6 : 0;
-    P.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, rad: 1.8 + R() * 2.2, top: k ? 0.35 + R() * 0.6 : 1, rot: R() * TAU });
+    P.push({ x: Math.cos(a) * d * (PP ? PP.radK : 1), y: Math.sin(a) * d * (PP ? PP.radK : 1), rad: (1.8 + R() * 2.2) * (PP ? PP.radK : 1), top: k ? 0.35 + R() * 0.6 : 1, rot: R() * TAU });
   }
   let ext = 0;
   for (const p of P) ext = Math.max(ext, Math.hypot(p.x, p.y) + p.rad);
-  const S = Math.ceil(ext * 2 + 8), c0 = S / 2 - 2, n = 8, out = [];
+  const S = Math.ceil(ext * 2 + 8), c0 = S / 2 - 2, n = PP ? PP.n : 8, out = [];
   // (a hexagon's reach: 1 on its outline)
   const hexR = (dx, dy, p) => { const a = Math.atan2(dy, dx) - p.rot, k = Math.PI / 3, m = ((a % k) + k) % k - k / 2; return (Math.hypot(dx, dy) * Math.cos(m)) / (p.rad * Math.cos(Math.PI / 6)); };
   for (let s = 0; s < n; s++) {
@@ -5767,10 +5772,11 @@ function crystalStack(r, v, far) {
       const px = x + 0.5 - c0, py = y + 0.5 - c0;
       for (const p of P) {
         if (t > p.top) continue;
-        const tip = t > p.top - 0.15, sc = tip ? 1 - (t - (p.top - 0.15)) / 0.2 : 1;
+        const tip = t > p.top - 0.15, sc = PP ? 1 - 0.88 * Math.pow(t / p.top, 1.25) : tip ? 1 - (t - (p.top - 0.15)) / 0.2 : 1;   // (spires taper all the way to a point)
         const q = hexR(px - p.x, py - p.y, p);
         if (q >= sc) continue;
         const lit = -((px - p.x) * 0.6 + (py - p.y) * 0.8) / p.rad;
+        if (PP) { if (t >= p.top - 0.1) return [...PP.tip[lit > 0 ? 0 : 1], 255]; const b = 0.55 + 0.45 * t, C = lit > 0.2 ? PP.hi : PP.lo; return [C[0] * b | 0, C[1] * b | 0, C[2] * b | 0, 255]; }
         if (t >= p.top - 0.15) return lit > 0 ? [240, 252, 255, 255] : [168, 220, 244, 255];
         const b = 0.55 + 0.45 * t;
         return lit > 0.2 ? [150 * b + 60 | 0, 214 * b + 30 | 0, 240, 255] : [80 * b + 30 | 0, 150 * b + 40 | 0, 210 * b + 30 | 0, 255];
@@ -5779,6 +5785,7 @@ function crystalStack(r, v, far) {
     });
     out.push({ c, w: S, h: S, t });
   }
+  if (PP && PP.glow) out[n - 1].glow = [[c0 + P[0].x, c0 + P[0].y, PP.glow, 10, 0.5]];   // (the tallest one's tip glowing)
   return out;
 }
 
@@ -5831,6 +5838,131 @@ function deadTreeStack(r, v, far) {
   }
   return out;
 }
+
+/* ================= the arctic, toxic (a track with look: 'toxic'; Frostline) =================
+   The same snowfields, but what froze here was green and poisonous: the ice is green-blue all through (glaciers,
+   blocks, ponds, the trench walls, the chunks blowing onto the lane), tall green-blue crystal spires stand among the
+   rocks, their tips glowing, and cracked vents in the snow, crusted yellow-green, spew green gas that rolls up toward
+   the camera and drifts off downwind. The snow itself stays white. */
+const TOXIC_ICE = { lo: [22, 92, 90], mid: [78, 176, 158], hi: [170, 240, 214], top: [196, 248, 228], rim: [238, 255, 248], dark: [46, 128, 116], crack: [64, 156, 136], edge: [244, 255, 250] };
+const TOXIC_SPIRE = { radK: 2.7, n: 14, tip: [[226, 255, 242], [140, 230, 200]], hi: [120, 236, 196], lo: [34, 140, 132], glow: '#6affc8' };
+const TOXIC_CRYSTAL = { radK: 1, n: 8, tip: [[236, 255, 246], [160, 236, 214]], hi: [140, 236, 206], lo: [50, 150, 140] };
+/* ---------- vents: cracked openings in the ground, gas pouring out (setting.vents) ----------
+   { every: how far apart along the lane to try one (units), chance, off: [min, max] past the lane's edge, r: [min, max],
+     gas: [dark, mid, light] colours, core, glow } */
+let VENTS = [];
+function buildVents() {
+  VENTS = [];
+  const V = SET.vents;
+  if (!V || !SET.ground) return;
+  const R = rng((TRACK.seed || 11) * 71 + 9), clear = groundClear();
+  const ok = (x, y, r) => {
+    if (!clear(x, y, r + 20) || hillAt(x, y, r + 10) > 0.004 || inRiver(x, y, r + 20) || inPatch(x, y, r + 6)) return false;
+    for (let i = 0; i < T.N; i += 2) if (Math.hypot(T.x[i] - x, T.y[i] - y) < T.hw + r + 16) return false;
+    for (const c of T.chords) if (chordDist(c, x, y) < c.hw + r + 16) return false;
+    for (const q of VENTS) if (Math.hypot(q.x - x, q.y - y) < q.r + r + 70) return false;
+    return true;
+  };
+  const step = Math.max(4, Math.round((V.every || 420) / T.step));
+  for (let i = Math.floor(R() * step); i < T.N; i += step) {
+    if (R() > (V.chance || 0.7) || Math.abs(T.h[i]) > 0.02) continue;
+    const r = V.r[0] + R() * (V.r[1] - V.r[0]);
+    for (let tries = 0; tries < 3; tries++) {
+      const side = R() < 0.5 ? -1 : 1, off = T.hw + r + V.off[0] + R() * (V.off[1] - V.off[0]), x = T.x[i] + T.nx[i] * side * off, y = T.y[i] + T.ny[i] * side * off;
+      if (ok(x, y, r)) { VENTS.push({ x, y, r: Math.round(r), v: Math.floor(R() * 4), ph: R() * 10 }); break; }
+    }
+  }
+}
+const inVent = (x, y, r) => VENTS.some((q) => Math.hypot(q.x - x, q.y - y) < q.r * 1.6 + r);
+/* a vent: a ragged dark mouth (its far side lit, its near side in shadow) glowing green down inside, cracks running
+   out from it through the snow, crusted round with yellow-green mineral and stained snow */
+function ventSprite(r, v) {
+  const key = SET.id + ':vent:' + r + ':' + v;
+  if (DECOR_CACHE[key]) return DECOR_CACHE[key];
+  const R = rng(r * 31 + v * 17 + 5), S = Math.ceil(r * 3.2 + 8), c0 = S / 2, ph = R() * TAU, cracks = [];
+  for (let k = 0; k < 4 + Math.floor(R() * 3); k++) {
+    let a = (k / 5) * TAU + R() * 0.8, x = c0 + Math.cos(a) * r * 0.45, y = c0 + Math.sin(a) * r * 0.45, w = 3.2;
+    const L = r * (0.9 + R() * 0.6);
+    for (let q = 0; q < 4; q++) { a += (R() - 0.5) * 0.9; const nx = x + Math.cos(a) * L / 4, ny = y + Math.sin(a) * L / 4; cracks.push([x, y, nx, ny, w]); x = nx; y = ny; w *= 0.8; }
+  }
+  const c = pixelSprite(S, S, (x, y) => {
+    const dx = x + 0.5 - c0, dy = y + 0.5 - c0, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    const edge = r * 0.6 * (1 + 0.16 * Math.sin(3 * a + ph) + 0.1 * Math.sin(5 * a + ph * 2));
+    if (d < edge) {
+      if (d < edge * 0.45) return [170, 255, 150, 255];                         // the glow down inside
+      if (d < edge * 0.7) return [64, 200, 96, 255];
+      return dx * 0.6 + dy * 0.8 > 0 ? [96, 150, 120, 255] : [14, 40, 30, 255];  // (the far wall lit, the near one dark)
+    }
+    for (const g of cracks) {
+      const q = segDist(x + 0.5, y + 0.5, g[0], g[1], g[2], g[3]);
+      if (q < g[4] * 0.5) return q < g[4] * 0.22 && d < r * 1.1 ? [120, 246, 120, 255] : [18, 52, 40, 255];   // (a crack, glowing down its middle near the mouth)
+    }
+    const nz = hash2(x, y, v + 41), ring = (d - edge) / (r * 0.7);
+    if (ring < 1 && nz > 0.35 + ring * 0.4) return nz > 0.8 ? [214, 236, 110, 255] : nz > 0.6 ? [150, 196, 80, 255] : [204, 236, 196, 255];   // (crust and stain)
+    return null;
+  });
+  return (DECOR_CACHE[key] = c);
+}
+function drawVents(time) {
+  const V = SET.vents;
+  for (const q of VENTS) {
+    if (offscreen(q.x, q.y, fscale(0), q.r * 2 + 10)) continue;
+    const sp = ventSprite(q.r, q.v);
+    atPos(0, q.x, q.y, (f) => {
+      const w = Math.round(sp.width * f);
+      lc.drawImage(sp, Math.round(q.x - w / 2), Math.round(q.y - w / 2), w, w);
+      glow(ec, V.glow, Math.round(q.r * 1.5 * f), q.x, q.y, 0.3 + 0.12 * Math.sin(time * 3 + q.ph));
+    });
+  }
+}
+/* the gas: puffs rising out of each vent, one after another, swelling, rolling up toward the camera (each at its own
+   height and so its own scale), carried off downwind, thinning out; lit on the side toward the sun */
+function drawVentGas(time) {
+  const V = SET.vents, M = 10, G = V.gas, list = [];
+  for (const q of VENTS) {
+    if (offscreen(q.x, q.y, fscale(0), 260)) continue;
+    for (let j = 0; j < M; j++) {
+      const t = (time * 0.16 + j / M + q.ph) % 1, h = t * 0.75, sw = Math.sin(time * 1.1 + j * 2.3 + q.ph) * 10 * t;
+      list.push({ t, h, x: q.x + V.wind[0] * t + sw * 0.6, y: q.y + V.wind[1] * t + sw, r: q.r * (0.45 + t * 2), q });
+    }
+  }
+  if (!list.length) return;
+  list.sort((a, b) => a.h - b.h);
+  lc.setTransform(1, 0, 0, 1, 0, 0); ec.setTransform(1, 0, 0, 1, 0, 0);
+  for (const p of list) {
+    const f = fscale(p.h), sx = Math.round(VW / 2 + (p.x - CX) * f), sy = Math.round(VH / 2 + (p.y - CY) * f), r = Math.max(2, Math.round(p.r * f));
+    if (sx < -r || sy < -r || sx > VW + r || sy > VH + r) continue;
+    const a = 0.78 * Math.pow(Math.sin(Math.PI * Math.min(1, p.t * 1.15)), 0.7) * (1 - p.t * 0.35) * Math.min(1, 0.25 + p.t * 3);   // (thin at the mouth, so the vent shows)
+    lc.globalAlpha = a * 0.75; lc.fillStyle = G[0]; lc.beginPath(); lc.arc(sx, sy, r, 0, TAU); lc.fill();
+    lc.globalAlpha = a * 0.8; lc.fillStyle = G[1]; lc.beginPath(); lc.arc(sx - Math.round(r * 0.18), sy - Math.round(r * 0.22), Math.round(r * 0.72), 0, TAU); lc.fill();
+    lc.globalAlpha = a * 0.7; lc.fillStyle = G[2]; lc.beginPath(); lc.arc(sx - Math.round(r * 0.38), sy - Math.round(r * 0.42), Math.max(1, Math.round(r * 0.3)), 0, TAU); lc.fill();
+    if (p.t < 0.35) { ec.globalAlpha = (0.35 - p.t) * 0.9; ec.fillStyle = V.core; ec.beginPath(); ec.arc(sx, sy, Math.round(r * 0.6), 0, TAU); ec.fill(); }
+  }
+  lc.globalAlpha = 1; ec.globalAlpha = 1;
+  setScale(1);
+}
+const ARCTIC_TOXIC_DEF = defineSetting(Object.assign({}, ARCTIC_DEF, {
+  id: 'arctic~toxic', base: 'arctic', floating: null,
+  palette: Object.assign({}, ARCTIC_DEF.palette, { rim: '#c4ffe8', map: '190,255,226', grade: ['rgba(140,255,180,0.18)', 'rgba(140,210,200,0.08)', 'rgba(40,150,130,0.24)'], vignette: '4,18,16' }),
+  ground: Object.assign({}, ARCTIC_DEF.ground, {
+    steep: Object.assign({}, ARCTIC_DEF.ground.steep, { cols: { deep: [16, 70, 62], lip: [224, 255, 240], bubble: [232, 255, 244], ice: [[56, 64], [150, 64], [136, 54]] } }),
+    pit: '#06201e',
+    wall: { hi: '#9ee6d0', lo: '#13403a', band: '#dcfff2' },
+    patches: [Object.assign({}, ARCTIC_DEF.ground.patches[0], { cols: { shadow: 'rgba(110,170,170,0.55)', ice: '#2e8a74', clear: '#4cb894', streak: 'rgba(196,255,226,0.5)', crack: 'rgba(232,255,244,0.8)' } })]
+  }),
+  vents: { every: 300, chance: 0.75, off: [18, 70], r: [17, 26], wind: [70, -40], gas: ['#2f9a4e', '#6ad66a', '#c6f69a'], core: '#7aff6a', glow: '#5aff6a' },
+  scenery: Object.assign({}, ARCTIC_DEF.scenery, {
+    sprite: (r, v, far) => paintRock(r, v, { hi: '#e8fff6', base: '#7fcfb8', lo: '#2a6660', far: '#4c9080', farHi: '#9fdcc8' }, far, false),
+    kinds: [
+      { name: 'rock', share: 0.46, stack: (r, v, far) => rockStack(r, v, far, GRANITE), height: [0.04, 0.11] },
+      { name: 'ice', share: 0.28, clump: 1.6, stack: (r, v, far) => iceStack(r, v, far, TOXIC_ICE), height: [0.05, 0.15] },
+      { name: 'crystal spire', share: 0.15, clump: 1.5, stack: (r, v, far) => crystalStack(r, v, far, TOXIC_SPIRE), height: [0.3, 0.48], fixed: true },
+      { name: 'crystals', share: 0.08, clump: 1.2, stack: (r, v, far) => crystalStack(r, v, far, TOXIC_CRYSTAL), height: [0.05, 0.09], fixed: true },
+      { name: 'tree', share: 0.04, clump: 2, stack: deadTreeStack, height: [0.12, 0.16], fixed: true }
+    ]
+  }),
+  hazard: { q: 0, sprite: (r, v) => paintRock(r, v, { hi: '#ffffff', base: '#9ee8d2', lo: '#2c7a70' }, false, false) }
+}));
 
 /* ================= setting: forest =================
    A green forest on an early summer afternoon. The track is a dirt road through the trees: pines and broad round-
@@ -7712,6 +7844,7 @@ function trackGfx() {
   buildTrenchEdges();
   buildOverpasses();
   buildPatches();
+  buildVents();
   buildPlants();
   buildDrifters();
   buildGapSign();
@@ -8588,7 +8721,7 @@ function buildPlants() {
     }
   }
   for (const o of src) {
-    if (!clear(o.x, o.y, o.r) || inPatch(o.x, o.y, o.r * 0.6) || inRiver(o.x, o.y, o.r * 0.4)) continue;
+    if (!clear(o.x, o.y, o.r) || inPatch(o.x, o.y, o.r * 0.6) || inRiver(o.x, o.y, o.r * 0.4) || inVent(o.x, o.y, o.r * 0.6)) continue;
     // (thinned out in patches: open stretches here, crowded outcrops there)
     if (PT) { const nz = vnoise(o.x / (PT.scale || 400), o.y / (PT.scale || 400), seed + 91), kp = PT.keep || [0.2, 1]; if (R() > kp[0] + (kp[1] - kp[0]) * clamp((nz - 0.25) * 2, 0, 1)) continue; }
     // (which kind: by share, those that grow in groups far likelier where their own patches are)
@@ -11312,7 +11445,7 @@ function renderFrame(time) {
   // everything that can be seen, back to front: lowest level first, each piece at its own scale
   const items = [], f0 = fscale(0);
   const GR = !!SET.ground;
-  if (GR) { items.push({ k: -0.1, y: 0, fn: drawGround }); if (OVER.length) { items.push({ k: -0.3, y: 0, fn: drawOverpassUnder }); items.push({ k: 0.015, y: 0, fn: drawOverpassRails }); } if (RIVER.paths.length || RIVER.lakes.length) { if (RIVER.paths.some((P) => P.ravine)) items.push({ k: -0.795, y: 0, fn: () => drawRiverBed(time, true) }); items.push({ k: -0.6, y: 0, fn: () => drawRiverBed(time, false) }); items.push({ k: -0.08, y: 0, fn: drawRiverRim }); } if (G3.ok) items.push({ k: 0.02, y: 0, fn: drawHills3D }); else items.push({ k: 0.3, y: 0, fn: () => drawHills(T.runs.length) }); items.push({ k: 0.32, y: 0, fn: drawPlants }); if (FLAT_GAPS.length || TRENCH_GAPS.length) items.push({ k: -0.9, y: 0, fn: () => drawChasms(time) }); if (T.gaps.some((g) => g.pool)) items.push({ k: -0.08, y: 0, fn: () => drawPoolPiers(time) }); if (TRACK.gapStyle === 'bridge' && RIVER.gaps.size) items.push({ k: 0.021, y: 0, fn: () => drawBrokenBridges(time) }); }
+  if (GR) { items.push({ k: -0.1, y: 0, fn: drawGround }); if (OVER.length) { items.push({ k: -0.3, y: 0, fn: drawOverpassUnder }); items.push({ k: 0.015, y: 0, fn: drawOverpassRails }); } if (RIVER.paths.length || RIVER.lakes.length) { if (RIVER.paths.some((P) => P.ravine)) items.push({ k: -0.795, y: 0, fn: () => drawRiverBed(time, true) }); items.push({ k: -0.6, y: 0, fn: () => drawRiverBed(time, false) }); items.push({ k: -0.08, y: 0, fn: drawRiverRim }); } if (G3.ok) items.push({ k: 0.02, y: 0, fn: drawHills3D }); else items.push({ k: 0.3, y: 0, fn: () => drawHills(T.runs.length) }); items.push({ k: 0.32, y: 0, fn: drawPlants }); if (VENTS.length) { items.push({ k: 0.005, y: 0, fn: () => drawVents(time) }); items.push({ k: 0.34, y: 0, fn: () => drawVentGas(time) }); }; if (FLAT_GAPS.length || TRENCH_GAPS.length) items.push({ k: -0.9, y: 0, fn: () => drawChasms(time) }); if (T.gaps.some((g) => g.pool)) items.push({ k: -0.08, y: 0, fn: () => drawPoolPiers(time) }); if (TRACK.gapStyle === 'bridge' && RIVER.gaps.size) items.push({ k: 0.021, y: 0, fn: () => drawBrokenBridges(time) }); }
   if ((SET.scenery.stem && !GR) || SET.floating.stem) items.push({ k: GR ? 0.45 : -0.2, y: 0, fn: drawStems });
   items.push({ k: 0, y: 0, fn: () => drawBaked(f0) });
   if (SET.drifters && !GR && DRIFT) items.push({ k: -0.97, y: 0, fn: () => drawDrifters(time) });
