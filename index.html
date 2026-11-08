@@ -14189,7 +14189,9 @@ function startRace() {
   CAM.x = p.x; CAM.y = p.y;
   updateCamera(0, mouse, p, true);
   acc = 0;
-  musicStop(0.25);   // (the countdown is quiet: the track's song starts on GO)
+  // (the track's song starts with the countdown, from its intro: under the flyover, or on the grid with the flyover off;
+  //  a flyover skipped carries on with it)
+  if (SONGS[SET.id]) musicPlay(SET.id, 0); else musicStop(0.25);
   if (FLYOVER) { W.fly = flyShots(); flyCam(); }
   else { W.fly = null; flyEnd(true); }
 }
@@ -15445,7 +15447,7 @@ function handleEvents() {
         break;
       case 'rock': if (live && near(e.a.x, e.a.y)) SFX.rock(); break;
       case 'beep': if (mode === 'race') { if (e.a > COUNT.T - COUNT.FLY) SFX.tick(); else SFX.beep(e.a); } break;
-      case 'go': if (mode === 'race') { SFX.go(); goT = 0.9; if (SONGS[SET.id]) musicPlay(SET.id, 4); } break;   // (straight into the theme, on GO)
+      case 'go': if (mode === 'race') { SFX.go(); goT = 0.9; if (SONGS[SET.id] && MUSIC.id !== SET.id) musicPlay(SET.id, 4); } break;   // (the song began with the countdown; if it somehow isn't playing, straight into the theme)
       case 'lap': if (e.a.isPlayer && mode === 'race') { SFX.lap(); toast('Lap ' + e.a.lapsDone + ' Complete - Time: ' + fmt(e.b)); } break;
       case 'finish':
         if (!e.a.isPlayer && e.a.finPos === 1) chat(e.a, 'win'); else if (e.a.isPlayer && e.a.finPos === 1 && W.order[1]) chat(W.order[1], 'lose');
