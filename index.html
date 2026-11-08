@@ -1095,7 +1095,7 @@ const TRACKS = [
     asteroids: [13 / 602, 145 / 602, 207 / 602, 237 / 602, 373 / 602, 438 / 602, 583 / 602]
   },
   {
-    id: 'industrial', name: 'Industrial', setting: 'volcano', seed: 23,
+    id: 'industrial', name: 'Kazumura', setting: 'volcano', seed: 23,
     points: [[150, -20], [-715, -735], [-1340, -1015], [-1150, -1530], [-700, -1470], [-515, -1030], [-145, -685], [235, -765], [500, -555], [680, -230], [855, 60], [635, 330], [335, 565], [0, 620], [-575, 537], [-1360, 550], [-1385, 130], [-1545, -195], [-1455, -470], [-1175, -520], [-1000, -240], [-690, 905], [-205, 870], [160, 1020], [415, 385]],
     shortcuts: [{from: [-1003, -862], to: [-557, -1112], via: [[-1090, -906], [-1156, -977], [-1194, -1067], [-1199, -1164], [-1171, -1257], [-1112, -1335], [-1031, -1388], [-936, -1409], [-839, -1398], [-753, -1353], [-686, -1282]], target: [0.11101, 57]}],   // (smoothed and balanced: tools/shortcuts.js)
     elevation: [{from: 0.74086, to: 0.97584, level: 1, rocks: true}, {from: 0.30193, to: 0.44049, level: -1, canopy: 'ice'}],
@@ -1644,14 +1644,15 @@ buildTrack(TRACKS[0]);
 /* ================= more circuits, designed with the track editor (same format: see "the circuits" above) ================= */
 TRACKS.push(
   {
-    id: 'ion-foundry', name: 'Ion Foundry', setting: 'dunes', seed: 31,
+    id: 'ion-foundry', name: 'Dust Devil', setting: 'dunes', seed: 31,
     points: [[425, -827], [405, -535], [225, -415], [80, -165], [-35, -40], [-230, 30], [-480, -60], [-660, 205], [-390, 625], [-315, 875], [-640, 1130], [-850, 1295], [-1065, 1395], [-1250, 1225], [-1420, 995], [-1590, 715], [-1325, 470], [-895, 95], [-770, -225], [-1070, -305], [-1335, -90], [-1560, -125], [-1595, -695], [-1510, -915], [-1310, -1100], [-1165, -1485], [-895, -1675], [-680, -1495], [-325, -1525], [-190, -1245], [-370, -1040], [-325, -835], [-225, -695], [-45, -520], [115, -370], [440, -285], [490, 65], [275, 245], [85, 380], [135, 570], [410, 735], [565, 975], [740, 1210], [960, 1395], [1230, 1380], [1385, 1140], [1270, 785], [1520, 580], [1545, 290], [1545, 0], [1530, -290], [1455, -440], [1330, -540], [1125, -655], [1100, -900], [1430, -1035], [1520, -1215], [1350, -1430], [1055, -1470], [940, -1100], [500, -1150]],
     shortcuts: [{from: [-32, -42], to: [-318, 881], via: [[-90, 385]]}],
     elevation: [{from: 0.2948, to: 0.39272, level: -1}, {from: 0.43095, to: 0.66386, level: 1, rocks: true}, {from: 0.68618, to: 0.74042, level: 1}],
-    barricades: [0.22108, 0.8063, 0.11226]
+    barricades: [0.22108, 0.8063, 0.11226],
+    landmarks: [{at: [-870, 576], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-647, -587], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [750, -470], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1839, 748], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}]
   },
   {
-    id: 'lagrange-knot', name: 'Lagrange Knot', setting: 'forest', seed: 38,
+    id: 'lagrange-knot', name: 'Rootknot', setting: 'forest', seed: 38,
     points: [[405, 85], [265, 345], [100, 585], [-100, 800], [-325, 985], [-640, 960], [-855, 1220], [-1145, 1230], [-1265, 1100], [-1215, 880], [-1410, 740], [-1705, 775], [-1790, 565], [-1620, 235], [-1325, 95], [-970, 45], [-850, -240], [-575, -345], [-290, -405], [0, -425], [290, -405], [575, -345], [850, -240], [1100, -90], [1320, 100], [1490, 335], [1760, 295], [1905, 470], [1565, 900], [1390, 1130], [1135, 1410], [810, 1260], [555, 1125], [305, 975], [80, 790], [-110, 570], [-275, 330], [-410, 70], [-515, -200], [-590, -485], [-540, -780], [-620, -1065], [-565, -1355], [-455, -1620], [-265, -1840], [5, -1930], [275, -1830], [460, -1605], [570, -1335], [620, -1050], [625, -967], [530, -745], [585, -465], [510, -185]],
     shortcuts: [{from: [-560, -1370], to: [602, -918], via: [[-393, -1446], [-251, -1548], [-97, -1616], [65, -1634], [218, -1583], [337, -1479], [419, -1344], [465, -1199]]}],   // (smoothed and balanced: tools/shortcuts.js)
     elevation: [{from: 0.36058, to: 0.4148, level: -1, canopy: 'ice'}, {from: 0.62938, to: 0.6836, level: -1, canopy: 'gas'}, {from: 0.70394, to: 0.76023, level: -1, canopy: 'ice'}, {from: 0.07408, to: 0.23187, level: -1, canopy: 'gas'}, {from: 0.46155, to: 0.61111, level: 1, rocks: true}, {from: 0.29709, to: 0.33366, level: 1}],
@@ -1679,7 +1680,7 @@ TRACKS.push(
     gapSign: {text: 'GOOD LUCK'}   // (a billboard down in the gap, its arrow pointing to the landing: the gap a slingshot's fling clears)
   },
   {
-    id: 'slag-run', name: 'Slag Run', setting: 'gale', seed: 59,
+    id: 'slag-run', name: "Queen's Run", setting: 'gale', seed: 59,
     points: [[469, 846], [425, 770], [280, 515], [140, 260], [-145, -50], [-530, 125], [-750, -145], [-425, -770], [-575, -1020], [-695, -1275], [-945, -1475], [-1185, -1315], [-1425, -1355], [-1550, -1160], [-1620, -875], [-1665, -585], [-1690, -295], [-1700, 0], [-1695, 290], [-1670, 585], [-1630, 875], [-1560, 1155], [-1435, 1420], [-1200, 1580], [-940, 1460], [-805, 1225], [-390, 1195], [-195, 900], [-275, 505], [-135, 250], [210, 60], [145, -265], [285, -525], [430, -780], [580, -1025], [750, -1265], [950, -1480], [1215, -1595], [1440, -1430], [1555, -1160], [1620, -875], [1265, -310], [1325, 215], [1510, 595], [1870, 695], [1995, 485], [1710, -135], [1995, -345], [2315, -195], [2395, 135], [1685, 295], [1665, 585], [1625, 875], [1555, 1160], [1440, 1425], [1210, 1585], [945, 1470], [745, 1255], [575, 1020]],
     shortcuts: [{from: [492, -885], to: [1307, -409], via: [[850, -1015], [1035, -1090], [1175, -1130], [1270, -1130], [1330, -1065], [1355, -930], [1280, -715]]}, {from: [-461, -907], to: [-1659, -635], via: [[-575, -925], [-805, -1020], [-1013, -1168], [-1150, -1155], [-1275, -1090], [-1395, -940], [-1485, -795]]}],
     elevation: [{from: 0.45382, to: 0.50814, level: 1, rocks: true}, {from: 0.33214, to: 0.43405, level: -1, canopy: 'ice'}, {from: 0.54418, to: 0.63562, level: 1}, {from: 0.69222, to: 0.81979, level: 1}, {from: 0.87238, to: 0.90859, level: -1}, {from: 0.92572, to: 0.975, level: -1}, {from: 0.10953, to: 0.22185, level: 1}],
@@ -1701,7 +1702,7 @@ TRACKS.push(
   },
   // new tracks: one for each setting but deep space
   {
-    id: 'mirage-basin', name: 'Mirage Basin', setting: 'dunes', seed: 80,
+    id: 'mirage-basin', name: 'Sunscour', setting: 'dunes', seed: 80,
     points: [[734, 0], [1003, 0], [1268, -26], [1483, -183], [1682, -362], [1809, -592], [1755, -850], [1551, -1018], [1415, -1295], [1083, -1281], [841, -1392], [579, -1357], [328, -1263], [165, -1070], [-174, -1075], [-377, -911], [-392, -650], [-318, -392], [-244, -134], [-170, 124], [-97, 382], [-2, 631], [219, 772], [480, 833], [741, 894], [1003, 956], [1264, 1018], [1472, 1180], [1639, 1389], [1757, 1625], [1673, 1872], [1437, 1988], [1177, 2056], [918, 2125], [658, 2193], [394, 2222], [132, 2167], [-131, 2113], [-345, 1860], [-656, 2003], [-919, 1949], [-1182, 1894], [-1423, 1785], [-1569, 1563], [-1683, 1320], [-1796, 1077], [-1875, 823], [-1794, 573], [-1580, 416], [-1420, 120], [-1106, 163], [-869, 37], [-607, 0], [-339, 0], [-71, 0], [198, 0], [485, 165]],
     shortcuts: [{from: [1344, 1067], to: [1033, 2094], via: [[1422, 1149], [1469, 1253], [1487, 1372], [1479, 1499], [1448, 1629], [1396, 1756], [1326, 1871], [1240, 1971], [1142, 2047]]}],   // (smoothed and balanced: tools/shortcuts.js)
     elevation: [{from: 0.27526, to: 0.35408, level: -1, canopy: 'storm'}, {from: 0.69274, to: 0.73821, level: 1, rocks: true}, {from: 0.06983, to: 0.22683, level: 1, rocks: true}],
@@ -1719,7 +1720,7 @@ TRACKS.push(
     holes: [{at: 0.16858, side: 'left'}, {at: 0.19892, side: 'right'}]
   },
   {
-    id: 'briar-hollow', name: 'Briar Hollow', setting: 'forest', seed: 94, gapStyle: 'bridge',   // (its river gap is a washed-out bridge; Lagrange Knot's is the open river jump)
+    id: 'briar-hollow', name: 'Briar Hollow', setting: 'forest', seed: 94, gapStyle: 'bridge',   // (its river gap is a washed-out bridge; Rootknot's is the open river jump)
     points: [[671, 0], [941, 0], [1210, 0], [1478, -12], [1708, -149], [1928, -306], [2159, -439], [2405, -354], [2624, -197], [2874, -133], [3058, -316], [3178, -557], [3257, -810], [3148, -1053], [3010, -1284], [2871, -1515], [2711, -1730], [2461, -1816], [2260, -1840], [1955, -1735], [1680, -1790], [1350, -1920], [1132, -1812], [946, -1618], [720, -1460], [515, -1380], [380, -1235], [280, -985], [255, -796], [147, -550], [39, -303], [-69, -56], [-177, 191], [-285, 438], [-830, 605], [-1105, 710], [-1095, 1035], [-450, 1065], [-185, 1170], [-140, 1460], [-245, 1800], [-445, 1905], [-855, 2030], [-1145, 1918], [-1412, 1952], [-1680, 1973], [-1825, 1510], [-1960, 1240], [-2090, 1095], [-2430, 1230], [-2590, 1014], [-2615, 751], [-2340, 530], [-2383, 266], [-2256, 29], [-2100, -170], [-1620, -505], [-1340, -105], [-1575, 155], [-1565, 310], [-1320, 415], [-1120, 280], [-1105, -10], [-860, -95], [-676, 0], [-407, 0], [-137, 0], [132, 0], [402, 0]],
     shortcuts: [{from: [2334, -391], to: [3052, -1215], via: [[2447, -361], [2566, -375], [2687, -426], [2802, -506], [2907, -609], [2994, -727], [3058, -853], [3093, -982], [3093, -1105]]}],   // (smoothed and balanced: tools/shortcuts.js)
     elevation: [{from: 0.36713, to: 0.42611, level: 1}, {from: 0.20813, to: 0.24732, level: -1, canopy: 'mist'}, {from: 0.79177, to: 0.93484, level: -1, canopy: 'mist'}],
@@ -1758,7 +1759,7 @@ TRACKS.push(
     landmarks: [{at: [780, 470], r: 125, desc: 'The jackpot moon: a gold planet banded like a casino chip, with a neon pink ring of chasing bulbs and chips orbiting it', art: 'jackpot-moon'}]
   },
   {
-    id: 'elevation', name: 'Elevation', setting: 'vegas', seed: 122,
+    id: 'elevation', name: 'Let It Ride', setting: 'vegas', seed: 122,
     points: [[-515, -1725], [20, -1520], [0, -620], [575, -537], [996, -310], [1150, 0], [695, 355], [355, 120], [700, -265], [1295, 60], [1155, 585], [575, 537], [-155, 890], [-425, 855], [-355, 485], [-545, 355], [-950, 680], [-1505, 580], [-1770, 160], [-1185, -645], [-505, -730], [-305, -905], [-320, -1225], [-635, -1270], [-1000, -1065], [-655, -460], [-1155, -30], [-1680, -455], [-1125, -1610]],
     elevation: [{from: 0.08974, to: 0.25538, level: 1}, {from: 0.34119, to: 0.38653, level: -1}, {from: 0.55748, to: 0.69368, level: -1}, {from: 0.82187, to: 0.90293, level: 1}],
     barricades: [0.0636, 0.49611],
@@ -1766,7 +1767,7 @@ TRACKS.push(
     gaps: [{from: 0.40999, to: 0.44086}, {from: 0.5357, to: 0.5563}, {from: 0.91772, to: 0.95039}]
   },
   {
-    id: 'bumpy-ride', name: 'Bumpy Ride', setting: 'dunes', seed: 129,
+    id: 'bumpy-ride', name: 'Dune Hopper', setting: 'dunes', seed: 129,
     points: [[5, -650], [200, -630], [485, -440], [860, -565], [975, -305], [775, -20], [985, 275], [810, 530], [395, 385], [0, 620], [-395, 135], [-770, 505], [-1060, 580], [-1215, 315], [-1145, 130], [-995, 80], [-805, 90], [-720, -40], [-870, -190], [-1035, -135], [-1200, -225], [-1165, -525], [-835, -535], [-400, -90], [-220, -85], [-185, -260], [-410, -425], [-395, -590], [-210, -635]],
     shortcuts: [{from: [791, -74], to: [398, 385], via: [[625, 210]]}],
     elevation: [{from: 0.83877, to: 0.96645, level: 1}, {from: 0.03666, to: 0.14095, level: -1}, {from: 0.32993, to: 0.40863, level: 1}, {from: 0.45828, to: 0.50864, level: 1}, {from: 0.54783, to: 0.62477, level: -1}, {from: 0.65345, to: 0.76559, level: -1}],
@@ -8313,7 +8314,7 @@ const PLANT_Q = [], PLANT_ORD = [];
    Decoration only: racers pass through it (the editor warns if one is placed on the track). */
 const LANDMARK_ART = {};
 const LM_CACHE = {};
-/* Slag Run: an old queen jelly, vast, battered and mean. Like the gale world's sky jellies (a dome of stacked layers,
+/* Queen's Run: an old queen jelly, vast, battered and mean. Like the gale world's sky jellies (a dome of stacked layers,
    tentacles hanging under it, streaming downwind), but bruised plum and murky rather than glassy: her skirt torn
    with bites, scars and blotches across the bell, a crown of bone spikes, some tentacles snapped short, and an
    angry red glow pulsing at her heart. The lowest TQ slices are her tentacles, the rest her bell. */
@@ -8520,6 +8521,54 @@ LANDMARK_ART['jackpot-moon'] = (() => {
         lc.fillStyle = ['#d43c56', '#2a7ae0', '#2a2a32'][q]; lc.beginPath(); lc.arc(cx, cy, cr, 0, TAU); lc.fill();
         lc.strokeStyle = '#f4ecd8'; lc.lineWidth = 1; lc.setLineDash([2, 2]); lc.beginPath(); lc.arc(cx, cy, cr - 1.5, 0, TAU); lc.stroke(); lc.setLineDash([]);
       }
+    }
+  };
+})();
+/* Dust Devil: whirlwinds of dust spinning over the desert beside the track. Each is a twisting funnel, narrow at the
+   ground and widening as it climbs (RINGS of dust at rising heights, each scaled by its height, so it stands up off the
+   ground like everything tall): specks of dust whirling round each ring, fastest at the bottom, a faint haze filling it,
+   the column swaying, and the whole of it drifting slowly about its spot. Its only slice is the scuffed patch of
+   ground under it; the rest moves, so it is drawn each frame (over). */
+LANDMARK_ART['dust-devil'] = (() => {
+  const RINGS = 14, H = 1.4, DUST = ['#ead3a4', '#d2ae76', '#a88052', '#8a663e'];
+  return {
+    height: 0, n: 1, sizeK: 2.6, lit: true,
+    slice(g, k, n, S, R) {   // (the patch of ground it scours)
+      const c0 = S / 2;
+      for (let q = 0; q < 3; q++) { g.fillStyle = q === 2 ? 'rgba(226,197,145,0.22)' : 'rgba(138,102,62,0.2)'; g.beginPath(); g.ellipse(c0, c0, R * (0.9 - q * 0.25), R * (0.7 - q * 0.2), 0, 0, TAU); g.fill(); }
+    },
+    over(lc, ec, x, y, f, time, R, L) {
+      const seed = L.at[0] * 0.013 + L.at[1] * 0.007;
+      const wx = L.at[0] + Math.sin(time * 0.13 + seed) * 20, wy = L.at[1] + Math.cos(time * 0.11 + seed * 1.3) * 20;   // (drifting about its spot)
+      lc.lineCap = 'round'; lc.lineJoin = 'round';
+      // (each ring: where it is on screen, at its own height, swaying)
+      const RG = [];
+      for (let k = 0; k <= RINGS; k++) {
+        const t = k / RINGS, fh = fscale(H * t);
+        const sx = wx + Math.sin(time * 0.9 + seed + t * 2.2) * R * 0.4 * t, sy = wy + Math.cos(time * 0.7 + seed + t * 1.8) * R * 0.25 * t;
+        RG.push([CX + (sx - CX) * fh, CY + (sy - CY) * fh, (R * 0.1 + R * 0.95 * Math.pow(t, 1.4)) * fh, t]);
+      }
+      // a haze of dust filling the funnel
+      for (const [cx, cy, rr, t] of RG) { lc.globalAlpha = 0.1 * (1 - t * 0.5); lc.fillStyle = DUST[1]; lc.beginPath(); lc.arc(cx, cy, rr, 0, TAU); lc.fill(); }
+      // spiral arms of dust, wound up the column and whirling round (the back of each darker than the front)
+      const ARMS = 4, spin = time * 4.5 + seed;
+      for (let j = 0; j < ARMS; j++) {
+        for (let k = 0; k < RINGS; k++) {
+          const A = RG[k], B = RG[k + 1], aa = spin + (j / ARMS) * TAU + k * 0.42, ab = spin + (j / ARMS) * TAU + (k + 1) * 0.42;
+          lc.globalAlpha = 0.85 * (1 - A[3] * 0.5); lc.strokeStyle = Math.sin(aa) > 0.2 ? DUST[3] : j % 2 ? DUST[0] : DUST[1]; lc.lineWidth = 1 + Math.round(A[3] * 3);
+          lc.beginPath(); lc.moveTo(A[0] + Math.cos(aa) * A[2], A[1] + Math.sin(aa) * A[2] * 0.92); lc.lineTo(B[0] + Math.cos(ab) * B[2], B[1] + Math.sin(ab) * B[2] * 0.92); lc.stroke();
+        }
+      }
+      // and grit flung round it
+      for (let k = 2; k <= RINGS; k += 2) {
+        const [cx, cy, rr, t] = RG[k], nj = 3 + Math.round(t * 6);
+        for (let j = 0; j < nj; j++) {
+          const a = time * (6 - 3 * t) + (j / nj) * TAU + k * 0.9 + seed, rj = rr * (1.08 + 0.12 * Math.sin(j * 2.3 + k));
+          lc.globalAlpha = 0.9 * (1 - t * 0.4); lc.fillStyle = DUST[(j + k) % 4]; lc.fillRect(Math.round(cx + Math.cos(a) * rj), Math.round(cy + Math.sin(a) * rj * 0.92), 2, 2);
+        }
+      }
+      lc.lineCap = 'butt';
+      lc.globalAlpha = 1;
     }
   };
 })();
@@ -9025,7 +9074,7 @@ function drawShaft(P, f0, fd, wd, time) {
   for (const k of corners) { const q = at(O[k], f0); lc.fillRect(Math.round(q[0]) - 1, Math.round(q[1]) - 1, 2, 2); }
 }
 const m0 = (P) => P[(P.length / 2) | 0];
-/* the old road bridge across a pit of lava (a pool gap: Industrial's): its steel piers stand up out of the lava in pairs
+/* the old road bridge across a pit of lava (a pool gap: Kazumura's): its steel piers stand up out of the lava in pairs
    along the road's line, some snapped short, each with an amber lamp on top. The lamps blink pair after pair from the
    jump toward the far side, so the way on is plain. Scenery only: nothing to hit. */
 function drawPoolPiers(time) {
@@ -12024,7 +12073,7 @@ function buildRiver() {
   if (RIVER.paths.length || RIVER.lakes.length) riverMask();
   laneHoles();
 }
-/* A gap marked pool (Industrial's): a broad pit of the world's water or lava, drawn as a lake, round the whole gap and
+/* A gap marked pool (Kazumura's): a broad pit of the world's water or lava, drawn as a lake, round the whole gap and
    well out beyond it, its shore irregular, coming no nearer any other road (or shortcut) than a little past its edge.
    Its outline: from the middle of the gap, out along rays all round, each reaching past the gap's own road by a
    wandering amount, and stopping short of anything it must keep off. */
@@ -12583,7 +12632,7 @@ function drawRiverBed(time, ravines) {
   lc.fillStyle = C.deep;
   for (const r of runs) outLake(r, (a, b) => ribbon(r.P, a, b, 0.45));
   for (const L of lakes) lakeIn(L, 0.55);
-  // (a broad pit of lava (Industrial's) is crusted over and dimmer, so so much of it is easy on the eye)
+  // (a broad pit of lava (Kazumura's) is crusted over and dimmer, so so much of it is easy on the eye)
   if (RV.glow) { lc.fillStyle = 'rgba(28,8,6,0.6)'; for (const L of lakes) if (L.pool) lakeIn(L, inset); }
   // (molten: the river and its lakes light up the glow layer as well)
   if (RV.glow) {
