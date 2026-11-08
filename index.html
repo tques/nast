@@ -1109,23 +1109,24 @@ const TRACKS = [
       [1450, 715], [1290, 712], [1205, 790], [1182, 900], [1112, 1032], [968, 1032], [898, 900], [875, 790],
       [790, 712], [660, 706], [420, 712], [160, 724], [-390, 724], [-503, 677], [-550, 564], [-550, 420],
       [-550, 300], [-550, 135], [-584, 54], [-665, 20], [-746, 54], [-780, 135], [-746, 216], [-665, 250],
-      [-550, 250], [-470, 250], [-385, 215], [-350, 130], [-350, 100], [-21, 29], [50, 0], [150, 0]
+      [-550, 250], [-470, 250], [-405, 232], [-362, 190], [-340, 140], [-318, 100], [-270, 75], [-190, 58],
+      [-21, 29], [50, 0], [150, 0]
     ],
     shortcuts: [{from: [560, 0], to: [1340, 30], via: [[653, 113], [747, 209], [842, 274], [939, 300], [1037, 282], [1137, 224], [1238, 135]]}, {from: [1384, 711], to: [660, 706], via: [[1294, 620], [1204, 544], [1114, 492], [1024, 474], [933, 491], [842, 541], [751, 617]]}],   // (smoothed and balanced: tools/shortcuts.js)
     elevation: [
-      { from: 0.06595, to: 0.15491, level: 1, rocks: true },    // the tower bump, high over the asteroid field
-      { from: 0.44479, to: 0.53988, level: -1, canopy: 'ice' },  // the trench bump, under drifting ice
-      { from: 0.82822, to: 0.92025, level: 1, rocks: true }     // the overpass across the loop
+      { from: 0.06636, to: 0.15586, level: 1, rocks: true },    // the tower bump, high over the asteroid field
+      { from: 0.44753, to: 0.54321, level: -1, canopy: 'ice' },  // the trench bump, under drifting ice
+      { from: 0.83333, to: 0.9537, level: 1, rocks: true }     // the overpass across the loop
     ],
-    barricades: [0.26227, 0.67178],
+    barricades: [0.26389, 0.67593],
     // a jump to learn on, and safe: a ramp over a hole in the left half of the lane, the right half solid to drive round it
     // (a Stinger waits just past the hole, for whoever jumps)
-    jumps: [{at: 0.61043, side: 'left'}],
-    holes: [{at: 0.6319, side: 'left'}],
-    pickups: [[0.00153, -30, 'cell'], [0.11503, 0, 'cell'], [0.19172, 28, 'sting'], [0.32362, -26, 'cell'], [0.40644, 24, 'sting'],
-      [0.4908, 0, 'cell'], [0.65031, -28, 'sting'], [0.73926, 26, 'cell'], [0.81442, 0, 'cell'],
-      [0.3681, 0, 'cell'], [0.55982, 26, 'cell'], [0.76074, -24, 'cell'], [0.89877, 0, 'cell']],
-    asteroids: [0.01994, 0.22239, 0.31748, 0.3635, 0.57209, 0.71012, 0.97086],
+    jumps: [{at: 0.6142, side: 'left'}],
+    holes: [{at: 0.6358, side: 'left'}],
+    pickups: [[0.00154, -30, 'cell'], [0.11574, 0, 'cell'], [0.1929, 28, 'sting'], [0.32562, -26, 'cell'], [0.40895, 24, 'sting'],
+      [0.49383, 0, 'cell'], [0.65432, -28, 'sting'], [0.74383, 26, 'cell'], [0.81944, 0, 'cell'],
+      [0.37037, 0, 'cell'], [0.56327, 26, 'cell'], [0.76543, -24, 'cell'], [0.90432, 0, 'cell']],
+    asteroids: [0.02006, 0.22377, 0.31944, 0.36574, 0.57562, 0.71451, 0.97068],
     landmarks: [{at: [440, -165], r: 80, desc: 'Space worms: a knot of asteroids bored through by fat segmented worms, arching from rock to rock and burrowing back in', art: 'space-worms'}, {at: [490, 875], r: 84, desc: 'Space worms: a knot of asteroids bored through by fat segmented worms, arching from rock to rock and burrowing back in', art: 'space-worms'}, {at: [1915, 380], r: 88, desc: 'Space worms: a knot of asteroids bored through by fat segmented worms, arching from rock to rock and burrowing back in', art: 'space-worms'}]
   },
   {
