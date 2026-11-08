@@ -172,6 +172,15 @@ body.cover #stage { position: fixed; left: 50%; top: 50%; transform: translate(-
 #chat span { display: block; line-height: 1.2; color: var(--ink); }
 #count { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font: 700 20cqw/1 var(--numbers); color: var(--ink); text-shadow: 0 0.6cqw 0 rgba(0, 0, 0, 0.5), 0 0 3cqw rgba(255, 176, 74, 0.6); text-transform: uppercase; letter-spacing: 0.06em; }
 #count.go { color: var(--amber); }
+#count.fly { left: auto; top: auto; right: 4cqw; bottom: 16cqh; transform: none; font-size: 9cqw; }
+#flyTitle { position: absolute; left: 4cqw; bottom: 16cqh; display: grid; gap: 0.6cqw; pointer-events: none; }
+#flyTitle b { font: 700 6.4cqw/0.9 var(--display); color: var(--amber); text-transform: uppercase; letter-spacing: 0.05em; text-shadow: 0 0.4cqw 0 #6b2e12, 0 0 2.4cqw rgba(255, 140, 60, 0.4); }
+#flyTitle span { font: 600 1.5cqw/1 var(--display); color: var(--ink); letter-spacing: 0.22em; text-transform: uppercase; text-shadow: 0 1px 3px #000; }
+#flyTitle[hidden] { display: none; }
+#hud.fly > .hud-pos, #hud.fly > .hud-map, #hud.fly > .hud-dash, #hud.fly > .hud-boost, #hud.fly > #pass, #hud.fly > #wrong { visibility: hidden; }   /* (the flyover: just the shots, the title and the count) */
+#flyCut { position: absolute; inset: 0; background: #05040c; opacity: 0; pointer-events: none; }
+#flyCut.cut { animation: flyCut 0.32s ease-out; }
+@keyframes flyCut { from { opacity: 1; } to { opacity: 0; } }
 #wrong { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); font: 700 3.4cqw/1 var(--display); color: var(--rose); letter-spacing: 0.1em; text-transform: uppercase; }
 #wrong[hidden], #count[hidden] { display: none; }
 
@@ -578,6 +587,8 @@ body.padNav.padPick-diff .diffChips .chip:focus, body.padNav.padPick-diff .cupDi
       </div>
       <div id="pass" hidden></div>
       <div id="toast" role="status"></div>
+      <div id="flyTitle" hidden><b id="flyName"></b><span id="flySub"></span></div>
+      <div id="flyCut" aria-hidden="true"></div>
       <div id="count" hidden></div>
       <div id="wrong" hidden>WRONG WAY</div>
     </div>
@@ -2199,12 +2210,15 @@ function spawnRock(slot, tier, x, y, idx) {
 }
 
 /* a race (solo: a time trial, the player alone on the grid, no Stingers to pick up: there is no one to use them on) */
+/* the countdown: T seconds in all; over the first FLY, the flyover of the track (a shot a tick: see flyShots), each
+   shot gliding GLIDE world px along the lane */
+const COUNT = { T: 10, FLY: 5, GLIDE: 420 };
 function newWorld(laps, solo) {
   if (!SCENERY) SCENERY = buildRocks(TRACK.seed || 11);
   W = { solo: !!solo,
     laps, time: 0, ships: [], bullets: [], parts: [], gates: [], targets: [], pickups: [], rocks: [], slots: [],
     ev: [], fx: [], blasts: [], mines: [], order: [], shake: 0, rocksOn: false,
-    race: { state: 'countdown', cd: 3.999, beep: 4, t: 0, finishCount: 0, doneT: 0, reported: false }
+    race: { state: 'countdown', cd: COUNT.T - 0.001, beep: COUNT.T, t: 0, finishCount: 0, doneT: 0, reported: false }
   };
   buildCourse();
   if (solo) W.pickups = W.pickups.filter((p) => p.type !== 'sting');
@@ -13259,6 +13273,7 @@ const SFX = {
   fall() { tone(680, 50, 1.0, 'sawtooth', 0.13); hiss(0.9, 0.25, 1400, 90); },
   warn() { tone(880, 880, 0.08, 'square', 0.08); tone(660, 660, 0.08, 'square', 0.08, 0.1); },
   beep(n) { tone(n === 1 ? 880 : 520, n === 1 ? 880 : 520, 0.18, 'square', 0.1); },
+  tick() { tone(300, 260, 0.07, 'sine', 0.06); },
   go() { tone(1040, 1040, 0.5, 'square', 0.12); tone(1560, 1560, 0.5, 'square', 0.06); },
   lap() { tone(700, 700, 0.1, 'triangle', 0.15); tone(1050, 1050, 0.2, 'triangle', 0.15, 0.1); },
   finish() { [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.3, 'triangle', 0.16, i * 0.11)); }
@@ -14059,7 +14074,8 @@ const $ = (id) => document.getElementById(id);
 const stage = $('stage'), view = $('view'), hud = $('hud'), mini = $('mini'), mctx = mini.getContext('2d');
 const el = {
   pos: $('posN'), lap: $('lapN'), clock: $('clock'), spd: $('spd'), alignPct: $('alignPct'), alignFill: $('alignFill'),
-  ePct: $('ePct'), eFill: $('eFill'), eBar: $('eBar'), eMark: $('eMark'), pips: $('pips'), toast: $('toast'), count: $('count'), wrong: $('wrong'), pass: $('pass')
+  ePct: $('ePct'), eFill: $('eFill'), eBar: $('eBar'), eMark: $('eMark'), pips: $('pips'), toast: $('toast'), count: $('count'), wrong: $('wrong'), pass: $('pass'),
+  flyTitle: $('flyTitle'), flyName: $('flyName'), flySub: $('flySub'), flyCut: $('flyCut')
 };
 const screens = { menu: $('menu'), tracks: $('tracks'), cup: $('cup'), pause: $('pause'), results: $('results'), help: $('help'), options: $('options') };
 const STEP = 1 / 60;
@@ -14161,7 +14177,45 @@ function startRace() {
   updateCamera(0, mouse, p, true);
   acc = 0;
   musicStop(0.25);   // (the countdown is quiet: the track's song starts on GO)
-  toast(PAD.on ? 'Left stick to steer and go, left trigger to brake' : 'Steer with the mouse, hold left button to go, Space to brake');
+  W.fly = flyShots(); flyCam();
+}
+/* the countdown (COUNT.T seconds). Over its first COUNT.FLY the camera leaves the grid for a flyover of the track: a
+   shot a tick, each gliding along the lane for its second, in order round the lap, with the track's name over them.
+   Each shot is on something worth seeing in its part of the lap (a slingshot, a jump, a shortcut's door, a raised or
+   sunken stretch, a hole, a landmark) where there is one, or evenly round the lap where not. Then back to the grid */
+function flyShots() {
+  const N = T.N, out = [], cands = [];
+  for (const g of T.slings || []) cands.push(wrapIdx(g.a + (wrapIdx(g.b - g.a) >> 1)));
+  for (const j of T.jumps) cands.push(j.i);
+  for (const c of T.chords) cands.push(c.a);
+  for (const r of T.runs) cands.push(wrapIdx(r.s + (r.n >> 1)));
+  for (const pt of T.pits || []) cands.push(pt.i);
+  for (const L of landmarks()) cands.push(nearestIdx(L.at[0], L.at[1], -1, 0, 0));
+  for (let k = 0; k < COUNT.FLY; k++) {
+    const lo = Math.floor(N * (0.04 + 0.92 * k / COUNT.FLY)), hi = Math.floor(N * (0.04 + 0.92 * (k + 1) / COUNT.FLY)), mid = (lo + hi) >> 1;
+    let best = -1;
+    for (const c of cands) if (c >= lo && c < hi && (best < 0 || Math.abs(c - mid) < Math.abs(best - mid))) best = c;
+    const at = best >= 0 ? best : mid, run = Math.round(COUNT.GLIDE / T.step);
+    out.push({ a: wrapIdx(at - (run >> 1)), run });
+  }
+  return { shots: out, k: -1, done: false };
+}
+function flyOn() { return mode === 'race' && W && W.fly && !W.fly.done && W.race.state === 'countdown' && W.race.cd > COUNT.T - COUNT.FLY; }
+function flyCam() {
+  const F = W.fly, t = COUNT.T - W.race.cd, k = clamp(Math.floor(t), 0, F.shots.length - 1), u = clamp(t - k, 0, 1), sh = F.shots[k];
+  const q = sh.run * u, i = wrapIdx(sh.a + Math.floor(q)), j = wrapIdx(i + 1), f = q - Math.floor(q);
+  CAM.x = T.x[i] + (T.x[j] - T.x[i]) * f; CAM.y = T.y[i] + (T.y[j] - T.y[i]) * f; CAM.shx = CAM.shy = 0; CAM.h = 0;
+  if (k !== F.k) {   // (a new shot: a quick cut from black, and the title)
+    F.k = k; el.flyCut.classList.remove('cut'); void el.flyCut.offsetWidth; el.flyCut.classList.add('cut');
+    if (k === 0) { el.flyName.textContent = TRACK.name; el.flySub.textContent = (SET.name || '') + '  ·  ' + (T.L / 1000).toFixed(1) + ' km  ·  ' + W.laps + (W.laps === 1 ? ' lap' : ' laps'); el.flyTitle.hidden = false; }
+  }
+}
+function flyEnd() {
+  const F = W.fly, p = W.ships[0];
+  F.done = true; el.flyTitle.hidden = true;
+  el.flyCut.classList.remove('cut'); void el.flyCut.offsetWidth; el.flyCut.classList.add('cut');
+  CAM.x = p.x; CAM.y = p.y; updateCamera(0, mouse, p, true);
+  if (mode === 'race') toast(PAD.on ? 'Left stick to steer and go, left trigger to brake' : 'Steer with the mouse, hold left button to go, Space to brake');
 }
 /* the menu shows one of the tracks, picked at random each time (the race tracks, not the player's own) */
 function randomTrack() { return Math.floor(Math.random() * BUILTIN_N); }
@@ -15364,7 +15418,7 @@ function handleEvents() {
         else if (e.b && e.b.isPlayer && live) SFX.target();
         break;
       case 'rock': if (live && near(e.a.x, e.a.y)) SFX.rock(); break;
-      case 'beep': if (mode === 'race') SFX.beep(e.a); break;
+      case 'beep': if (mode === 'race') { if (e.a > COUNT.T - COUNT.FLY) SFX.tick(); else SFX.beep(e.a); } break;
       case 'go': if (mode === 'race') { SFX.go(); goT = 0.9; if (SONGS[SET.id]) musicPlay(SET.id, 4); } break;   // (straight into the theme, on GO)
       case 'lap': if (e.a.isPlayer && mode === 'race') { SFX.lap(); toast('Lap ' + e.a.lapsDone + ' Complete - Time: ' + fmt(e.b)); } break;
       case 'finish':
@@ -15414,7 +15468,8 @@ function updateHud(dt) {
   }
   toastT -= dt;
   if (toastT <= 0) el.toast.classList.remove('on');
-  if (R.state === 'countdown') { el.count.hidden = false; el.count.className = ''; el.count.textContent = Math.max(1, Math.ceil(R.cd)); }
+  hud.classList.toggle('fly', flyOn());
+  if (R.state === 'countdown') { el.count.hidden = false; el.count.className = flyOn() ? 'fly' : ''; el.count.textContent = Math.max(1, Math.ceil(R.cd)); }
   else if (goT > 0) { goT -= dt; el.count.hidden = false; el.count.className = 'go'; el.count.textContent = 'GO'; }
   else el.count.hidden = true;
   el.wrong.hidden = !(p.wrongT > 1 && !p.finished);
@@ -15532,7 +15587,7 @@ function frame(now) {
   if (mode !== 'pause') {
     acc += dt;
     const racing = mode === 'race' || mode === 'results';
-    updateCamera(dt, mode === 'race' ? mouse : null, racing ? W.ships[0] : W.order[0], false);
+    if (flyOn()) flyCam(); else { if (W.fly && !W.fly.done) flyEnd(); updateCamera(dt, mode === 'race' ? mouse : null, racing ? W.ships[0] : W.order[0], false); }
     let n = 0;
     while (acc >= STEP && n < 5) { prepInput(); stepWorld(STEP); handleEvents(); chatTick(STEP); acc -= STEP; n++; }
     if (mode === 'results') renderBoard();
