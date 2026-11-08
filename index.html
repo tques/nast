@@ -1713,7 +1713,9 @@ TRACKS.push(
     points: [[1030, -1645], [745, -1590], [680, -1335], [380, -1215], [60, -1085], [-75, -830], [-135, -550], [-115, -260], [0, 0], [210, 200], [475, 305], [765, 315], [1035, 215], [1170, -30], [1015, -255], [740, -345], [455, -320], [190, -200], [-5, 10], [-120, 275], [-140, 560], [-85, 845], [145, 1020], [235, 1320], [535, 1345], [735, 1600], [1020, 1655], [1305, 1650], [1590, 1600], [2005, 1195], [1905, 820], [1665, 805], [1335, 820], [1155, 575], [1380, 265], [1685, 345], [1780, 645], [1675, 890], [1765, 1115], [2095, 1280], [2365, 1215], [2580, 1025], [2770, 805], [2420, 275], [2850, -30], [2990, -165], [3045, -370], [2815, -545], [2780, -810], [2425, -895], [2380, -1225], [2140, -1385], [1895, -1395], [1783, -1396], [1485, -1425], [1320, -1650]],
     shortcuts: [{from: [2420, 274], to: [1505, -1416], via: [[2245, -165], [2350, -525], [2065, -945], [1680, -1120]]}],
     elevation: [{from: 0.28129, to: 0.32405, level: 1, rocks: true}, {from: 0.56771, to: 0.71068, level: 1}, {from: 0.35458, to: 0.53261, level: -1}, {from: 0.81493, to: 0.9484, level: 1}],
-    barricades: [0.09493, 0.76174]
+    barricades: [0.09493, 0.76174],
+    // the androids who live out here (see 'Rime Belt: the androids who live out on the ice')
+    landmarks: [{at: [895, -1545], r: 80, desc: 'A row of androids standing at the trackside like fence posts, their heads following the racers round in unison', art: 'android-spectators'}, {at: [2553, 651], r: 80, desc: 'A row of androids standing at the trackside like fence posts, their heads following the racers round in unison', art: 'android-spectators'}, {at: [330, -977], r: 125, desc: 'Android charging docks standing in the open snow, androids dormant in most of them, footpaths in dead-straight lines, androids walking them', art: 'android-docks'}, {at: [2982, 828], r: 120, desc: 'Android charging docks standing in the open snow, androids dormant in most of them, footpaths in dead-straight lines, androids walking them', art: 'android-docks'}, {at: [77, -869], r: 36, desc: 'A relay mast: a lattice tower guyed to the ground, a dish on its side and a red light blinking at its top', art: 'relay-mast'}, {at: [2628, 401], r: 36, desc: 'A relay mast: a lattice tower guyed to the ground, a dish on its side and a red light blinking at its top', art: 'relay-mast'}, {at: [40, 713], r: 80, desc: 'The androids\' shelter: a ramp down to a blast door in a concrete headwall under a snow-covered mound, an amber beacon turning, paths coming in from every side', art: 'bunker-entrance'}, {at: [806, -201], r: 40, desc: 'A perfect snowman, the androids\' attempt at a human custom: three identical spheres in an exact stack, rod arms, bolt eyes, in a circle of footprints', art: 'perfect-snowman'}, {at: [1320, -1767], r: 44, desc: 'A broken android half buried in a drift, an arm reaching out, one eye still blinking', art: 'android-wreck'}]
   },
   {
     id: 'perihelion', name: 'Perihelion', setting: 'vegas', seed: 52,
@@ -9218,6 +9220,291 @@ LANDMARK_ART['space-worms'] = (() => {
     }
   };
 })();
+/* ---------- Rime Belt: the androids who live out on the ice ----------
+   They need no warmth, food or roof, so all there is of them is power, parts and order: charging docks standing in
+   the open snow with androids dormant in them, footpaths of identical prints in dead-straight lines, androids walking
+   them at an even pace, relay masts, a row of them standing at the trackside like fence posts whose heads follow
+   you round in unison, a perfect snowman (their attempt at a human custom), one of them broken half under the snow,
+   still blinking, and the blast door of the shelter they go down into when the weather turns. */
+const LMP = (h, x, y) => { const f = fscale(h); return [VW / 2 + (x - CX) * f, VH / 2 + (y - CY) * f, f]; };
+const ANDROID = { shell: ['#f2f6fa', '#b8c2d0', '#6a7486'], dark: '#2c323e', visor: '#5ef2ff', off: '#2a5664' };
+/* one android, standing at (x, y) in the world: body turned to face (radians), head to look (radians); walk: the
+   stride's phase (or null, standing still); dormant: its visor dark. Each part at its own height, so it stands up. */
+function drawAndroid(x, y, face, look, walk, dormant) {
+  const g = lc, K = 2.2, cf = Math.cos(face), sf = Math.sin(face), cl = Math.cos(look), sl = Math.sin(look);   // (K: its size, a little taller than a racer is long)
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  // its shadow, away from the sun, longer than it is wide: it stands up
+  let p = LMP(0, x + 5 * K, y + 6.5 * K), p0 = LMP(0, x, y);
+  g.fillStyle = 'rgba(44,64,120,0.3)'; g.lineCap = 'round'; g.strokeStyle = g.fillStyle; g.lineWidth = 5 * K * p[2];
+  g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p[0], p[1]); g.stroke(); g.lineCap = 'butt';
+  // feet (a stride when walking)
+  for (const sd of [-1, 1]) {
+    const st = walk == null ? 0 : Math.sin(walk + (sd > 0 ? Math.PI : 0)) * 2.2 * K;
+    p = LMP(0.02, x - sf * sd * 1.6 * K + cf * st, y + cf * sd * 1.6 * K + sf * st);
+    const w = Math.max(2, Math.round(2 * K * p[2]));
+    g.fillStyle = ANDROID.dark; g.fillRect(Math.round(p[0] - w / 2), Math.round(p[1] - w / 2), w, w);
+  }
+  // the torso: shoulders across the way it faces, lit upper-left, a dark seam down its back
+  const bob = walk == null ? 0 : Math.abs(Math.sin(walk)) * 0.006;
+  p = LMP(0.085 + bob, x, y);
+  g.fillStyle = ANDROID.dark; g.beginPath(); g.ellipse(p[0], p[1], 4.4 * K * p[2], 2.6 * K * p[2], face + Math.PI / 2, 0, TAU); g.fill();
+  g.fillStyle = ANDROID.shell[2]; g.beginPath(); g.ellipse(p[0], p[1], 4 * K * p[2], 2.3 * K * p[2], face + Math.PI / 2, 0, TAU); g.fill();
+  g.fillStyle = ANDROID.shell[1]; g.beginPath(); g.ellipse(p[0] - 0.5 * K * p[2], p[1] - 0.6 * K * p[2], 3.3 * K * p[2], 1.8 * K * p[2], face + Math.PI / 2, 0, TAU); g.fill();
+  g.fillStyle = ANDROID.shell[0]; g.beginPath(); g.ellipse(p[0] - 1.1 * K * p[2], p[1] - 1.2 * K * p[2], 1.5 * K * p[2], 0.8 * K * p[2], face + Math.PI / 2, 0, TAU); g.fill();
+  // its head, with the visor on the side it looks toward
+  p = LMP(0.125 + bob, x, y);
+  const hr = Math.max(2, 2.3 * K * p[2]);
+  g.fillStyle = ANDROID.dark; g.beginPath(); g.arc(Math.round(p[0]), Math.round(p[1]), hr + 1, 0, TAU); g.fill();
+  g.fillStyle = ANDROID.shell[1]; g.beginPath(); g.arc(Math.round(p[0]), Math.round(p[1]), hr, 0, TAU); g.fill();
+  g.fillStyle = ANDROID.shell[0]; g.beginPath(); g.arc(Math.round(p[0] - hr * 0.25), Math.round(p[1] - hr * 0.3), hr * 0.62, 0, TAU); g.fill();
+  const vx = Math.round(p[0] + cl * hr * 0.6), vy = Math.round(p[1] + sl * hr * 0.6);
+  g.strokeStyle = dormant ? ANDROID.off : ANDROID.visor; g.lineWidth = Math.max(2, hr * 0.45);
+  g.beginPath(); g.arc(Math.round(p[0]), Math.round(p[1]), hr * 0.72, look - 0.85, look + 0.85); g.stroke();
+  if (!dormant) glow(ec, ANDROID.visor, Math.max(6, Math.round(hr * 1.6)), vx, vy, 0.4);
+}
+/* footprints along a straight path in a slice (pixels; a pair every 5 units, the pair across the way it runs) */
+function paintPrints(g, x0, y0, x1, y1, lim, c0) {
+  const L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+  for (let d = 2, k = 0; d < L; d += 4.5, k++) {
+    const sd = k % 2 ? 1 : -1, x = x0 + ux * d - uy * sd * 1.6, y = y0 + uy * d + ux * sd * 1.6;
+    const e = Math.max(Math.abs(x - c0), Math.abs(y - c0)) / lim;
+    if (e > 1) continue;
+    g.globalAlpha = e > 0.8 ? (1 - e) * 5 : 1;   // (fading out toward the edge of the picture: the path runs on)
+    g.fillStyle = '#93a8c6'; g.fillRect(Math.round(x) - 1, Math.round(y), 2, 1);
+    g.fillStyle = '#c4d2e6'; g.fillRect(Math.round(x) - 1, Math.round(y) - 1, 2, 1);
+  }
+  g.globalAlpha = 1;
+}
+/* a settlement of charging docks: a row of them on a pad of packed snow, androids standing dormant in most, paths
+   squared off round them and running away out of sight, and androids walking them */
+LANDMARK_ART['android-docks'] = (() => {
+  const layout = (R) => {
+    const n = 5 + (Math.round(R) % 2), docks = [];
+    for (let i = 0; i < n; i++) docks.push({ x: (i - (n - 1) / 2) * R * 0.3, y: -R * 0.2, full: (i * 7 + Math.round(R)) % 5 !== 2 });
+    // paths: [x0, y0, x1, y1], in units from the middle
+    const paths = [[-R * 1.3, R * 0.32, R * 1.3, R * 0.32], [R * 1.02, R * 0.32, R * 1.02, -R * 1.3]];
+    for (const d of docks) paths.push([d.x, d.y + R * 0.08, d.x, R * 0.32]);
+    return { docks, paths, n };
+  };
+  return {
+    height: 0, n: 1, sizeK: 2.7, lit: true,
+    slice(g, k, n, S, R) {
+      const c0 = S / 2, { docks, paths } = layout(R);
+      g.fillStyle = 'rgba(140,162,200,0.28)';
+      g.fillRect(Math.round(c0 + docks[0].x - R * 0.2), Math.round(c0 - R * 0.42), Math.round(docks[docks.length - 1].x - docks[0].x + R * 0.4), Math.round(R * 0.46));
+      for (const q of paths) paintPrints(g, c0 + q[0], c0 + q[1], c0 + q[2], c0 + q[3], S / 2 - 2, c0);
+    },
+    over(lc0, ec0, x, y, f, time, R, L) {
+      const { docks, paths } = layout(R), X = L.at[0], Y = L.at[1];
+      lc.setTransform(1, 0, 0, 1, 0, 0);
+      const line = (h0, x0, y0, h1, x1, y1, w, col) => { const a = LMP(h0, X + x0, Y + y0), b = LMP(h1, X + x1, Y + y1); lc.strokeStyle = col; lc.lineWidth = Math.max(1, w * b[2]); lc.beginPath(); lc.moveTo(a[0], a[1]); lc.lineTo(b[0], b[1]); lc.stroke(); };
+      const H = 0.19, hw = R * 0.12;
+      for (const d of docks) {
+        // the base plate, the androids, then the frame over them
+        const p = LMP(0.004, X + d.x, Y + d.y);
+        lc.fillStyle = '#5a6476'; lc.fillRect(Math.round(p[0] - hw * p[2]), Math.round(p[1] - R * 0.06 * p[2]), Math.round(hw * 2 * p[2]), Math.max(2, Math.round(R * 0.025 * p[2])));   // (the dock's footplate, behind its feet)
+        // (the frame's shadow on the snow)
+        const s0 = LMP(0, X + d.x, Y + d.y - R * 0.03), s1 = LMP(0, X + d.x + 0.6 * H * 170, Y + d.y - R * 0.03 + 0.8 * H * 170); lc.strokeStyle = 'rgba(44,64,120,0.22)'; lc.lineWidth = hw * 2 * s0[2]; lc.beginPath(); lc.moveTo(s0[0], s0[1]); lc.lineTo(s1[0], s1[1]); lc.stroke();
+        if (d.full) drawAndroid(X + d.x, Y + d.y + R * 0.04, Math.PI / 2, Math.PI / 2, null, true);
+        lc.setTransform(1, 0, 0, 1, 0, 0);
+        for (const sd of [-1, 1]) { line(0, d.x + sd * hw, d.y - R * 0.03, H, d.x + sd * hw, d.y - R * 0.03, 3, '#3a4252'); line(H * 0.6, d.x + sd * hw, d.y - R * 0.03, H * 0.6, d.x + sd * hw * 0.6, d.y - R * 0.03, 1.5, '#5a6476'); }
+        line(H, d.x - hw, d.y - R * 0.03, H, d.x + hw, d.y - R * 0.03, 4, '#566074');
+        const q = LMP(H, X + d.x, Y + d.y - R * 0.03), on = 0.5 + 0.5 * Math.sin(time * 1.6 + d.x * 0.1), col = d.full ? '#5effa8' : '#ff5a5a';
+        lc.fillStyle = col; lc.fillRect(Math.round(q[0]) - 2, Math.round(q[1]) - 2, 4, 3);
+        glow(ec, col, 10, Math.round(q[0]), Math.round(q[1]), 0.25 + 0.35 * on);
+      }
+      // androids walking the paths, one after another at the same even pace
+      for (let w = 0; w < 3; w++) {
+        const q = w === 2 ? paths[1] : paths[0], L0 = Math.hypot(q[2] - q[0], q[3] - q[1]), d = ((time * 14 + w * L0 * 0.5) % L0), ux = (q[2] - q[0]) / L0, uy = (q[3] - q[1]) / L0;
+        const wx = X + q[0] + ux * d, wy = Y + q[1] + uy * d, fa = Math.atan2(uy, ux);
+        drawAndroid(wx, wy, fa, fa, time * 6 + w, false);
+      }
+      setScale(1);
+    }
+  };
+})();
+/* a relay mast: a lattice tower tapering up from a concrete pad, guyed out to the ground, a dish on its side and a
+   red light blinking at its top */
+LANDMARK_ART['relay-mast'] = {
+  height: 0, n: 1, sizeK: 2.4, lit: true,
+  slice(g, k, n, S, R) {
+    const c0 = S / 2;
+    g.fillStyle = '#9aa4b4'; g.fillRect(Math.round(c0 - R * 0.42), Math.round(c0 - R * 0.42), Math.round(R * 0.84), Math.round(R * 0.84));
+    g.fillStyle = '#c8d0dc'; g.fillRect(Math.round(c0 - R * 0.42), Math.round(c0 - R * 0.42), Math.round(R * 0.84), 2);
+    for (const [ax, ay] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { g.fillStyle = '#5a6476'; g.fillRect(Math.round(c0 + ax * R * 0.95) - 2, Math.round(c0 + ay * R * 0.95) - 2, 4, 4); }
+  },
+  over(lc0, ec0, x, y, f, time, R, L) {
+    const X = L.at[0], Y = L.at[1], H = 1.15, B = R * 0.3, Tp = R * 0.06, SL = H * 170;
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    // its long shadow across the snow (the tower tapering away from the sun), and the dish's
+    { const a = LMP(0, X, Y), b = LMP(0, X + 0.6 * SL, Y + 0.8 * SL); lc.strokeStyle = 'rgba(44,64,120,0.26)'; lc.lineCap = 'round';
+      for (let q = 0; q < 6; q++) { const u = q / 6, v = (q + 1) / 6; lc.lineWidth = Math.max(1, (B + (Tp - B) * u) * 1.6 * a[2]); lc.beginPath(); lc.moveTo(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u); lc.lineTo(a[0] + (b[0] - a[0]) * v, a[1] + (b[1] - a[1]) * v); lc.stroke(); }
+      lc.fillStyle = lc.strokeStyle; lc.beginPath(); lc.ellipse(a[0] + (b[0] - a[0]) * 0.72 + R * 0.2 * a[2], a[1] + (b[1] - a[1]) * 0.72, R * 0.28 * a[2], R * 0.2 * a[2], 0.5, 0, TAU); lc.fill(); lc.lineCap = 'butt'; }
+    const corner = (h, i) => { const s = B + (Tp - B) * (h / H), cx = i & 1 ? 1 : -1, cy = i & 2 ? 1 : -1; return LMP(h, X + cx * s, Y + cy * s); };
+    const seg = (a, b, w, col) => { lc.strokeStyle = col; lc.lineWidth = w; lc.beginPath(); lc.moveTo(a[0], a[1]); lc.lineTo(b[0], b[1]); lc.stroke(); };
+    // guy wires
+    for (const [ax, ay] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) seg(LMP(0, X + ax * R * 0.95, Y + ay * R * 0.95), LMP(H * 0.75, X + ax * Tp, Y + ay * Tp), 1, 'rgba(200,210,226,0.7)');
+    // the lattice, braced every level
+    const steps = 8;
+    for (let s = 0; s < steps; s++) {
+      const h0 = H * s / steps, h1 = H * (s + 1) / steps;
+      for (let i = 0; i < 4; i++) {
+        seg(corner(h0, i), corner(h1, i), 3, i === 0 ? '#c8d0dc' : '#5a6476');
+        const j = [1, 3, 0, 2][i];
+        seg(corner(h0, i), corner(h1, j), 1.5, '#7a8496');
+      }
+    }
+    // the dish, then the light
+    const d = LMP(H * 0.72, X + R * 0.22, Y + R * 0.1);
+    lc.fillStyle = '#6a7486'; lc.beginPath(); lc.ellipse(d[0], d[1], R * 0.3 * d[2], R * 0.22 * d[2], 0.5, 0, TAU); lc.fill();
+    lc.fillStyle = '#e8eef6'; lc.beginPath(); lc.ellipse(d[0] - 1, d[1] - 1, R * 0.24 * d[2], R * 0.17 * d[2], 0.5, 0, TAU); lc.fill();
+    const t = LMP(H, X, Y), on = (time + X * 0.001) % 1.4 < 0.5;
+    lc.fillStyle = on ? '#ff4a3a' : '#6a2020'; lc.fillRect(Math.round(t[0]) - 3, Math.round(t[1]) - 3, 6, 6);
+    if (on) glow(ec, '#ff4a3a', 20, Math.round(t[0]), Math.round(t[1]), 0.8);
+    setScale(1);
+  }
+};
+/* a row of androids standing at the trackside, evenly spaced, facing the lane; their heads follow the player round,
+   all together */
+LANDMARK_ART['android-spectators'] = {
+  height: 0, n: 1, sizeK: 2.2, lit: true,
+  slice() {},
+  over(lc0, ec0, x, y, f, time, R, L) {
+    if (!L._dir) {   // (which way the lane runs past them, and which way it lies: from the nearest bit of it)
+      let bi = 0, bd = 1e18;
+      for (let i = 0; i < T.N; i++) { const d = (T.x[i] - L.at[0]) ** 2 + (T.y[i] - L.at[1]) ** 2; if (d < bd) { bd = d; bi = i; } }
+      L._dir = [T.tx[bi], T.ty[bi], Math.atan2(T.y[bi] - L.at[1], T.x[bi] - L.at[0])];
+    }
+    const [tx, ty, toLane] = L._dir, n = L.n || Math.max(3, Math.round(R / 14)), pl = W && W.ships && W.ships[0];
+    let look = toLane;
+    if (pl && Math.hypot(pl.x - L.at[0], pl.y - L.at[1]) < 700) look = Math.atan2(pl.y - L.at[1], pl.x - L.at[0]);
+    // (and they turn only so far: they never look back over their shoulders)
+    let dl = Math.atan2(Math.sin(look - toLane), Math.cos(look - toLane));
+    dl = clamp(dl, -1.5, 1.5);
+    for (let i = 0; i < n; i++) {
+      const o = (i - (n - 1) / 2) * 26;
+      drawAndroid(L.at[0] + tx * o, L.at[1] + ty * o, toLane, toLane + dl, null, false);
+    }
+    setScale(1);
+  }
+};
+/* a perfect snowman: three spheres exactly the same size in an exact stack, straight rod arms, bolts for eyes, a
+   true cone for a nose and a mouth of evenly spaced dots, in a circle of footprints */
+LANDMARK_ART['perfect-snowman'] = {
+  height: 0.16, n: 21, sizeK: 3, lit: false,
+  slice(g, k, n, S, R) {
+    const c0 = S / 2, t = k / (n - 1), rs = R * 0.36;
+    if (k === 0) {   // (the circle of prints round it)
+      for (let a = 0; a < TAU; a += 0.21) { const px = c0 + Math.cos(a) * R * 1.25, py = c0 + Math.sin(a) * R * 1.25; g.fillStyle = '#93a8c6'; g.fillRect(Math.round(px) - 1, Math.round(py), 2, 1); g.fillStyle = '#c4d2e6'; g.fillRect(Math.round(px) - 1, Math.round(py) - 1, 2, 1); }
+    }
+    const u = t * 3, idx = Math.min(2, Math.floor(u)), z = (u - idx) * 2 - 1, rr = rs * Math.sqrt(Math.max(0, 1 - z * z));
+    if (rr < 1) return;
+    const im = g.getImageData(0, 0, S, S), d = im.data;
+    for (let y = Math.floor(c0 - rr); y <= c0 + rr; y++) for (let x = Math.floor(c0 - rr); x <= c0 + rr; x++) {
+      const dx = x + 0.5 - c0, dy = y + 0.5 - c0, q = Math.hypot(dx, dy);
+      if (q > rr) continue;
+      const nz = Math.sqrt(Math.max(0, 1 - q * q / (rs * rs))), lit = -(dx * 0.6 + dy * 0.8) / rs * 0.6 + nz * 0.4;
+      const c = lit > 0.35 ? [255, 255, 255] : lit > -0.05 ? [226, 234, 246] : lit > -0.4 ? [184, 198, 222] : [140, 158, 194], o = (y * S + x) * 4;
+      d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+    }
+    g.putImageData(im, 0, 0);
+    // its face, looking south: seen from above, the nose sticks out past the head, the eyes and mouth just inside its rim
+    if (idx === 2 && Math.abs(z) < 1.01 / (n / 3)) {
+      g.fillStyle = '#ff8a2a'; g.beginPath(); g.moveTo(c0 - 2.5, c0 + rs * 0.85); g.lineTo(c0 + 2.5, c0 + rs * 0.85); g.lineTo(c0, c0 + rs * 1.7); g.closePath(); g.fill();
+      g.fillStyle = '#c4601a'; g.fillRect(Math.round(c0), Math.round(c0 + rs * 0.95), 2, Math.round(rs * 0.6));
+      g.fillStyle = '#3a4252'; for (let i = -2; i <= 2; i++) g.fillRect(Math.round(c0 + i * rs * 0.2) - 1, Math.round(c0 + rs * 0.9 - Math.abs(i) * 1.2), 2, 2);
+    }
+    if (idx === 2 && z >= 0.53 && z < 0.53 + 2 / (n / 3)) {   // (the slice whose rim the eyes sit just inside: higher ones are smaller, so they show)
+      for (const sd of [-1, 1]) { const ex = Math.round(c0 + sd * rs * 0.3), ey = Math.round(c0 + rs * 0.76); g.fillStyle = '#3a4252'; g.fillRect(ex - 2, ey - 2, 4, 4); g.fillStyle = '#c4ccd8'; g.fillRect(ex - 1, ey - 1, 2, 2); }
+    }
+  },
+  over(lc0, ec0, x, y, f, time, R, L) {
+    const X = L.at[0], Y = L.at[1], h = 0.16 * 0.5;
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    for (const sd of [-1, 1]) { const a = LMP(h, X + sd * R * 0.3, Y), b = LMP(h, X + sd * R * 0.95, Y); lc.strokeStyle = '#5a6476'; lc.lineWidth = Math.max(1.5, 1.5 * b[2]); lc.beginPath(); lc.moveTo(a[0], a[1]); lc.lineTo(b[0], b[1]); lc.stroke(); }
+    setScale(1);
+  }
+};
+/* one of them broken, half under a drift: its torso and head out of the snow, an arm reaching, a hand lying apart,
+   and one eye still blinking */
+LANDMARK_ART['android-wreck'] = {
+  height: 0, n: 1, sizeK: 2.6, lit: true,
+  slice(g, k, n, S, R) {
+    const c0 = S / 2, s = R / 20;
+    // the drift over its legs
+    g.fillStyle = '#b8c8e0'; g.beginPath(); g.ellipse(c0 + 6 * s, c0 + 5 * s, 13 * s, 8 * s, 0.4, 0, TAU); g.fill();
+    g.fillStyle = '#f4f8ff'; g.beginPath(); g.ellipse(c0 + 5 * s, c0 + 4 * s, 11 * s, 6.5 * s, 0.4, 0, TAU); g.fill();
+    // torso, then the reaching arm, the loose hand, the head
+    g.fillStyle = '#6a7486'; g.beginPath(); g.ellipse(c0 - 2 * s, c0 - 1 * s, 6 * s, 3.6 * s, 0.4, 0, TAU); g.fill();
+    g.fillStyle = '#b8c2d0'; g.beginPath(); g.ellipse(c0 - 2.6 * s, c0 - 1.6 * s, 5 * s, 2.8 * s, 0.4, 0, TAU); g.fill();
+    g.strokeStyle = '#2c323e'; g.lineWidth = 2 * s; g.beginPath(); g.moveTo(c0 - 6 * s, c0 - 3 * s); g.lineTo(c0 - 11 * s, c0 - 9 * s); g.lineTo(c0 - 15 * s, c0 - 8 * s); g.stroke();
+    g.strokeStyle = '#b8c2d0'; g.lineWidth = 1.4 * s; g.beginPath(); g.moveTo(c0 - 6 * s, c0 - 3.4 * s); g.lineTo(c0 - 11 * s, c0 - 9.4 * s); g.stroke();
+    g.fillStyle = '#2c323e'; g.fillRect(Math.round(c0 + 9 * s), Math.round(c0 - 8 * s), Math.round(3 * s), Math.round(2 * s));
+    g.fillStyle = '#b8c2d0'; g.fillRect(Math.round(c0 + 9 * s), Math.round(c0 - 8 * s), Math.round(2 * s), Math.round(1 * s));
+    g.fillStyle = '#2c323e'; g.beginPath(); g.arc(c0 - 8 * s, c0 + 1 * s, 3.4 * s, 0, TAU); g.fill();
+    g.fillStyle = '#e8eef6'; g.beginPath(); g.arc(c0 - 8.4 * s, c0 + 0.6 * s, 2.7 * s, 0, TAU); g.fill();
+    g.strokeStyle = '#3a4252'; g.lineWidth = 1; g.beginPath(); g.moveTo(c0 - 10 * s, c0 - 1 * s); g.lineTo(c0 - 7 * s, c0 + 2 * s); g.stroke();   // (its cracked face)
+  },
+  over(lc0, ec0, x, y, f, time, R, L) {
+    const s = R / 20, on = time % 1.9 < 0.25 || (time % 1.9 > 0.45 && time % 1.9 < 0.6);   // (a stuttering blink)
+    if (!on) return;
+    const p = LMP(0, L.at[0] - 9.6 * s, L.at[1] + 1.4 * s);
+    lc.setTransform(1, 0, 0, 1, 0, 0); lc.fillStyle = '#ff3a3a'; lc.fillRect(Math.round(p[0]) - 1, Math.round(p[1]) - 1, 2, 2);
+    glow(ec, '#ff3a3a', 8, Math.round(p[0]), Math.round(p[1]), 0.8);
+    setScale(1);
+  }
+};
+/* the shelter: a ramp cut down into the ground to a blast door in a concrete headwall, the hill of snow-covered
+   bunker behind it, hazard stripes round the door, an amber beacon turning over it, and paths coming in to it from
+   every side */
+LANDMARK_ART['bunker-entrance'] = {
+  height: 0.12, n: 10, sizeK: 2.8, lit: false,
+  slice(g, k, n, S, R) {
+    const c0 = S / 2, t = k / (n - 1), my = c0 - R * 0.25;
+    if (k === 0) {
+      for (const [ex, ey] of [[-1.35, 0.55], [1.35, 0.6], [0.2, 1.38], [-0.9, -1.3], [1.1, -1.25]]) paintPrints(g, c0 + ex * R, c0 + ey * R, c0, c0 + R * 0.8, S / 2 - 2, c0);
+      // the ramp: a cut down into the ground, darker the deeper, its walls concrete
+      const rw = R * 0.36, y0 = c0 + R * 0.2, y1 = c0 + R * 0.8;
+      g.fillStyle = '#6a7282'; g.fillRect(Math.round(c0 - rw - 3), Math.round(y0), Math.round(rw * 2 + 6), Math.round(y1 - y0));
+      for (let q = 0; q < 8; q++) { const v = q / 7, yy = y0 + (y1 - y0) * v; g.fillStyle = `rgb(${46 + 70 * v | 0},${52 + 74 * v | 0},${66 + 80 * v | 0})`; g.fillRect(Math.round(c0 - rw), Math.round(yy), Math.round(rw * 2), Math.ceil((y1 - y0) / 7)); }
+      g.fillStyle = '#c8d0dc'; g.fillRect(Math.round(c0 - rw - 3), Math.round(y0), 2, Math.round(y1 - y0));
+      return;
+    }
+    // the mound of the bunker, snow-covered, rising behind
+    const rr = R * 0.95 * Math.sqrt(Math.max(0, 1 - t * t));
+    if (rr > 2) {
+      const im = g.getImageData(0, 0, S, S), d = im.data;
+      for (let y = Math.floor(my - rr); y <= my + rr; y++) for (let x = Math.floor(c0 - rr * 1.2); x <= c0 + rr * 1.2; x++) {
+        const dx = (x + 0.5 - c0) / 1.2, dy = y + 0.5 - my, q = Math.hypot(dx, dy);
+        if (q > rr || y + 0.5 > c0 + R * 0.02) continue;
+        const lit = -(dx * 0.6 + dy * 0.8) / R + t * 0.5, c = lit > 0.3 ? [252, 254, 255] : lit > -0.1 ? [222, 232, 246] : [176, 192, 220], o = (y * S + x) * 4;
+        d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+      }
+      g.putImageData(im, 0, 0);
+    }
+    // the headwall and its blast door, up to about half the mound's height
+    if (t <= 0.5) {
+      const hw = R * 0.5, y0 = c0 - R * 0.02, y1 = c0 + R * 0.22;
+      g.fillStyle = '#8a929e'; g.fillRect(Math.round(c0 - hw), Math.round(y0), Math.round(hw * 2), Math.round(y1 - y0));
+      g.fillStyle = '#b4bcc8'; g.fillRect(Math.round(c0 - hw), Math.round(y0), Math.round(hw * 2), 2);
+      if (t >= 0.33) {   // (its top: the door's hazard frame and the door, with its wheel)
+        const dw = R * 0.32;
+        for (let i = 0; i < 12; i++) { g.fillStyle = i % 2 ? '#1c1c20' : '#f2c230'; g.fillRect(Math.round(c0 - dw + i * dw / 6), Math.round(y1 - 4), Math.ceil(dw / 6), 4); }
+        g.fillStyle = '#5a6272'; g.fillRect(Math.round(c0 - dw + 2), Math.round(y0 + 3), Math.round(dw * 2 - 4), Math.round(y1 - y0 - 8));
+        g.strokeStyle = '#2c323e'; g.lineWidth = 2; g.beginPath(); g.arc(c0, (y0 + y1) / 2 - 2, R * 0.07, 0, TAU); g.stroke();
+        g.beginPath(); g.moveTo(c0 - R * 0.07, (y0 + y1) / 2 - 2); g.lineTo(c0 + R * 0.07, (y0 + y1) / 2 - 2); g.moveTo(c0, (y0 + y1) / 2 - 2 - R * 0.07); g.lineTo(c0, (y0 + y1) / 2 - 2 + R * 0.07); g.stroke();
+      }
+    }
+  },
+  over(lc0, ec0, x, y, f, time, R, L) {
+    const p = LMP(0.07, L.at[0] + R * 0.42, L.at[1] + R * 0.05), a = time * 4;
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    lc.fillStyle = '#5a3a10'; lc.fillRect(Math.round(p[0]) - 2, Math.round(p[1]) - 2, 5, 5);
+    lc.fillStyle = '#ffb030'; lc.fillRect(Math.round(p[0] + Math.cos(a) * 2) - 1, Math.round(p[1] + Math.sin(a) * 2) - 1, 2, 2);
+    glow(ec, '#ffb030', 16, Math.round(p[0] + Math.cos(a) * 8), Math.round(p[1] + Math.sin(a) * 8), 0.55);
+    setScale(1);
+  }
+};
 function landmarks() { return (TRACK.landmarks || []).filter((L) => L && L.art && LANDMARK_ART[L.art] && Array.isArray(L.at)); }
 function landmarkSlices(L) {
   const A = LANDMARK_ART[L.art], R = Math.max(8, +L.r || 60), key = L.art + ':' + R;
