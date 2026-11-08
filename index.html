@@ -1025,6 +1025,11 @@ const RAMP = 144;
 /* holes: A how long one is along the lane, for each metre of its width (taller than wide, like a 0); EDGE: the deck
    left between a half-lane hole and the wall (or the lane's middle); DEPTH: how far down its floor is drawn (levels) */
 const PIT = { A: 1.45, EDGE: 5, DEPTH: 1.6 };
+/* a crater's look, by world: its earth walls (dark to lit), the dark back and floor, the broken road edge (lip, lit; and
+   its shadowed underside), cracks out across the road, loose chunks of road, and roots hanging in the walls */
+const CRATER = {
+  forest: { wall: ['#2a1d13', '#3e2b1c', '#57402a', '#755a3b'], back: '#1d140d', floor: '#100a06', lip: '#a8875e', under: '#2b1f15', crack: '#2c2016', chunk: ['#7a6148', '#5a4532', '#8c7254'], root: '#1a110b' }
+};
 // flight off a jump pad: rise H levels at RISE levels a second, hang for HOLD seconds, then fall under G (levels/s²)
 const AIR = { H: 1.25, RISE: 3.6, HOLD: 0.7, G: 5.5, VREF: 300, QMIN: 0.45, QMAX: 1.4 };
 /* a jump goes higher and hangs longer the faster you hit the pad: height and hang time scale with speed / VREF */
@@ -1366,11 +1371,32 @@ function pitOutline(p) {
     const nx = T.nx[i0] + (T.nx[i1] - T.nx[i0]) * t, ny = T.ny[i0] + (T.ny[i1] - T.ny[i0]) * t, nl = Math.hypot(nx, ny) || 1;
     return [x + (nx / nl) * lat, y + (ny / nl) * lat];
   };
-  const ring = (dA, dW) => { const r = []; for (let k = 0; k < K; k++) { const a = (k / K) * TAU; r.push(at((p.A + dA) * Math.cos(a), p.c + (p.w + dW) * Math.sin(a))); } return r; };
+  // (a crater, in a world that has them: a jagged outline of its own, the same every lap; see pitJag)
+  p.jag = CRATER[TRACK.setting || 'space'] ? craterJag(p) : null;   // (the world is not set up yet while the track is built: its name, from the track)
+  const jf = (k) => (p.jag ? p.jag[k] : 1);
+  const ring = (dA, dW) => { const r = []; for (let k = 0; k < K; k++) { const a = (k / K) * TAU, f = jf(k); r.push(at((p.A * f + dA) * Math.cos(a), p.c + (p.w * f + dW) * Math.sin(a))); } return r; };
   p.rim = ring(0, 0); p.outer = ring(5, 5); p.inner = ring(-4, -4);
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   for (const q of p.outer) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); }
   p.x = (x0 + x1) / 2; p.y = (y0 + y1) / 2; p.R = Math.hypot(x1 - x0, y1 - y0) / 2;
+}
+/* craters: on a ground world that has them, a hole is a crater with a broken, jagged edge rather than a striped oval.
+   Its outline: how far out (x the oval's) it reaches at each of 36 points round it, from its own seed, sharp-cornered:
+   points pushed in and out at random, and a couple of bites taken out of it; never further out than JAG_MAX, so a hole
+   over one half of the lane stays on its half. pitJag: how far out at angle a (between the points, straight edges) */
+const JAG_MAX = 1.06;
+function craterJag(p) {
+  const K = 36, f = [];
+  for (let k = 0; k < K; k++) f.push(0.84 + 0.2 * hash2(p.i, k, 41) + (k % 2 ? -0.04 : 0.03));
+  for (let b = 0; b < 2; b++) {   // (bites)
+    const at = Math.floor(hash2(p.i, b, 43) * K), w = 2 + Math.floor(hash2(p.i, b, 47) * 3), d = 0.14 + 0.1 * hash2(p.i, b, 53);
+    for (let q = -w; q <= w; q++) f[(at + q + K) % K] -= d * (1 - Math.abs(q) / (w + 1));
+  }
+  return f.map((v) => clamp(v, 0.62, JAG_MAX));
+}
+function pitJag(p, a) {
+  const K = p.jag.length, u = (((a / TAU) % 1) + 1) % 1 * K, k = Math.floor(u) % K, t = u - Math.floor(u);
+  return p.jag[k] + (p.jag[(k + 1) % K] - p.jag[k]) * t;
 }
 /* a hole across the whole lane is a gap to the computer drivers: they line up for the pad before it, at the speed */
 function pitZones() {
@@ -1386,7 +1412,7 @@ function pitAt(x, y, idx, h, m) {
     const ex = x - T.x[idx], ey = y - T.y[idx];
     const al = d * T.step + ex * T.tx[idx] + ey * T.ty[idx], lat = ex * T.nx[idx] + ey * T.ny[idx];
     const ka = al / Math.max(1, p.A + m), kw = (lat - p.c) / Math.max(1, p.w + m);
-    if (ka * ka + kw * kw < 1) return p;
+    if (ka * ka + kw * kw < (p.jag ? pitJag(p, Math.atan2(kw, ka)) ** 2 : 1)) return p;
   }
   return null;
 }
@@ -9849,7 +9875,7 @@ const PIT_COL = { floor: '#09080e', back: '#16121e', wall: ['#211c2b', '#352e44'
 function pitScreen(P, f) { const o = []; for (const q of P) o.push([VW / 2 + (q[0] - CX) * f, VH / 2 + (q[1] - CY) * f]); return o; }
 function pitPath(ctx, P) { ctx.beginPath(); ctx.moveTo(P[0][0], P[0][1]); for (let k = 1; k < P.length; k++) ctx.lineTo(P[k][0], P[k][1]); ctx.closePath(); }
 function drawPit(p, time) {
-  const h = T.h[p.i], f0 = fscale(h), f1 = fscale(h - PIT.DEPTH);
+  const h = T.h[p.i], f0 = fscale(h), f1 = fscale(h - PIT.DEPTH), PC = (p.jag && CRATER[TRACK.setting]) || PIT_COL;
   if (offscreen(p.x, p.y, f0, p.R + 10)) return;
   const R = pitScreen(p.rim, f0), F = pitScreen(p.rim, f1), K = R.length;
   const cx = R.reduce((a, q) => a + q[0], 0) / K, cy = R.reduce((a, q) => a + q[1], 0) / K;
@@ -9863,20 +9889,29 @@ function drawPit(p, time) {
     lc.restore();
     return;
   }
-  lc.fillStyle = PIT_COL.back; lc.fill();
+  lc.fillStyle = PC.back; lc.fill();
   for (let k = 0; k < K; k++) {
     const k2 = (k + 1) % K, mx = (R[k][0] + R[k2][0]) / 2, my = (R[k][1] + R[k2][1]) / 2;
     const nx = cx - mx, ny = cy - my, nl = Math.hypot(nx, ny) || 1, lit = (nx * -0.6 + ny * -0.8) / nl;   // (the inside face, toward the light)
-    lc.fillStyle = PIT_COL.wall[clamp(Math.round((lit + 1) * 1.5), 0, 3)];
+    lc.fillStyle = PC.wall[clamp(Math.round((lit + 1) * 1.5), 0, 3)];
     lc.beginPath(); lc.moveTo(R[k][0], R[k][1]); lc.lineTo(R[k2][0], R[k2][1]); lc.lineTo(F[k2][0], F[k2][1]); lc.lineTo(F[k][0], F[k][1]); lc.closePath(); lc.fill();
     lc.strokeStyle = lc.fillStyle; lc.lineWidth = 1; lc.stroke();   // (no seams between the facets)
   }
-  pitPath(lc, F); lc.fillStyle = PIT_COL.floor; lc.fill();
+  if (PC.root) {   // (roots hanging down the walls, from under the broken edge)
+    lc.strokeStyle = PC.root; lc.lineWidth = 1;
+    for (let k = 0; k < K; k += 3) {
+      if (hash2(p.i, k, 61) < 0.45) continue;
+      const L = 0.25 + 0.4 * hash2(p.i, k, 67), x = R[k][0] + (F[k][0] - R[k][0]) * L, y = R[k][1] + (F[k][1] - R[k][1]) * L;
+      lc.beginPath(); lc.moveTo(R[k][0], R[k][1]); lc.lineTo((R[k][0] + x) / 2 + 2, (R[k][1] + y) / 2); lc.lineTo(x, y); lc.stroke();
+    }
+  }
+  pitPath(lc, F); lc.fillStyle = PC.floor; lc.fill();
   lc.restore();
 }
 function drawPitRim(p, time) {
   const f0 = fscale(T.h[p.i]);
-  if (offscreen(p.x, p.y, f0, p.R + 10)) return;
+  if (offscreen(p.x, p.y, f0, p.R + 40)) return;
+  if (p.jag && CRATER[TRACK.setting]) { drawCraterRim(p, f0, CRATER[TRACK.setting]); return; }
   const O = pitScreen(p.outer, f0), I = pitScreen(p.inner, f0), K = O.length;
   lc.setTransform(1, 0, 0, 1, 0, 0); ec.setTransform(1, 0, 0, 1, 0, 0);
   // (the band only: the outer ring with the inner one cut out of it)
@@ -9891,6 +9926,40 @@ function drawPitRim(p, time) {
   pitPath(lc, I); lc.strokeStyle = PIT_COL.blk; lc.lineWidth = 1; lc.stroke();
   pitPath(lc, O); lc.strokeStyle = '#0b0906'; lc.stroke();
   pitPath(ec, O); ec.strokeStyle = PIT_COL.yel; ec.globalAlpha = 0.16 + 0.06 * Math.sin(time * 4); ec.lineWidth = 3; ec.stroke(); ec.globalAlpha = 1;
+}
+/* a crater's broken edge, on the road round it: cracks running out across the road, loose chunks of it, and the torn
+   edge itself, lit where it faces the light (upper left) and dark under its lip where it faces away */
+function drawCraterRim(p, f0, PC) {
+  const R = pitScreen(p.rim, f0), K = R.length, sx = VW / 2 + (p.x - CX) * f0, sy = VH / 2 + (p.y - CY) * f0;
+  lc.setTransform(1, 0, 0, 1, 0, 0);
+  // cracks: jagged lines out from the corners of the edge
+  lc.strokeStyle = PC.crack; lc.lineWidth = 1;
+  for (let k = 0; k < K; k += 2) {
+    if (hash2(p.i, k, 71) < 0.5) continue;
+    let x = R[k][0], y = R[k][1];
+    const dx = x - sx, dy = y - sy, dl = Math.hypot(dx, dy) || 1, ux = dx / dl, uy = dy / dl, n = 2 + Math.floor(hash2(p.i, k, 73) * 3);
+    lc.beginPath(); lc.moveTo(Math.round(x), Math.round(y));
+    for (let q = 0; q < n; q++) {
+      const st = (5 + 6 * hash2(p.i, k * 7 + q, 79)) * f0, wob = (hash2(p.i, k * 7 + q, 83) - 0.5) * 7 * f0;
+      x += ux * st - uy * wob; y += uy * st + ux * wob; lc.lineTo(Math.round(x), Math.round(y));
+    }
+    lc.stroke();
+  }
+  // loose chunks of road scattered round it
+  for (let k = 0; k < 14; k++) {
+    const j = Math.floor(hash2(p.i, k, 89) * K), out = (3 + 12 * hash2(p.i, k, 97)) * f0;
+    const dx = R[j][0] - sx, dy = R[j][1] - sy, dl = Math.hypot(dx, dy) || 1, x = Math.round(R[j][0] + dx / dl * out), y = Math.round(R[j][1] + dy / dl * out);
+    const w = 1 + Math.floor(hash2(p.i, k, 101) * 3);
+    lc.fillStyle = PC.under; lc.fillRect(x + 1, y + 1, w, w);
+    lc.fillStyle = PC.chunk[k % PC.chunk.length]; lc.fillRect(x, y, w, w);
+  }
+  // the torn edge: each stretch of it lit or shadowed by which way it faces
+  for (let k = 0; k < K; k++) {
+    const k2 = (k + 1) % K, mx = (R[k][0] + R[k2][0]) / 2, my = (R[k][1] + R[k2][1]) / 2;
+    const ox = mx - sx, oy = my - sy, ol = Math.hypot(ox, oy) || 1, face = (ox * -0.6 + oy * -0.8) / ol;   // (+: this stretch is on the side toward the light, its face turned away, in shadow; -: across the hole, its face catching the light)
+    lc.strokeStyle = face < -0.2 ? PC.lip : face > 0.3 ? PC.under : PC.chunk[1]; lc.lineWidth = 2;
+    lc.beginPath(); lc.moveTo(R[k][0], R[k][1]); lc.lineTo(R[k2][0], R[k2][1]); lc.stroke();
+  }
 }
 function drawRock(r, f) {
   if (offscreen(r.x, r.y, f, 30)) return;
