@@ -1118,8 +1118,12 @@ const TRACKS = [
       { from: 514 / 602, to: 574 / 602, level: 1, rocks: true }     // the overpass across the loop
     ],
     barricades: [171 / 602, 425 / 602],
+    // a jump to learn on, and safe: a ramp over a hole in the left half of the lane, the right half solid to drive round it
+    // (a Stinger waits just past the hole, for whoever jumps)
+    jumps: [{at: 381 / 602, side: 'left'}],
+    holes: [{at: 395 / 602, side: 'left'}],
     pickups: [[1 / 602, -30, 'cell'], [75 / 602, 0, 'cell'], [125 / 602, 28, 'sting'], [211 / 602, -26, 'cell'], [265 / 602, 24, 'sting'],
-      [320 / 602, 0, 'cell'], [395 / 602, -28, 'sting'], [456 / 602, 26, 'cell'], [505 / 602, 0, 'cell'],
+      [320 / 602, 0, 'cell'], [412 / 602, -28, 'sting'], [456 / 602, 26, 'cell'], [505 / 602, 0, 'cell'],
       [240 / 602, 0, 'cell'], [365 / 602, 26, 'cell'], [470 / 602, -24, 'cell'], [560 / 602, 0, 'cell']],
     asteroids: [13 / 602, 145 / 602, 207 / 602, 237 / 602, 373 / 602, 438 / 602, 583 / 602]
   },
