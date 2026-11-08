@@ -1045,6 +1045,8 @@ function segDist(px, py, ax, ay, bx, by) {
                  fall: what a racer that goes off the edge is told it went into ('Into the star!' if left out).
      setting     the world around the track (see "settings: the world around the track"): 'space' if left out. A sunken stretch's canopy
                  names one of that setting's overhead types.
+     look        a variant of that world's look, where it has one (the setting '<world>~<look>'): 'alien' on the forest
+                 (Briar Hollow) is the same world with alien plants in violet, red-violet and teal. Optional.
      landmarks   one-off pieces of scenery beside the track, from the editor's Landmark tool: {at: [x, y], r, desc,
                  art?}. Drawn only when art names an entry in LANDMARK_ART (see the landmarks section): the
                  description says what it should look like, for whoever draws it.
@@ -1056,10 +1058,15 @@ const RAMP = 144;
 const PIT = { A: 1.45, EDGE: 5, DEPTH: 1.6 };
 /* a crater's look, by world: its earth walls (dark to lit), the dark back and floor, the broken road edge (lip, lit; and
    its shadowed underside), cracks out across the road, loose chunks of road, and roots hanging in the walls */
+/* (the current track's crater look: its world's, or its world's alien variant's) */
+const craterOf = () => (TRACK.look && CRATER[TRACK.setting + '~' + TRACK.look]) || CRATER[TRACK.setting || 'space'];
 const CRATER = {
   forest: { wall: ['#2a1d13', '#3e2b1c', '#57402a', '#755a3b'], back: '#1d140d', floor: '#100a06', lip: '#a8875e', under: '#2b1f15', crack: '#2c2016', chunk: ['#7a6148', '#5a4532', '#8c7254'], root: '#1a110b',
     // (what it is filled with, this far down: murky pond water, lily pads on it)
     fill: { depth: 0.6, base: '#2c3c29', deep: '#1c281c', ripple: '#5f7c56', shine: '#a6c296', bits: 'pad', bit: ['#4c7636', '#3a5e2a'], splash: '#9fc08c' } },
+  // (the forest's alien look: the same earth, the pond in it pink-violet with teal pads on it)
+  'forest~alien': { wall: ['#24161c', '#36222a', '#4e3440', '#6c4e5a'], back: '#1a1016', floor: '#0e080c', lip: '#a8875e', under: '#2b1f15', crack: '#2c2016', chunk: ['#7a6148', '#5a4532', '#8c7254'], root: '#1a0f16',
+    fill: { depth: 0.6, base: '#4e2860', deep: '#341a44', ripple: '#9a62b0', shine: '#e0a6ec', bits: 'pad', bit: ['#3aa69e', '#22766e'], splash: '#e6b0f0' } },
   // (a sinkhole in the sand, half full of quicksand: pocked with bubbles, swirling slowly)
   dunes: { wall: ['#6e4f2e', '#8a6538', '#a8804a', '#c49c62'], back: '#3e2a18', floor: '#22160c', lip: '#d8b27a', under: '#3a271f', crack: '#2e1f16', chunk: ['#654a3a', '#4a3428', '#c9a46c'],
     fill: { depth: 0.55, base: '#7c5a34', deep: '#553b20', ripple: '#a8824e', shine: '#d6b47c', bits: 'bubble', bit: ['#553b20', '#a07848'], splash: '#c9a46c' } },
@@ -1418,7 +1425,7 @@ function pitOutline(p) {
     return [x + (nx / nl) * lat, y + (ny / nl) * lat];
   };
   // (a crater, in a world that has them: a jagged outline of its own, the same every lap; see pitJag)
-  p.jag = CRATER[TRACK.setting || 'space'] ? craterJag(p) : null;   // (the world is not set up yet while the track is built: its name, from the track)
+  p.jag = craterOf() ? craterJag(p) : null;   // (the world is not set up yet while the track is built: its name, from the track)
   const jf = (k) => (p.jag ? p.jag[k] : 1);
   const ring = (dA, dW) => { const r = []; for (let k = 0; k < K; k++) { const a = (k / K) * TAU, f = jf(k); r.push(at((p.A * f + dA) * Math.cos(a), p.c + (p.w * f + dW) * Math.sin(a))); } return r; };
   p.rim = ring(0, 0); p.outer = ring(5, 5); p.inner = ring(-4, -4);
@@ -1755,7 +1762,7 @@ TRACKS.push(
     holes: [{at: 0.16858, side: 'left'}, {at: 0.19892, side: 'right'}]
   },
   {
-    id: 'briar-hollow', name: 'Briar Hollow', setting: 'forest', seed: 94, gapStyle: 'bridge',   // (its river gap is a washed-out bridge; Rootknot's is the open river jump)
+    id: 'briar-hollow', name: 'Briar Hollow', setting: 'forest', look: 'alien', seed: 94, gapStyle: 'bridge',   // (its river gap is a washed-out bridge; Rootknot's is the open river jump)
     points: [[671, 0], [941, 0], [1210, 0], [1478, -12], [1708, -149], [1928, -306], [2159, -439], [2405, -354], [2624, -197], [2874, -133], [3058, -316], [3178, -557], [3257, -810], [3148, -1053], [3010, -1284], [2871, -1515], [2711, -1730], [2461, -1816], [2260, -1840], [1955, -1735], [1680, -1790], [1350, -1920], [1132, -1812], [946, -1618], [720, -1460], [515, -1380], [380, -1235], [280, -985], [255, -796], [147, -550], [39, -303], [-69, -56], [-177, 191], [-285, 438], [-830, 605], [-1105, 710], [-1095, 1035], [-450, 1065], [-185, 1170], [-140, 1460], [-245, 1800], [-445, 1905], [-855, 2030], [-1145, 1918], [-1412, 1952], [-1680, 1973], [-1825, 1510], [-1960, 1240], [-2090, 1095], [-2430, 1230], [-2590, 1014], [-2615, 751], [-2340, 530], [-2383, 266], [-2256, 29], [-2100, -170], [-1620, -505], [-1340, -105], [-1575, 155], [-1565, 310], [-1320, 415], [-1120, 280], [-1105, -10], [-860, -95], [-676, 0], [-407, 0], [-137, 0], [132, 0], [402, 0]],
     shortcuts: [{from: [2334, -391], to: [3052, -1215], via: [[2447, -361], [2566, -375], [2687, -426], [2802, -506], [2907, -609], [2994, -727], [3058, -853], [3093, -982], [3093, -1105]]}],   // (smoothed and balanced: tools/shortcuts.js)
     elevation: [{from: 0.36713, to: 0.42611, level: 1}, {from: 0.20813, to: 0.24732, level: -1, canopy: 'mist'}, {from: 0.79177, to: 0.93484, level: -1, canopy: 'mist'}],
@@ -2410,7 +2417,7 @@ function fallOut(s) {
   }
   const pit = s.pit; s.pit = null;
   if (pit) ri = wrapIdx(pit.b + 6);   // (out of a hole: back on just past it)
-  const FL = pit && pit.jag && CRATER[TRACK.setting] && CRATER[TRACK.setting].fill;
+  const FL = pit && pit.jag && craterOf() && craterOf().fill;
   if (FL) burst(s.x, s.y, 18, 90, FL.splash, 0.6, false);   // (a splash: into what fills it)
   if (ri < 0) { const on = wrapIdx(s.idx - from); ri = on > 12 && on < N / 2 ? s.idx : wrapIdx(from + 12); }
   CURH = s.h;
@@ -4845,6 +4852,8 @@ function defineSetting(def) {
   return def;
 }
 /* make a setting the active one (the track's own, or space); the renderer calls this whenever the track changes */
+/* the world the current setting belongs to (a variant, such as 'forest~alien', plays its world's music and so on) */
+const worldId = () => SET.base || SET.id;
 function useSetting(id) {
   SET = SETTINGS[id] || SETTINGS.space;
   if (typeof COL !== 'undefined') Object.assign(COL, COL_BASE, SET.palette);
@@ -5833,7 +5842,7 @@ const MOSSY = {
   strata: [[118, 116, 106], [136, 134, 120], [104, 104, 96], [124, 122, 110]],
   cap: { hi: [160, 204, 96], base: [92, 142, 62], lo: [46, 80, 40], from: 0.62 }
 };
-defineSetting({
+const FOREST_DEF = defineSetting({
   id: 'forest', name: 'Forest', words: { scenery: 'trees' },
   palette: {
     dot: '#2c3a28', dotHi: '#344530', side: '#14100c', rim: '#e8d9a0', overDeck: '#2a2a20', overDeckHi: '#33331f', map: '170,210,120',
@@ -6075,19 +6084,19 @@ function pineStack(r, v, far) {
 
 /* a broad tree: a short trunk up to a round crown of a few leafy lumps, each a ball (its underside shows dark as it
    leans past), clumped into leafy clusters, lit toward the sun. One in six is turning gold. */
-function oakStack(r, v, far) {
+function oakStack(r, v, far, P) {   // (P: another palette, { pal, trunk: [lit, shaded] }, for the alien bulb trees)
   const R = rng(Math.floor(r * 7) * 67 + v * 211 + (far ? 3 : 0) + 3301), cr = Math.min(28, 10 + r * 0.7), n = 9;
   const lumps = [[0, 0, cr * 0.7]], nl = 4 + Math.floor(R() * 4);
   for (let k = 0; k < nl; k++) { const a = R() * TAU, d = cr * (0.35 + R() * 0.35); lumps.push([Math.cos(a) * d, Math.sin(a) * d, cr * (0.38 + R() * 0.22)]); }
   let ext = 0;
   for (const L of lumps) ext = Math.max(ext, Math.hypot(L[0], L[1]) + L[2]);
   const S = Math.ceil(ext * 2 + 8), c0 = S / 2 - 2, out = [], base = 0.4;
-  const pal = v % 6 === 2 ? { lo: [86, 64, 20], base: [170, 132, 40], hi: [232, 196, 84] } : v % 6 === 5 ? { lo: [30, 58, 26], base: [84, 128, 52], hi: [158, 196, 92] } : { lo: [24, 52, 28], base: [58, 108, 48], hi: [128, 176, 78] };
+  const pal = P ? P.pal : v % 6 === 2 ? { lo: [86, 64, 20], base: [170, 132, 40], hi: [232, 196, 84] } : v % 6 === 5 ? { lo: [30, 58, 26], base: [84, 128, 52], hi: [158, 196, 92] } : { lo: [24, 52, 28], base: [58, 108, 48], hi: [128, 176, 78] };
   for (let s = 0; s < n; s++) {
     const t = s / (n - 1), u = (t - base) / (1 - base);
     const c = pixelSprite(S, S, (x, y) => {
       const px = x + 0.5 - c0, py = y + 0.5 - c0;
-      if (u < 0) return Math.hypot(px, py) < 1.8 + cr * 0.05 ? (px + py < 0 ? [112, 88, 64, 255] : [62, 46, 34, 255]) : null;   // the trunk
+      if (u < 0) return Math.hypot(px, py) < 1.8 + cr * 0.05 ? (px + py < 0 ? (P ? P.trunk[0] : [112, 88, 64]).concat(255) : (P ? P.trunk[1] : [62, 46, 34]).concat(255)) : null;   // the trunk
       // a ball's width at this height: widest at its middle, the lumps' middles a little apart in height
       let best = null, bd = 0;
       for (let k = 0; k < lumps.length; k++) {
@@ -6157,7 +6166,7 @@ function logStack(r, v, far) {
 }
 
 /* a little ring of toadstools: white stalks under red caps with white spots */
-function toadstoolStack(r, v, far) {
+function toadstoolStack(r, v, far, P) {   // (P: other cap colours, { hi, base, lo, spot }, for the alien glow caps)
   const R = rng(Math.floor(r * 3) * 79 + v * 233 + (far ? 3 : 0) + 3901), m = 3 + Math.floor(R() * 4), T0 = [];
   for (let k = 0; k < m; k++) { const a = (k / m) * TAU + R() * 0.6, d = 4 + R() * 4; T0.push([Math.cos(a) * d, Math.sin(a) * d, 1.6 + R() * 1.6]); }
   const S = 26, c0 = S / 2 - 2, n = 4, out = [];
@@ -6170,8 +6179,9 @@ function toadstoolStack(r, v, far) {
         if (s < 2) { if (d < 0.9) return [236, 228, 210, 255]; continue; }   // the stalk
         const w = q[2] * (s === n - 1 ? 0.85 : 1);
         if (d >= w) continue;
-        if (hash2(x, y, v + 13) > 0.78) return [250, 246, 236, 255];        // a spot
+        if (hash2(x, y, v + 13) > 0.78) return P ? P.spot.concat(255) : [250, 246, 236, 255];        // a spot
         const lit = -((px - q[0]) * 0.6 + (py - q[1]) * 0.8) / w;
+        if (P) return (lit > 0.3 ? P.hi : lit > -0.3 ? P.base : P.lo).concat(255);
         return lit > 0.3 ? [240, 70, 56, 255] : lit > -0.3 ? [204, 40, 36, 255] : [130, 24, 28, 255];
       }
       return null;
@@ -6180,6 +6190,226 @@ function toadstoolStack(r, v, far) {
   }
   return out;
 }
+
+/* ================= the forest world, alien (a track with look: 'alien'; Briar Hollow) =================
+   The same world, but nothing an Earth forest has: a floor of blue-teal moss, bulb trees with violet and red-violet
+   crowns dotted with glowing pods, tall spire fungi of teal and red-violet discs in tiers with a glowing bud on top,
+   magenta frond rosettes curling at their tips, rings of glowing caps, violet lichen on grey rocks, fallen stalks,
+   a river of pink-violet water, all under a lilac sun. Everything else (hills, crags, bridges, the river's course) is
+   the forest's own. */
+/* recolour a picture painted in Earth colours, in place: greens to violets, browns and yellows to red-violet, reds to
+   cyan (greys, whites and blues kept) */
+function alienTint(c) {
+  const g = c.getContext('2d'), im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const r = d[i] / 255, gg = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), l = (mx + mn) / 2, dd = mx - mn;
+    if (dd < 0.06) continue;
+    let s = dd / (1 - Math.abs(2 * l - 1)), h = mx === r ? 60 * (((gg - b) / dd) % 6) : mx === gg ? 60 * ((b - r) / dd + 2) : 60 * ((r - gg) / dd + 4);
+    if (h < 0) h += 360;
+    if (h >= 55 && h < 175) h = 285 + (h - 110) * 0.4;                    // greens: violet to red-violet
+    else if (h >= 15 && h < 55) { h = 318; s *= 0.62; }                   // browns and yellows: dusky red-violet
+    else if (h >= 335 || h < 15) { h = 178; }                             // reds: cyan
+    else continue;
+    const C = (1 - Math.abs(2 * l - 1)) * Math.min(1, s), X = C * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - C / 2;
+    const [r1, g1, b1] = h < 60 ? [C, X, 0] : h < 120 ? [X, C, 0] : h < 180 ? [0, C, X] : h < 240 ? [0, X, C] : h < 300 ? [X, 0, C] : [C, 0, X];
+    d[i] = (r1 + m) * 255; d[i + 1] = (g1 + m) * 255; d[i + 2] = (b1 + m) * 255;
+  }
+  g.putImageData(im, 0, 0);
+  return c;
+}
+const LICHEN = Object.assign({}, MOSSY, { cap: { hi: [222, 140, 226], base: [150, 72, 172], lo: [72, 32, 92], from: 0.62 } });
+
+/* a spire fungus: a pale stalk carrying three or four flat discs in tiers, each smaller than the one below, frilled at
+   the rim and freckled on top, with a glowing bud at its tip. Most are teal; one in three red-violet. */
+function spireStack(r, v, far) {
+  const R = rng(Math.floor(r * 7) * 83 + v * 241 + (far ? 3 : 0) + 4101), R0 = Math.min(26, 9 + r * 0.7), tiers = 3 + (v & 1), n = tiers * 2 + 1;
+  const S = Math.ceil(R0 * 2.3 + 8), c0 = S / 2 - 2, fr = 11 + Math.floor(R() * 5), out = [];
+  const pal = v % 3 === 1 ? { lo: [74, 18, 58], base: [156, 46, 120], hi: [226, 104, 178], rim: [255, 196, 232], dot: [255, 226, 244], bud: '#ff8ad8' }
+    : { lo: [14, 64, 70], base: [34, 132, 130], hi: [96, 206, 186], rim: [186, 255, 228], dot: [214, 255, 240], bud: '#7affea' };
+  const stalk = [[214, 200, 226], [132, 112, 150]];
+  for (let s = 0; s < n; s++) {
+    const t = s / (n - 1), tier = (s - 1) >> 1, disc = s % 2 === 1, top = s === n - 1;
+    const rd = R0 * (1 - tier / (tiers + 0.7)), ph = R() * TAU, m = 0.66 + 0.34 * t;
+    const c = pixelSprite(S, S, (x, y) => {
+      const dx = x + 0.5 - c0, dy = y + 0.5 - c0, d = Math.hypot(dx, dy);
+      if (top) { if (d < 2.6) return d < 1.2 ? [255, 255, 255, 255] : hexA(pal.bud).concat(255); return null; }
+      if (!disc) { if (d < 1.6 + R0 * 0.04) return dx + dy < 0 ? stalk[0].concat(255) : stalk[1].concat(255); return null; }
+      const a = Math.atan2(dy, dx), edge = rd * (0.9 + 0.1 * Math.cos(fr * a + ph));
+      if (d > edge) return null;
+      if (d < 1.6 + R0 * 0.04) return stalk[0].concat(255);
+      const lit = -(dx * 0.6 + dy * 0.8) / rd, nz = hash2(x, y, v + s * 5);
+      if (d > edge - 1.3) return (lit > -0.2 ? pal.rim : pal.lo).map((q) => q * m | 0).concat(255);
+      if (nz > 0.93 && d < edge - 2) return pal.dot.concat(255);
+      const ring = Math.abs(Math.sin(d * 1.3)) < 0.18 ? 0.88 : 1, col = lit > 0.3 ? pal.hi : lit > -0.3 ? pal.base : pal.lo, k = m * ring;
+      return [col[0] * k | 0, col[1] * k | 0, col[2] * k | 0, 255];
+    });
+    const sl = { c, w: S, h: S, t };
+    if (top) sl.glow = [[c0, c0, pal.bud, 9, 0.75]];
+    out.push(sl);
+  }
+  return out;
+}
+
+/* a bulb tree: a pale trunk up to a crown of round lumps (the broad tree's shape) in violet, red-violet or indigo,
+   dotted with pods that glow */
+function bulbTreeStack(r, v, far) {
+  const pal = v % 3 === 0 ? { lo: [70, 16, 58], base: [146, 40, 112], hi: [218, 100, 172] } : v % 3 === 1 ? { lo: [44, 22, 86], base: [104, 56, 170], hi: [170, 122, 234] } : { lo: [30, 24, 72], base: [70, 64, 150], hi: [130, 140, 226] };
+  const st = oakStack(r, v, far, { pal, trunk: [[206, 190, 222], [120, 100, 140]] });
+  // (pods on the crown's top slices: bright pixels, and a few of them glowing)
+  const R = rng(Math.floor(r * 7) * 89 + v * 251 + 4301), top = st[st.length - 1], g = top.c.getContext('2d'), im = g.getImageData(0, 0, top.w, top.h), d = im.data, glows = [];
+  const pod = v % 2 ? [255, 214, 120] : [140, 255, 236], podHex = v % 2 ? '#ffc070' : '#6affe0';
+  for (let k = 0; k < 40 && glows.length < 4; k++) {
+    const x = Math.floor(R() * top.w), y = Math.floor(R() * top.h), i = (y * top.w + x) * 4;
+    if (!d[i + 3] || x < 1 || y < 1 || x > top.w - 2 || y > top.h - 2) continue;
+    for (const [ox, oy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const j = ((y + oy) * top.w + x + ox) * 4; if (d[j + 3]) { d[j] = pod[0]; d[j + 1] = pod[1]; d[j + 2] = pod[2]; } }
+    glows.push([x + 1, y + 1, podHex, 6, 0.45]);
+  }
+  g.putImageData(im, 0, 0);
+  top.glow = glows;
+  return st;
+}
+
+/* a frond rosette: magenta fronds fanning out from the middle, each with a dark midrib, curling round at the tip into
+   a pale coil; the lower slices longer, so the fronds arch up and over */
+function frondStack(r, v, far) {
+  const R = rng(Math.floor(r * 5) * 97 + v * 263 + (far ? 3 : 0) + 4501), L = Math.min(16, 6 + r * 0.38), m = 5 + Math.floor(R() * 3), fr = [];
+  for (let k = 0; k < m; k++) fr.push([(k / m) * TAU + R() * 0.5, L * (0.75 + R() * 0.3), (R() < 0.5 ? -1 : 1) * (0.5 + R() * 0.5)]);
+  const S = Math.ceil(L * 2 + 10), c0 = S / 2 - 2, n = 4, out = [];
+  const pal = v % 3 === 2 ? { lo: [40, 70, 110], base: [70, 150, 200], hi: [150, 220, 250], tip: [230, 250, 255], rib: [24, 44, 80] }
+    : { lo: [86, 16, 70], base: [178, 44, 140], hi: [240, 112, 196], tip: [255, 210, 236], rib: [64, 10, 50] };
+  for (let s = 0; s < n; s++) {
+    const t = s / (n - 1), mm = 0.72 + 0.28 * t;
+    const c = pixelSprite(S, S, (x, y) => {
+      const dx = x + 0.5 - c0, dy = y + 0.5 - c0, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+      for (const [a0, Lk, cu] of fr) {
+        const len = Lk * (1 - 0.45 * t);
+        if (d > len + 1.5) continue;
+        const u = d / len, aa = a0 + cu * u * u * 1.2;
+        let da = a - aa; da = Math.atan2(Math.sin(da), Math.cos(da));
+        const off = da * d, w = (1.1 + 2.2 * Math.sin(Math.min(1, u) * Math.PI)) * (1 - 0.3 * t);
+        if (u > 0.82) {   // (the coiled tip)
+          const tx = c0 + Math.cos(aa) * len * 0.9, ty = c0 + Math.sin(aa) * len * 0.9, q = Math.hypot(x + 0.5 - tx, y + 0.5 - ty);
+          if (q < 2.2) return q > 1.1 ? pal.tip.concat(255) : pal.hi.concat(255);
+          continue;
+        }
+        if (Math.abs(off) > w) continue;
+        if (Math.abs(off) < 0.5 && u > 0.15) return pal.rib.concat(255);
+        const lit = -(Math.cos(aa) * 0.6 + Math.sin(aa) * 0.8) * 0.6 + (off * cu > 0 ? 0.25 : -0.25), col = lit > 0.3 ? pal.hi : lit > -0.3 ? pal.base : pal.lo;
+        return [col[0] * mm | 0, col[1] * mm | 0, col[2] * mm | 0, 255];
+      }
+      return null;
+    });
+    out.push({ c, w: S, h: S, t });
+  }
+  return out;
+}
+
+/* a ring of glow caps: the toadstool ring's shape, the caps cyan or pink and lit from within */
+function glowcapStack(r, v, far) {
+  const pink = v % 2 === 1, st = toadstoolStack(r, v, far, pink ? { hi: [255, 190, 236], base: [240, 110, 200], lo: [150, 40, 130], spot: [255, 244, 252] } : { hi: [200, 255, 246], base: [80, 230, 216], lo: [24, 130, 140], spot: [240, 255, 252] });
+  const top = st[st.length - 1];
+  top.glow = [[top.w / 2 - 2, top.h / 2 - 2, pink ? '#ff7ad8' : '#5affea', 12, 0.55]];
+  return st;
+}
+
+defineSetting(Object.assign({}, FOREST_DEF, {
+  id: 'forest~alien', base: 'forest', floating: null,
+  palette: {
+    dot: '#2a3048', dotHi: '#323a56', side: '#120c18', rim: '#f0dcc4', overDeck: '#2a2436', overDeckHi: '#332c42', map: '200,150,236',
+    corr: '#4e3c4c', corrRim: '#dcb0d0', catchCorr: '#3e3448', catchRim: '#86e6d6',
+    grade: ['rgba(255,188,226,0.28)', 'rgba(150,90,200,0.08)', 'rgba(26,36,96,0.36)'], vignette: '14,6,22'
+  },
+  // far below: a canopy of violet and red-violet crowns
+  backdrop(W0, H0) {
+    const TW = TAU / W0, TH = TAU / H0;
+    const F = (px, py) => { const u = px * TW, v = py * TH; return Math.sin(7 * u + 5 * v + 1.3 * Math.sin(4 * v)) * 0.4 + Math.sin(11 * u - 9 * v + Math.sin(5 * u)) * 0.35 + Math.sin(17 * u + 13 * v) * 0.25; };
+    return pixelSprite(W0, H0, (x, y) => {
+      const f = F(x, y), sl = F(x + 1.5, y + 1.5) - F(x - 1.5, y - 1.5), nz = hash2(x, y, 41), t = clamp(0.45 + f * 0.25 - sl * 0.9 + (nz - 0.5) * 0.15, 0, 1), w = Math.sin(x * TW * 3 + y * TH * 2) * 0.5 + 0.5;
+      return [34 + (40 + 30 * w) * t | 0, 18 + 30 * t | 0, 52 + 70 * t | 0, 255];
+    });
+  },
+  ground: Object.assign({}, FOREST_DEF.ground, {
+    // a floor of blue-teal moss in soft swells, cyan blades catching the light, magenta and violet spores fallen on it
+    tile(W0, H0) {
+      const TW = TAU / W0, TH = TAU / H0;
+      const swell = (px, py) => Math.sin(px * TW * 3 + py * TH * 2 + 1.6 * Math.sin(py * TH * 3)) * 0.55 + Math.sin(px * TW * 2 - py * TH * 4 + 0.7) * 0.45;
+      const dark = [30, 52, 72], mid = [42, 80, 96], lite = [64, 116, 124];
+      return pixelSprite(W0, H0, (px, py) => {
+        const sw = swell(px, py), sl = (swell(px + 2, py) - swell(px - 2, py)) * 5 + (swell(px, py + 2) - swell(px, py - 2)) * 6;
+        const t = clamp(0.5 + sw * 0.16 - sl * 0.6, 0, 1);
+        let col = t < 0.5 ? dark.map((a, k) => a + (mid[k] - a) * (t / 0.5)) : mid.map((a, k) => a + (lite[k] - a) * ((t - 0.5) / 0.5));
+        const nz = hash2(px, py, 43), lf = hash2(px >> 1, py >> 1, 47);
+        if (lf > 0.985) col = lf > 0.993 ? [214, 84, 170] : [140, 90, 200];
+        else if (nz > 0.9) col = [col[0] * 1.1, col[1] * 1.2, col[2] * 1.22];
+        else if (nz < 0.1) col = col.map((c) => c * 0.8);
+        return [col[0], col[1], col[2], 255];
+      });
+    },
+    // the crags: grey stone in layers, violet lichen in its seams
+    steep: {
+      size: [256, 256], from: 5, to: 6,
+      tile(W0, H0) {
+        const TW = TAU / W0, TH = TAU / H0;
+        return pixelSprite(W0, H0, (px, py) => {
+          const st = Math.sin(py * TH * 18 + 1.6 * Math.sin(px * TW * 3) + 0.8 * Math.sin(px * TW * 7 + 1)), nz = hash2(px, py, 49);
+          const crack = Math.abs(Math.sin(px * TW * 9 + py * TH * 4 + 2 * Math.sin(py * TH * 5))) < 0.03;
+          if (crack) return [40, 36, 50, 255];
+          if (st > 0.92) return nz > 0.6 ? [150, 76, 172, 255] : [66, 60, 74, 255];
+          const t = 0.5 + st * 0.18 + (nz - 0.5) * 0.2;
+          return [66 + 56 * t | 0, 64 + 52 * t | 0, 74 + 58 * t | 0, 255];
+        });
+      }
+    },
+    pit: '#1c0f2c',
+    wall: { hi: '#7a5a72', lo: '#22141e', band: '#987090' },
+    bank: { hi: '#58a8a8', lo: '#223e56' },
+    light: { shadow: [14, 12, 40], strength: 0.46, contrast: 270, edge: [10, 8, 24], cast: [18, 16, 46], lit: [206, 176, 236], litK: 0.42, shade: [18, 18, 56], shadeK: 0.72 },
+    // meadows of glowing flowers in the clearings
+    patches: [{
+      per: 3, size: [50, 110], stretch: [0.5, 0.9],
+      draw(l, x, y, rx, ry, ang, R) {
+        l.translate(x, y); l.rotate(ang);
+        const n = Math.round((rx * ry) / 18), cols = ['#8af6e6', '#ff86de', '#c8a6ff', '#f4f8b0'];
+        l.fillStyle = 'rgba(96,190,196,0.1)';
+        for (let k = 0; k < 14; k++) { const a = R() * TAU, q = Math.sqrt(R()) * 0.6; l.beginPath(); l.ellipse(Math.cos(a) * q * rx, Math.sin(a) * q * ry, rx * (0.3 + R() * 0.3), ry * (0.3 + R() * 0.3), R() * 3, 0, TAU); l.fill(); }
+        for (let k = 0; k < n; k++) {
+          const a = R() * TAU, q = Math.sqrt(R()) * 0.85, px = Math.cos(a) * q * rx, py = Math.sin(a) * q * ry;
+          l.fillStyle = cols[Math.floor(R() * (R() < 0.6 ? 2 : 4))];
+          l.fillRect(Math.round(px), Math.round(py), 1, 1);
+          if (R() < 0.3) l.fillRect(Math.round(px) + 1, Math.round(py), 1, 1);
+        }
+      }
+    }],
+    river: Object.assign({}, FOREST_DEF.ground.river, { colours: { bank: '#4c3a5a', edge: '#3a1848', water: '#6c2e7e', deep: '#56226a', current: '#e6a0ec', fleck: '#fff0ff', wall: ['#7a5a72', '#2a1a2a'], wet: 'rgba(40,24,48,0.75)' } })
+  }),
+  sky: {
+    layers: FOREST_DEF.sky.layers,
+    colours: ['#ff9ae6', '#8cf2ff'], altShare: 0.4, sparkle: null
+  },
+  dust: { colour: '#e8d0f4', density: 0.3 },
+  foreground: { fill: 'rgba(36,14,52,0.62)', edge: 'rgba(206,120,236,0.3)' },
+  scenery: {
+    q: 3, sprite: (r, v, far) => paintRock(r, v, { hi: '#c890e0', base: '#6a3a8a', lo: '#2a1440', far: '#40285a', farHi: '#7a5a9a' }, far, false),
+    kinds: [
+      { name: 'spire', share: 0.4, clump: 1.2, stack: spireStack, height: [0.15, 0.24], fixed: true },
+      { name: 'bulb tree', share: 0.32, clump: 1.2, stack: bulbTreeStack, height: [0.12, 0.18], fixed: true },
+      { name: 'fronds', share: 0.13, stack: frondStack, height: [0.03, 0.05], fixed: true },
+      { name: 'rock', share: 0.06, stack: (r, v, far) => rockStack(r * 0.8, v, far, LICHEN), height: [0.03, 0.08] },
+      { name: 'stalk', share: 0.03, stack: (r, v, far) => logStack(r, v, far).map((sl) => (alienTint(sl.c), sl)), height: [0.02, 0.025], fixed: true },
+      { name: 'glowcaps', share: 0.06, clump: 2, stack: glowcapStack, height: [0.012, 0.02], fixed: true }
+    ],
+    fill: FOREST_DEF.scenery.fill, patchy: FOREST_DEF.scenery.patchy
+  },
+  // the thorn bushes blowing onto the lane: the same tangles, in red-violet with cyan berries
+  hazard: { q: 0, sprite(r, v) { const o = FOREST_DEF.hazard.sprite(r, v); alienTint(o.c); return o; } },
+  overhead: {
+    branches: Object.assign({}, FOREST_DEF.overhead.branches, {
+      make() { const out = FOREST_DEF.overhead.branches.make(); for (const a of out) alienTint(a[0]); return out; },
+      vine: '#5a2a6a', vineLeaf: '#c460c4'
+    })
+  }
+}));
 
 /* ================= setting: volcano =================
    A mining world on a volcano: black basalt ground dusted with ash and split by faintly glowing cracks, cinder cones
@@ -7334,7 +7564,7 @@ function initRender(canvas) {
 function trackGfx() {
   const N = T.N;
   // the track's own setting supplies everything around it
-  useSetting(TRACK.setting);
+  useSetting(TRACK.look && SETTINGS[TRACK.setting + '~' + TRACK.look] ? TRACK.setting + '~' + TRACK.look : TRACK.setting);   // (a track can ask for a variant of its world: look)
   if (OW) buildGrade();
   for (let t = 1; t <= 3; t++) for (let v = 0; v < 4; v++) decorSprite('hazard', TIER_R[t], v, false);
   TRACK_PATH = new Path2D();
@@ -8358,6 +8588,7 @@ function drawPlants() {
     const dx = Math.round(CX + (p.x - CX) * f - w / 2 + 2 * f), dy = Math.round(CY + (p.y - CY) * f - h / 2 + 2 * f);
     if (sl.atlas) lc.drawImage(sl.atlas, sl.ax, sl.ay, sl.c.width, sl.c.height, dx, dy, w, h);
     else lc.drawImage(sl.c, dx, dy, w, h);
+    if (sl.glow) for (const g of sl.glow) glow(ec, g[2], Math.max(4, Math.round(g[3] * f)), dx + g[0] * f, dy + g[1] * f, g[4]);   // (glowing parts: [x, y in the slice, colour, radius, strength])
   }
 }
 const PLANT_Q = [], PLANT_ORD = [];
@@ -10115,7 +10346,7 @@ const PIT_COL = { floor: '#09080e', back: '#16121e', wall: ['#211c2b', '#352e44'
 function pitScreen(P, f) { const o = []; for (const q of P) o.push([VW / 2 + (q[0] - CX) * f, VH / 2 + (q[1] - CY) * f]); return o; }
 function pitPath(ctx, P) { ctx.beginPath(); ctx.moveTo(P[0][0], P[0][1]); for (let k = 1; k < P.length; k++) ctx.lineTo(P[k][0], P[k][1]); ctx.closePath(); }
 function drawPit(p, time) {
-  const PC = (p.jag && CRATER[TRACK.setting]) || PIT_COL, FL = PC.fill;
+  const PC = (p.jag && craterOf()) || PIT_COL, FL = PC.fill;
   const h = T.h[p.i], f0 = fscale(h), f1 = fscale(h - (FL ? FL.depth : PIT.DEPTH));   // (filled: its walls only down to what fills it)
   if (offscreen(p.x, p.y, f0, p.R + 10)) return;
   const R = pitScreen(p.rim, f0), F = pitScreen(p.rim, f1), K = R.length;
@@ -10197,7 +10428,7 @@ function pitFill(p, F, FL, time) {
 function drawPitRim(p, time) {
   const f0 = fscale(T.h[p.i]);
   if (offscreen(p.x, p.y, f0, p.R + 40)) return;
-  if (p.jag && CRATER[TRACK.setting]) { drawCraterRim(p, f0, CRATER[TRACK.setting]); return; }
+  if (p.jag && craterOf()) { drawCraterRim(p, f0, craterOf()); return; }
   const O = pitScreen(p.outer, f0), I = pitScreen(p.inner, f0), K = O.length;
   lc.setTransform(1, 0, 0, 1, 0, 0); ec.setTransform(1, 0, 0, 1, 0, 0);
   // (the band only: the outer ring with the inner one cut out of it)
@@ -14294,7 +14525,7 @@ let PLAY = 'race';   // 'race' (against the field) or 'trial' (a time trial: alo
 function startRace() {
   audioInit();
   chatReset();
-  if (SONGS[SET.id]) recDecode(SET.id);   // (ready by the time the lights go green)
+  if (SONGS[worldId()]) recDecode(worldId());   // (ready by the time the lights go green)
   // (a single race: five rivals at random; a cup race: the cup's own five, whatever the menu's demo races drew since)
   if (TOUR && TOUR.rivals) { RIVALS = TOUR.rivals.slice(); RACERS.length = 1; RACERS.push(...RIVALS); } else pickRivals();
   // (every racer's turning frames made now, at the start, rather than mid-race the first time each is drawn)
@@ -14313,7 +14544,7 @@ function startRace() {
   acc = 0;
   // (the track's song starts with the countdown, from its intro: under the flyover, or on the grid with the flyover off;
   //  a flyover skipped carries on with it)
-  if (SONGS[SET.id]) musicPlay(SET.id, 0); else musicStop(0.25);
+  if (SONGS[worldId()]) musicPlay(worldId(), 0); else musicStop(0.25);
   if (FLYOVER) { W.fly = flyShots(); flyCam(); }
   else { W.fly = null; flyEnd(true); }
 }
@@ -15541,7 +15772,7 @@ function handleEvents() {
         if (e.a.isPlayer && mode === 'race') { if (e.b === 'lap') toast('Guns, shortcuts and barricades go live on lap 2'); else if (e.b === 'slowed') { SFX.denied(); toast('Weapons offline while your engine recovers'); } else SFX.denied(); }
         break;
       case 'stingout': break;
-      case 'splash': if (!e.a.isPlayer) chat(e.a, 'crash'); if (e.a.isPlayer && mode === 'race') toast(SET.id === 'volcano' ? 'Into the lava!' : 'Into the water!'); if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.fall(); break;
+      case 'splash': if (!e.a.isPlayer) chat(e.a, 'crash'); if (e.a.isPlayer && mode === 'race') toast(worldId() === 'volcano' ? 'Into the lava!' : 'Into the water!'); if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.fall(); break;
       case 'respawn': if (e.a.isPlayer && mode === 'race') toast('Back in the race'); break;
       case 'jump': if (live && (e.a.isPlayer || near(e.a.x, e.a.y))) SFX.jump(); break;
       case 'land':
@@ -15569,7 +15800,7 @@ function handleEvents() {
         break;
       case 'rock': if (live && near(e.a.x, e.a.y)) SFX.rock(); break;
       case 'beep': if (mode === 'race') { if (e.a > COUNT.T - COUNT.FLY) SFX.tick(); else SFX.beep(e.a); } break;
-      case 'go': if (mode === 'race') { SFX.go(); goT = 0.9; if (SONGS[SET.id] && MUSIC.id !== SET.id) musicPlay(SET.id, 4); } break;   // (the song began with the countdown; if it somehow isn't playing, straight into the theme)
+      case 'go': if (mode === 'race') { SFX.go(); goT = 0.9; if (SONGS[worldId()] && MUSIC.id !== worldId()) musicPlay(worldId(), 4); } break;   // (the song began with the countdown; if it somehow isn't playing, straight into the theme)
       case 'lap': if (e.a.isPlayer && mode === 'race') { SFX.lap(); toast('Lap ' + e.a.lapsDone + ' Complete - Time: ' + fmt(e.b)); } break;
       case 'finish':
         if (!e.a.isPlayer && e.a.finPos === 1) chat(e.a, 'win'); else if (e.a.isPlayer && e.a.finPos === 1 && W.order[1]) chat(W.order[1], 'lose');
@@ -15849,6 +16080,7 @@ function trackFromCode(text) {
   let hsh = 7; for (const ch of JSON.stringify(d.points) + name) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0;
   const def = { id: '', name, custom: true, seed: (hsh >>> 0) % 997 + 3, points: d.points };
   if (d.setting && SETTINGS[d.setting]) def.setting = d.setting;
+  if (typeof d.look === 'string' && d.look) def.look = d.look;   // (a variant of its world's look: see 'the circuits')
   for (const k of ['shortcuts', 'elevation', 'barricades', 'jumps', 'gaps', 'holes', 'loops', 'slingshots', 'landmarks']) if (Array.isArray(d[k]) && d[k].length) def[k] = d[k];   // (landmarks come without art: not drawn)
   // (its id comes from everything in it, not just its shape: a track edited in the editor and pasted again is a new
   //  track to the caches, best times and ghosts, never the old one under the same name)
