@@ -1659,7 +1659,8 @@ TRACKS.push(
     elevation: [{from: 0.19254, to: 0.24833, level: 1}, {from: 0.81292, to: 0.96255, level: -1}],
     barricades: [0.41354, 0.65439],
     jumps: [{at: 0.27422}, {at: 0.46471, side: 'left'}, {at: 0.51589, side: 'left'}],
-    gaps: [{from: 0.2819, to: 0.30497}, {from: 0.24271, to: 0.24763}, {from: 0.47096, to: 0.49499}, {from: 0.51982, to: 0.54631}]
+    gaps: [{from: 0.2819, to: 0.30497}, {from: 0.24271, to: 0.24763}, {from: 0.47096, to: 0.49499}, {from: 0.51982, to: 0.54631}],
+    holes: [{at: 0.57354, side: 'left'}, {at: 0.60521, side: 'right'}]
   },
   // new tracks: one for each setting but deep space
   {
@@ -1669,14 +1670,16 @@ TRACKS.push(
     elevation: [{from: 0.27526, to: 0.35408, level: -1, canopy: 'storm'}, {from: 0.69274, to: 0.73821, level: 1, rocks: true}, {from: 0.06983, to: 0.22683, level: 1, rocks: true}],
     barricades: [0.7799, 0.58647, 0.5334],
     jumps: [{at: 0.39652}],
-    gaps: [{from: 0.40714, to: 0.43511}]
+    gaps: [{from: 0.40714, to: 0.43511}],
+    holes: [{at: 0.87339, side: 'left'}, {at: 0.90751, side: 'right'}]
   },
   {
     id: 'frostline', name: 'Frostline', setting: 'arctic', seed: 87,
     points: [[-255, -56], [13, -50], [505, 50], [980, -5], [1480, 130], [1825, 30], [2100, 150], [1910, 605], [1700, 1080], [1715, 1525], [1845, 1890], [2140, 2115], [2210, 2360], [2095, 2535], [1880, 2635], [1590, 2590], [1375, 2435], [1295, 2245], [1195, 1900], [785, 1970], [675, 2280], [550, 2555], [220, 2455], [-60, 1875], [-1028, 1737], [-1160, 1210], [-1391, 1049], [-1643, 957], [-1896, 868], [-2151, 783], [-2385, 662], [-2448, 411], [-2420, 40], [-2065, -270], [-1750, 120], [-2100, 1355], [-1635, 1535], [-1420, 220], [-1060, -77], [-792, -70], [-524, -63]],
     shortcuts: [{from: [824, 1947], to: [-83, 1863]}],
     elevation: [{from: 0.22192, to: 0.27938, level: 1, rocks: true}, {from: 0.66316, to: 0.90389, level: 1}, {from: 0.50282, to: 0.587, level: -1, canopy: 'blizzard'}],
-    barricades: [0.4119, 0.64297]
+    barricades: [0.4119, 0.64297],
+    holes: [{at: 0.16858, side: 'left'}, {at: 0.19892, side: 'right'}]
   },
   {
     id: 'briar-hollow', name: 'Briar Hollow', setting: 'forest', seed: 94, gapStyle: 'bridge',   // (its river gap is a washed-out bridge; Lagrange Knot's is the open river jump)
@@ -1685,7 +1688,8 @@ TRACKS.push(
     elevation: [{from: 0.36713, to: 0.42611, level: 1}, {from: 0.20813, to: 0.24732, level: -1, canopy: 'mist'}, {from: 0.79177, to: 0.93484, level: -1, canopy: 'mist'}],
     barricades: [0.13543, 0.71364],
     jumps: [{at: 0.30242}],
-    gaps: [{from: 0.31089, to: 0.3323}]
+    gaps: [{from: 0.31089, to: 0.3323}],
+    holes: [{at: 0.58851, side: 'left'}, {at: 0.61489, side: 'right'}]
   },
   {
     id: 'cinder-coil', name: 'Cinder Coil', setting: 'volcano', seed: 101,
@@ -1694,6 +1698,7 @@ TRACKS.push(
     barricades: [0.24288, 0.88277],
     jumps: [{at: 0.72345}, {at: 0.16127}, {at: 0.91775, side: 'left'}, {at: 0.58161}],
     gaps: [{from: 0.73251, to: 0.75324}, {from: 0.17034, to: 0.19106}, {from: 0.58744, to: 0.6114}],
+    holes: [{at: 0.29145, side: 'left'}, {at: 0.3206, side: 'right'}],
     slingshots: [{from: 0.39184, to: 0.46373, at: [-1300, 2150], fall: 'Into the lava!'}],   // (round the molten core: hug the inside, come out flung)
     landmarks: [{at: [-1300, 2150], r: 115, desc: 'A molten core hanging over a lava pool in the hairpin: a ball of black crust split by glowing orange cracks, dripping into the pool below', art: 'cinder-core'}]
   },
@@ -2011,6 +2016,7 @@ function trackLayout() {
   for (const c of T.chords) { mark(c.a, -20, 6); mark(c.b, -6, 6); if (c.target) mark(T.mapF(c.target[0]), -6, 6); }
   for (const r of T.runs) { mark(r.s, -2, r.r + 2); mark(r.s + r.n - 1, -r.r - 2, 2); }
   for (const g of T.gaps) mark(g.a, -10, g.n + 8);
+  for (const pt of T.pits || []) mark(pt.i, -pt.n - 6, pt.n + 6);   // (nothing to pick up, and no asteroid, in a hole)
   for (const j of T.jumps) mark(j.i, -6, 6);
   // and the whole flight off every jump pad: a racer leaving a pad flat out (boosting) stays in the air this far, over
   // anything on the deck beneath it, so nothing to pick up goes there. (Taken to the lowest deck it could come down on.)
