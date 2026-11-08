@@ -1106,26 +1106,27 @@ const TRACKS = [
     points: [
       [300, 0], [560, 0], [715, -25], [790, -110], [808, -240], [868, -338], [1025, -338], [1092, -240],
       [1100, -110], [1170, -10], [1310, 30], [1580, 10], [1860, 80], [2080, 340], [2020, 570], [1730, 715],
-      [1450, 715], [1290, 712], [1205, 790], [1182, 900], [1112, 1032], [968, 1032], [898, 900], [875, 790], [790, 712],
-      [660, 706], [420, 712], [160, 724], [-90, 724], [-203, 677], [-250, 564], [-250, 420], [-250, 300],
-      [-250, 135], [-284, 54], [-365, 20], [-446, 54], [-480, 135], [-446, 216], [-365, 250], [-250, 250], [-170, 250],
-      [-85, 215], [-50, 130], [-50, 100], [-21, 29], [50, 0], [150, 0]
+      [1450, 715], [1290, 712], [1205, 790], [1182, 900], [1112, 1032], [968, 1032], [898, 900], [875, 790],
+      [790, 712], [660, 706], [420, 712], [160, 724], [-390, 724], [-503, 677], [-550, 564], [-550, 420],
+      [-550, 300], [-550, 135], [-584, 54], [-665, 20], [-746, 54], [-780, 135], [-746, 216], [-665, 250],
+      [-550, 250], [-470, 250], [-385, 215], [-350, 130], [-350, 100], [-21, 29], [50, 0], [150, 0]
     ],
     shortcuts: [{from: [560, 0], to: [1340, 30], via: [[653, 113], [747, 209], [842, 274], [939, 300], [1037, 282], [1137, 224], [1238, 135]]}, {from: [1384, 711], to: [660, 706], via: [[1294, 620], [1204, 544], [1114, 492], [1024, 474], [933, 491], [842, 541], [751, 617]]}],   // (smoothed and balanced: tools/shortcuts.js)
     elevation: [
-      { from: 43 / 602, to: 101 / 602, level: 1, rocks: true },    // the tower bump, high over the asteroid field
-      { from: 290 / 602, to: 352 / 602, level: -1, canopy: 'ice' },  // the trench bump, under drifting ice
-      { from: 514 / 602, to: 574 / 602, level: 1, rocks: true }     // the overpass across the loop
+      { from: 0.06595, to: 0.15491, level: 1, rocks: true },    // the tower bump, high over the asteroid field
+      { from: 0.44479, to: 0.53988, level: -1, canopy: 'ice' },  // the trench bump, under drifting ice
+      { from: 0.82822, to: 0.92025, level: 1, rocks: true }     // the overpass across the loop
     ],
-    barricades: [171 / 602, 425 / 602],
+    barricades: [0.26227, 0.67178],
     // a jump to learn on, and safe: a ramp over a hole in the left half of the lane, the right half solid to drive round it
     // (a Stinger waits just past the hole, for whoever jumps)
-    jumps: [{at: 381 / 602, side: 'left'}],
-    holes: [{at: 395 / 602, side: 'left'}],
-    pickups: [[1 / 602, -30, 'cell'], [75 / 602, 0, 'cell'], [125 / 602, 28, 'sting'], [211 / 602, -26, 'cell'], [265 / 602, 24, 'sting'],
-      [320 / 602, 0, 'cell'], [412 / 602, -28, 'sting'], [456 / 602, 26, 'cell'], [505 / 602, 0, 'cell'],
-      [240 / 602, 0, 'cell'], [365 / 602, 26, 'cell'], [470 / 602, -24, 'cell'], [560 / 602, 0, 'cell']],
-    asteroids: [13 / 602, 145 / 602, 207 / 602, 237 / 602, 373 / 602, 438 / 602, 583 / 602]
+    jumps: [{at: 0.61043, side: 'left'}],
+    holes: [{at: 0.6319, side: 'left'}],
+    pickups: [[0.00153, -30, 'cell'], [0.11503, 0, 'cell'], [0.19172, 28, 'sting'], [0.32362, -26, 'cell'], [0.40644, 24, 'sting'],
+      [0.4908, 0, 'cell'], [0.65031, -28, 'sting'], [0.73926, 26, 'cell'], [0.81442, 0, 'cell'],
+      [0.3681, 0, 'cell'], [0.55982, 26, 'cell'], [0.76074, -24, 'cell'], [0.89877, 0, 'cell']],
+    asteroids: [0.01994, 0.22239, 0.31748, 0.3635, 0.57209, 0.71012, 0.97086],
+    landmarks: [{at: [440, -165], r: 80, desc: 'Space worms: a knot of asteroids bored through by fat segmented worms, arching from rock to rock and burrowing back in', art: 'space-worms'}, {at: [490, 875], r: 84, desc: 'Space worms: a knot of asteroids bored through by fat segmented worms, arching from rock to rock and burrowing back in', art: 'space-worms'}, {at: [1915, 380], r: 88, desc: 'Space worms: a knot of asteroids bored through by fat segmented worms, arching from rock to rock and burrowing back in', art: 'space-worms'}]
   },
   {
     id: 'industrial', name: 'Kazumura', setting: 'volcano', seed: 23,
@@ -8628,6 +8629,122 @@ LANDMARK_ART['dust-devil'] = (() => {
         }
       }
       lc.lineCap = 'butt';
+      lc.globalAlpha = 1;
+    }
+  };
+})();
+/* space worms: a knot of asteroids that worms have bored through, the worms arching from one rock to the next and
+   burrowing back in. The rocks are stacked slices like the other landmarks (so they stand up off the field in 3D); the
+   worms are drawn every frame, each body segment a lit ball at its own height, so they rise toward the camera, swell
+   and swing past the rocks as you go by. The knot's layout comes from its r, so knots of different sizes differ. */
+LANDMARK_ART['space-worms'] = (() => {
+  const H = 0.24;   // (how tall the knot stands, in levels: the biggest rock is as round up as it is across)
+  const ROCK = ['#1c1530', '#33284a', '#4f4468', '#7c6274', '#b98a68'];   // (the field's own asteroids, amber-lit)
+  const FLESH = ['#3a1630', '#7c3654', '#c06a84', '#eaa6b2', '#ffe0dc'], MAW = '#12040e', TOOTH = '#f6ead2';
+  const LAY = {};
+  function layout(R) {
+    if (LAY[R]) return LAY[R];
+    const Q = rng(Math.round(R) * 7 + 3), a0 = Q() * TAU, rocks = [], HU = H / (0.84 * R);   // (HU: levels per world unit)
+    // three rocks round the middle, one big and two smaller
+    for (let i = 0; i < 3; i++) {
+      const a = a0 + i * TAU / 3 + (Q() - 0.5) * 0.6, d = R * (0.58 + Q() * 0.1), r = R * (i ? 0.3 + Q() * 0.06 : 0.42);
+      const lump = [Q() * TAU, Q() * TAU, 0.06 + Q() * 0.05];
+      rocks.push({ x: Math.cos(a) * d, y: Math.sin(a) * d * 0.9, r, h: r * HU, lump, HU });
+    }
+    // a worm from each rock to the next, each on its own clock, some going the other way round
+    const worms = [];
+    for (let i = 0; i < 3; i++) {
+      const A = rocks[i], B = rocks[(i + 1) % 3], back = i === 1;
+      const w = { A: back ? B : A, B: back ? A : B, HU, arc: 0.2 + Q() * 0.12, M: 17 + Math.floor(Q() * 4), wr: R * (0.085 + Q() * 0.015), per: 5.5 + Q() * 2.5, ph: Q() * 9, wig: Q() * TAU };
+      // where it breaks the surface, going out and coming back in (the rocks are cratered there)
+      let s0 = 0, s1 = 1;
+      for (let s = 0; s <= 1; s += 0.005) { const p = wormAt(w, s, 0); if (inside(w.A, p)) s0 = s; }
+      for (let s = 1; s >= 0; s -= 0.005) { const p = wormAt(w, s, 0); if (inside(w.B, p)) s1 = s; }
+      w.s0 = s0; w.s1 = s1; w.holes = [wormAt(w, s0, 0), wormAt(w, s1, 0)];
+      worms.push(w);
+    }
+    return (LAY[R] = { rocks, worms });
+  }
+  const rough = (k, p) => 1 + k.lump[2] * Math.sin(3 * Math.atan2(p.y - k.y, p.x - k.x) + k.lump[0]) + 0.04 * Math.sin(5 * Math.atan2(p.y - k.y, p.x - k.x) + k.lump[1]);
+  const inside = (k, p) => Math.hypot(p.x - k.x, p.y - k.y, (p.h - k.h) / k.HU) < k.r * rough(k, p) * 0.97;
+  // a point along a worm (s: 0 at the first rock's middle, 1 at the second's): an arch, swaying side to side as it goes
+  function wormAt(w, s, sway) {
+    const dx = w.B.x - w.A.x, dy = w.B.y - w.A.y, L = Math.hypot(dx, dy) || 1, side = Math.sin(s * Math.PI) * sway;
+    return { x: w.A.x + dx * s - dy / L * side, y: w.A.y + dy * s + dx / L * side, h: w.A.h + (w.B.h - w.A.h) * s + (w.arc + L * w.HU * 0.5) * Math.sin(s * Math.PI) };
+  }
+  // a lit ball, lit from the upper left, in flat steps
+  function ball(g, x, y, r, P, band) {
+    x = Math.round(x); y = Math.round(y);
+    g.fillStyle = P[0]; g.beginPath(); g.arc(x, y, r + 1, 0, TAU); g.fill();
+    g.fillStyle = band ? P[1] : P[2]; g.beginPath(); g.arc(x - r * 0.12, y - r * 0.16, r * 0.84, 0, TAU); g.fill();
+    g.fillStyle = band ? P[2] : P[3]; g.beginPath(); g.arc(x - r * 0.32, y - r * 0.4, r * 0.42, 0, TAU); g.fill();
+    if (r > 4) { g.fillStyle = P[4]; g.fillRect(Math.round(x - r * 0.45), Math.round(y - r * 0.55), Math.max(1, Math.round(r * 0.22)), Math.max(1, Math.round(r * 0.2))); }
+  }
+  return {
+    height: H, n: 12, sizeK: 2.6, lit: true,
+    slice(g, k, n, S, R) {
+      const { rocks, worms } = layout(R), c0 = S / 2, hk = H * k / (n - 1);
+      const im = g.createImageData(S, S), d = im.data;
+      for (const K of rocks) {
+        const z = (hk - K.h) / K.h;
+        if (Math.abs(z) >= 1) continue;
+        const rr = K.r * 1.12 * Math.sqrt(1 - z * z), x0 = Math.max(0, Math.floor(c0 + K.x - rr)), x1 = Math.min(S, Math.ceil(c0 + K.x + rr)), y0 = Math.max(0, Math.floor(c0 + K.y - rr)), y1 = Math.min(S, Math.ceil(c0 + K.y + rr));
+        for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+          const dx = x + 0.5 - c0 - K.x, dy = y + 0.5 - c0 - K.y, d0 = Math.hypot(dx, dy), lim = K.r * rough(K, { x: dx + K.x, y: dy + K.y }) * Math.sqrt(1 - z * z);
+          if (d0 > lim) continue;
+          // (shaded as the rock's top surface over this spot, the same on every slice: the stack reads as one solid rock)
+          const nz = Math.sqrt(Math.max(0, 1 - (d0 * d0) / (K.r * K.r))), lit = -(dx * 0.6 + dy * 0.8) / K.r * 0.62 + nz * 0.42;
+          let b = clamp(Math.round((lit + 0.2) * 2.6), 0, 4);
+          if (Math.abs(z) < 0.25 && lim - d0 < 2.2 && dx * 0.6 + dy * 0.8 < -0.35 * d0) b = 4;   // (the amber rim light the field's asteroids have, round its outline)
+          // (pocked: small craters, their upper-left walls in shadow)
+          const cx = Math.floor((dx + 200) / 9), cy = Math.floor((dy + 200) / 9), hsh = hash2(cx, cy, Math.round(K.r));
+          if (hsh < 0.18) { const ox = (dx + 200) % 9 - 4.5, oy = (dy + 200) % 9 - 4.5, q = Math.hypot(ox, oy); if (q < 2.6) b = Math.max(0, b - (ox + oy < 0 ? 2 : 1)); else if (q < 3.4 && ox + oy > 0) b = Math.min(4, b + 1); }
+          const c = hexA(ROCK[b]), i = (y * S + x) * 4;
+          d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+        }
+      }
+      g.putImageData(im, 0, 0);
+      // the burrows the worms come and go by: on the slice that is the rock's surface there
+      for (const w of worms) for (const p of w.holes) {
+        if (Math.round(p.h / H * (n - 1)) !== k) continue;
+        const r = Math.round(w.wr * 1.25), x = Math.round(c0 + p.x), y = Math.round(c0 + p.y);
+        g.fillStyle = ROCK[3]; g.beginPath(); g.arc(x + 1, y + 1, r + 2, 0, TAU); g.fill();   // (the far rim, lit)
+        g.fillStyle = ROCK[0]; g.beginPath(); g.arc(x, y, r + 1, 0, TAU); g.fill();
+        g.fillStyle = MAW; g.beginPath(); g.arc(x + 0.5, y + 0.5, r - 1, 0, TAU); g.fill();
+      }
+    },
+    over(lc, ec, x0, y0, f0, time, R, L) {
+      const { worms } = layout(R), cx = L.at[0], cy = L.at[1], seg = [];
+      for (const w of worms) {
+        // the head runs from the first burrow to past the second, then the burrow rests a moment
+        const span = (w.s1 - w.s0) + w.M * 0.03, t = ((time + w.ph) % w.per) / w.per, run = 0.72;
+        if (t > run) continue;
+        const sh = w.s0 + (t / run) * (span + 0.06);
+        for (let j = w.M; j >= 0; j--) {
+          const s = sh - j * 0.03;
+          if (s < w.s0 - 0.01 || s > w.s1 + 0.01) continue;
+          const p = wormAt(w, s, w.wr * 0.9 * Math.sin(s * 14 - time * 5 + w.wig));
+          if (inside(w.A, p) || inside(w.B, p)) continue;
+          const f = fscale(p.h), taper = j === 0 ? 1.25 : 1 - 0.45 * (j / w.M);
+          seg.push({ h: p.h, sx: CX + (cx + p.x - CX) * f, sy: CY + (cy + p.y - CY) * f, r: Math.max(1.5, w.wr * taper * f), head: j === 0, band: j % 3 === 2, w, s });
+        }
+      }
+      if (!seg.length) return;
+      seg.sort((a, b) => a.h - b.h);
+      for (const q of seg) {
+        ball(lc, q.sx, q.sy, q.r, FLESH, q.band);
+        if (!q.head) continue;
+        // its mouth, turned the way it is going: a dark ring of teeth, glowing faintly inside
+        const w = q.w, a = wormAt(w, q.s, 0), b = wormAt(w, q.s + 0.02, 0), fa = fscale(a.h), fb = fscale(b.h);
+        let ux = (cx + b.x - CX) * fb - (cx + a.x - CX) * fa, uy = (cy + b.y - CY) * fb - (cy + a.y - CY) * fa;
+        const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+        const climb = clamp((b.h - a.h) / 0.004, -1, 1), off = q.r * (0.35 + 0.3 * Math.abs(climb)), mr = q.r * (0.62 - 0.12 * Math.abs(climb));
+        const mx = Math.round(q.sx + ux * off), my = Math.round(q.sy + uy * off);
+        lc.fillStyle = MAW; lc.beginPath(); lc.arc(mx, my, mr, 0, TAU); lc.fill();
+        const nt = 7;
+        for (let i = 0; i < nt; i++) { const ta = i / nt * TAU + time * 2; lc.fillStyle = TOOTH; lc.fillRect(Math.round(mx + Math.cos(ta) * mr * 0.8) - 1, Math.round(my + Math.sin(ta) * mr * 0.8) - 1, 2, 2); }
+        glow(ec, '#ff7a9a', Math.max(8, Math.round(q.r * 2)), mx, my, 0.35);
+      }
       lc.globalAlpha = 1;
     }
   };
