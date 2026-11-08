@@ -1697,7 +1697,7 @@ TRACKS.push(
     shortcuts: [{from: [-32, -42], to: [-318, 881], via: [[-90, 385]]}],
     elevation: [{from: 0.2948, to: 0.39272, level: -1}, {from: 0.43095, to: 0.66386, level: 1, rocks: true}, {from: 0.68618, to: 0.74042, level: 1}],
     barricades: [0.22108, 0.8063, 0.11226],
-    landmarks: [{at: [247, -630], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-820, 287], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-615, -1668], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-46, 636], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1459, 849], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1338, -1183], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-1064, -1223], r: 70, desc: 'A crashed flying saucer, burnt out: a long furrow ploughed through the sand, the saucer tilted and half buried at its end, hull scorched, dome cracked open, panels scattered, smoke still rising', art: 'crashed-ufo'}]
+    landmarks: [{at: [247, -630], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-820, 287], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-615, -1668], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-46, 636], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1459, 849], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1338, -1183], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-1064, -1223], r: 70, desc: 'A crashed flying saucer, burnt out: a long furrow ploughed through the sand, the saucer tilted and half buried at its end, hull scorched, dome cracked open, panels scattered, smoke still rising', art: 'crashed-ufo'}, {at: [-1280, 761], r: 110, desc: 'The bones of something enormous lying on its back half under the sand: a spine of vertebrae, ribs arching up out of the sand toward each other (some snapped), their shadows across the sand, a long horned skull', art: 'alien-skeleton'}, {at: [1779, 619], r: 104, desc: 'The bones of something enormous lying on its back half under the sand: a spine of vertebrae, ribs arching up out of the sand toward each other (some snapped), their shadows across the sand, a long horned skull', art: 'alien-skeleton'}]
   },
   {
     id: 'lagrange-knot', name: 'Rootknot', setting: 'forest', look: 'corrupt', corrupt: {at: [-1500, 700], r: 1900}, seed: 38,   // (half overrun by the alien growth, spreading from the west lobe)
@@ -1760,7 +1760,7 @@ TRACKS.push(
     jumps: [{at: 0.39652}],
     gaps: [{from: 0.40714, to: 0.43511}],
     holes: [{at: 0.87339, side: 'left'}, {at: 0.90751, side: 'right'}],
-    landmarks: [{at: [104, -891], r: 55, desc: 'A crater blasted into the sand, ejecta streaked round it, the asteroid that made it lying charred in the bottom, its cracks glowing, steam rising off it', art: 'meteor-crater'}, {at: [1784, 1301], r: 60, desc: 'A crater blasted into the sand, ejecta streaked round it, the asteroid that made it lying charred in the bottom, its cracks glowing, steam rising off it', art: 'meteor-crater'}, {at: [-1657, 674], r: 52, desc: 'A crater blasted into the sand, ejecta streaked round it, the asteroid that made it lying charred in the bottom, its cracks glowing, steam rising off it', art: 'meteor-crater'}]
+    landmarks: [{at: [104, -891], r: 55, desc: 'A crater blasted into the sand, ejecta streaked round it, the asteroid that made it lying charred in the bottom, its cracks glowing, steam rising off it', art: 'meteor-crater'}, {at: [1784, 1301], r: 60, desc: 'A crater blasted into the sand, ejecta streaked round it, the asteroid that made it lying charred in the bottom, its cracks glowing, steam rising off it', art: 'meteor-crater'}, {at: [-1657, 674], r: 52, desc: 'A crater blasted into the sand, ejecta streaked round it, the asteroid that made it lying charred in the bottom, its cracks glowing, steam rising off it', art: 'meteor-crater'}, {at: [193, 429], r: 115, desc: 'The bones of something enormous lying on its back half under the sand: a spine of vertebrae, ribs arching up out of the sand toward each other (some snapped), their shadows across the sand, a long horned skull', art: 'alien-skeleton'}, {at: [-412, 2192], r: 108, desc: 'The bones of something enormous lying on its back half under the sand: a spine of vertebrae, ribs arching up out of the sand toward each other (some snapped), their shadows across the sand, a long horned skull', art: 'alien-skeleton'}]
   },
   {
     id: 'frostline', name: 'Frostline', setting: 'arctic', look: 'toxic', seed: 87,   // (toxic: green-blue ice, crystal spires, vents of green gas)
@@ -5328,8 +5328,8 @@ function spikyStack(r, v, far, n) {
   const nl = 7 + Math.floor(R() * 5), leaves = [];
   for (let k = 0; k < nl; k++) leaves.push({ a: (k / nl) * TAU + (R() - 0.5) * 0.5, len: r * (0.65 + R() * 0.4), w: 1.3 + R() * 1.2 + r * 0.07 });
   for (const L of leaves) { L.ca = Math.cos(L.a); L.sa = Math.sin(L.a); L.lit = L.ca * -0.6 + L.sa * -0.8; }
-  const P = far ? { lo: [32, 44, 46], base: [62, 84, 76], hi: [104, 128, 110], tip: [140, 92, 80], core: [26, 22, 30] }
-    : { lo: [30, 66, 54], base: [70, 132, 96], hi: [156, 214, 150], tip: [228, 132, 96], core: [34, 30, 36] };
+  const P = far ? { lo: [70, 56, 48], base: [130, 116, 98], hi: [170, 156, 132], tip: [140, 40, 60], core: [26, 22, 30] }
+    : { lo: [110, 88, 72], base: [196, 178, 148], hi: [242, 232, 208], tip: [206, 40, 76], core: [44, 20, 30] };   // (bone-white blades, crimson tips: nothing that grows on Earth)
   // every pixel's leaves worked out once (which leaves cover it, how far along and across each), then each slice
   // just picks from them
   const hits = new Array(S * S), core = new Uint8Array(S * S);
@@ -5451,8 +5451,9 @@ function rockStack(r, v, far, P) {
 /* a cactus: a clump of ribbed barrel cacti (some flowering), or now and then a tall saguaro with arms. Ribs run up
    each stem (stripes round its middle), lit on the side facing the sun, with a dark edge and pale spines. */
 function cactusStack(r, v, far) {
-  const R = rng(Math.floor(r * 7) * 41 + v * 389 + (far ? 9 : 0) + 501), tall = v % 3 === 0;
-  const G = [74, 128, 82], GH = [150, 198, 118], GL = [30, 60, 44], FL = R() < 0.5 ? [246, 112, 156] : [250, 214, 96];
+  // (alien, not a saguaro: stems of stacked bulbs, arms fanning straight out and up, in glassy turquoise or bone white)
+  const R = rng(Math.floor(r * 7) * 41 + v * 389 + (far ? 9 : 0) + 501), tall = v % 3 === 0, glass = v % 2 === 0;
+  const G = glass ? [44, 156, 160] : [206, 188, 160], GH = glass ? [150, 236, 220] : [246, 236, 214], GL = glass ? [14, 64, 74] : [104, 80, 66], SP = glass ? [222, 255, 248] : [156, 40, 40], FL = glass ? [255, 120, 220] : [110, 255, 200];
   const tint = (c, m) => [Math.min(255, c[0] * m) | 0, Math.min(255, c[1] * m) | 0, Math.min(255, c[2] * m) | 0, 255];
   const cr = 3.5 + Math.min(r, 34) * 0.1, n = tall ? 12 : 6;
   // each slice is a set of round stems: [x, y, radius] (offsets from the foot)
@@ -5461,11 +5462,10 @@ function cactusStack(r, v, far) {
     const arms = [], na = 1 + Math.floor(R() * 3);
     for (let k = 0; k < na; k++) arms.push({ a: (k / na) * TAU + R() * 1.2, ta: 0.3 + R() * 0.25, tt: 0.62 + R() * 0.22, d: cr * (2 + R() * 0.6) });
     for (let s = 0; s < n; s++) {
-      const t = s / (n - 1), L = [[0, 0, cr * (t > 0.86 ? Math.sqrt(1 - Math.pow((t - 0.86) / 0.17, 2)) : 1)]];
+      const t = s / (n - 1), bead = 0.74 + 0.26 * Math.abs(Math.cos(t * Math.PI * 3.5)), t1 = t > 0.86 ? Math.sqrt(1 - Math.pow((t - 0.86) / 0.17, 2)) : 1, L = [[0, 0, cr * t1 * bead]];
       for (const A of arms) {
-        const ca = Math.cos(A.a), sa = Math.sin(A.a), ar = cr * 0.72;
-        if (Math.abs(t - A.ta) < 0.06) for (let u = 0.3; u <= 1; u += 0.14) L.push([ca * A.d * u, sa * A.d * u, ar * 0.9]);
-        if (t >= A.ta && t <= A.tt) L.push([ca * A.d, sa * A.d, ar * (t > A.tt - 0.08 ? 0.75 : 1)]);
+        const ca = Math.cos(A.a), sa = Math.sin(A.a), ar = cr * 0.66, u = (t - A.ta) / (A.tt - A.ta);
+        if (u >= 0 && u <= 1) L.push([ca * A.d * (0.25 + u * 0.9), sa * A.d * (0.25 + u * 0.9), ar * (0.74 + 0.26 * Math.abs(Math.cos(u * Math.PI * 2))) * (u > 0.85 ? 0.8 : 1)]);   // (leaning out as it climbs)
       }
       slices.push(L);
     }
@@ -5488,12 +5488,14 @@ function cactusStack(r, v, far) {
       if (!owner(px + 1, py) || !owner(px - 1, py) || !owner(px, py + 1) || !owner(px, py - 1)) return tint(GL, 1);
       const a = Math.atan2(dy, dx), rib = Math.cos(a * ribs), lit = -(dx * 0.6 + dy * 0.8) / (d || 1);
       if (top && flower && d < c[2] * 0.4 && c === L[0]) return tint(FL, hash2(x, y, 5) > 0.5 ? 1 : 0.82);
-      if (rib > 0.92 && hash2(x, y, v + s) > 0.55) return tint([226, 232, 196], 1);   // a spine on a rib
+      if (rib > 0.92 && hash2(x, y, v + s) > 0.55) return tint(SP, 1);   // a spine on a rib
       const m = (0.6 + 0.4 * t) * (0.86 + 0.3 * lit * Math.min(1, d / (c[2] * 0.5))) * (rib < -0.4 ? 0.8 : 1);
       return tint(top && d < c[2] * 0.6 ? GH : G, m);
     });
     out.push({ c: cv, w: S, h: S, t });
   });
+  if (tall && glass) out[n - 1].glow = [[c0, c0, '#ff7ad8', 8, 0.5]];   // (a bud glowing at its tip)
+  if (!tall && flower) out[n - 1].glow = [[c0, c0, glass ? '#ff7ad8' : '#5affc0', 6, 0.4]];
   return out;
 }
 
@@ -9782,6 +9784,81 @@ LANDMARK_ART['barrel-fire'] = {
     setScale(1);
   }
 };
+/* the bones of something enormous, lying on its back half under the sand: its spine a line of vertebrae (gaps where
+   the sand still covers it), its ribs arching up out of the sand toward each other over it (some snapped short), each
+   throwing its shadow across the sand, and its long horned skull at one end */
+LANDMARK_ART['alien-skeleton'] = (() => {
+  const BONE = ['#5a4434', '#a88e6c', '#dccbaa', '#f6ecd6'];
+  const lay = (R) => {
+    const a = (R * 0.71) % Math.PI, ux = Math.cos(a), uy = Math.sin(a), ribs = [], Rr = rng(Math.round(R) * 13);
+    const sp = (u) => { const w = Math.sin(u * 2.4) * R * 0.08; return [(u - 0.5) * R * 1.6 * ux - uy * w, (u - 0.5) * R * 1.6 * uy + ux * w]; };   // (the spine, gently S-curved)
+    for (let j = 0; j < 9; j++) {
+      const u = 0.18 + j * 0.065, big = 1 - Math.abs(u - 0.45) * 1.3;
+      for (const sd of [-1, 1]) ribs.push({ u, sd, W: R * 0.46 * big, H: 0.42 * big, end: Rr() < 0.25 ? 0.45 + Rr() * 0.3 : 0.92 + Rr() * 0.08 });
+    }
+    return { ux, uy, sp, ribs };
+  };
+  // a point along a rib (v: 0 at its foot in the sand, 1 at its tip over the spine): [x, y, height]
+  const ribAt = (Lx, Ly, Q, rb, v) => {
+    const th = v * 0.44 * Math.PI, [sx, sy] = Q.sp(rb.u), lat = rb.sd * rb.W * Math.cos(th), back = -v * rb.W * 0.25;
+    return [Lx + sx - Q.uy * lat + Q.ux * back, Ly + sy + Q.ux * lat + Q.uy * back, rb.H * Math.sin(th)];
+  };
+  return {
+    height: 0, n: 1, sizeK: 3.4, lit: true,
+    slice(g, k, n, S, R) {
+      const c0 = S / 2, Q = lay(R), Rr = rng(Math.round(R) * 17);
+      // the sand heaped along it, and bits of bone scattered about
+      for (let u = 0; u <= 1; u += 0.04) { const [x, y] = Q.sp(u); g.fillStyle = rgbS(SAND.lite, 0.55); g.beginPath(); g.ellipse(c0 + x, c0 + y, R * 0.2, R * 0.14, Math.atan2(Q.uy, Q.ux), 0, TAU); g.fill(); }
+      for (let i = 0; i < 14; i++) { const a = Rr() * TAU, d = R * (0.6 + Rr() * 0.7), w = 3 + Rr() * 6; g.save(); g.translate(c0 + Math.cos(a) * d, c0 + Math.sin(a) * d); g.rotate(Rr() * 3); g.fillStyle = BONE[1]; g.fillRect(-w / 2, -1.5, w, 3); g.fillStyle = BONE[3]; g.fillRect(-w / 2, -1.5, w, 1); g.restore(); }
+    },
+    over(lc0, ec0, x, y, f, time, R, L) {
+      const Q = lay(R), X = L.at[0], Y = L.at[1], SL = 170, steps = 9;
+      lc.setTransform(1, 0, 0, 1, 0, 0); lc.lineCap = 'round';
+      // the ribs' shadows on the sand, first
+      lc.strokeStyle = 'rgba(70,34,22,0.3)';
+      for (const rb of Q.ribs) {
+        lc.lineWidth = R * 0.05; lc.beginPath();
+        for (let q = 0; q <= steps; q++) { const v = rb.end * q / steps, [px, py, h] = ribAt(X, Y, Q, rb, v), p = LMP(0, px + 0.6 * h * SL, py + 0.8 * h * SL); q ? lc.lineTo(p[0], p[1]) : lc.moveTo(p[0], p[1]); }
+        lc.stroke();
+      }
+      // the spine: vertebrae, some still under the sand
+      for (let u = 0.05; u <= 0.95; u += 0.055) {
+        if (hash2(Math.round(u * 100), 3, Math.round(R)) < 0.25) continue;
+        const [sx, sy] = Q.sp(u), p = LMP(0.012, X + sx, Y + sy), w = R * 0.07 * p[2];
+        lc.fillStyle = BONE[0]; lc.beginPath(); lc.ellipse(p[0], p[1], w + 1, w * 0.7 + 1, Math.atan2(Q.uy, Q.ux), 0, TAU); lc.fill();
+        lc.fillStyle = BONE[2]; lc.beginPath(); lc.ellipse(p[0] - 1, p[1] - 1, w, w * 0.7, Math.atan2(Q.uy, Q.ux), 0, TAU); lc.fill();
+      }
+      // the ribs, lowest bits first: a dark edge, the bone, a lit edge toward the sun
+      const segs = [];
+      for (const rb of Q.ribs) for (let q = 0; q < steps; q++) {
+        const v0 = rb.end * q / steps, v1 = rb.end * (q + 1) / steps, a = ribAt(X, Y, Q, rb, v0), b = ribAt(X, Y, Q, rb, v1);
+        segs.push([(a[2] + b[2]) / 2, a, b, 1 - 0.45 * v1]);
+      }
+      segs.sort((p, q) => p[0] - q[0]);
+      for (const [, a, b, wk] of segs) {
+        const A = LMP(a[2], a[0], a[1]), B = LMP(b[2], b[0], b[1]), w = Math.max(2, R * 0.05 * wk * B[2]);
+        lc.strokeStyle = BONE[0]; lc.lineWidth = w + 2; lc.beginPath(); lc.moveTo(A[0], A[1]); lc.lineTo(B[0], B[1]); lc.stroke();
+        lc.strokeStyle = BONE[2]; lc.lineWidth = w; lc.beginPath(); lc.moveTo(A[0], A[1]); lc.lineTo(B[0], B[1]); lc.stroke();
+        lc.strokeStyle = BONE[3]; lc.lineWidth = Math.max(1, w * 0.35); lc.beginPath(); lc.moveTo(A[0] - w * 0.25, A[1] - w * 0.3); lc.lineTo(B[0] - w * 0.25, B[1] - w * 0.3); lc.stroke();
+      }
+      // the skull, at the head end: long, a crest of horns, dark sockets
+      const [hx, hy] = Q.sp(1.02), ang = Math.atan2(Q.uy, Q.ux), cx = X + hx + Q.ux * R * 0.16, cy = Y + hy + Q.uy * R * 0.16;
+      for (const [h, sc, col] of [[0, 1.05, BONE[0]], [0.03, 1, BONE[1]], [0.06, 0.88, BONE[2]], [0.08, 0.6, BONE[3]]]) {
+        const p = LMP(h, cx - (h ? 1 : 0), cy - (h ? 1 : 0));
+        lc.fillStyle = col; lc.beginPath(); lc.ellipse(p[0], p[1], R * 0.3 * sc * p[2], R * 0.15 * sc * p[2], ang, 0, TAU); lc.fill();
+      }
+      for (const sd of [-1, 1]) {
+        const p = LMP(0.08, cx - Q.ux * R * 0.04 - Q.uy * sd * R * 0.07, cy - Q.uy * R * 0.04 + Q.ux * sd * R * 0.07);
+        lc.fillStyle = '#2a1a14'; lc.beginPath(); lc.ellipse(p[0], p[1], R * 0.05 * p[2], R * 0.035 * p[2], ang, 0, TAU); lc.fill();
+        const a0 = LMP(0.09, cx - Q.ux * R * 0.18 - Q.uy * sd * R * 0.08, cy - Q.uy * R * 0.18 + Q.ux * sd * R * 0.08), a1 = LMP(0.16, cx - Q.ux * R * 0.42 - Q.uy * sd * R * 0.2, cy - Q.uy * R * 0.42 + Q.ux * sd * R * 0.2);
+        lc.strokeStyle = BONE[0]; lc.lineWidth = Math.max(2, R * 0.045 * a1[2]) + 2; lc.beginPath(); lc.moveTo(a0[0], a0[1]); lc.lineTo(a1[0], a1[1]); lc.stroke();
+        lc.strokeStyle = BONE[2]; lc.lineWidth = Math.max(2, R * 0.045 * a1[2]); lc.beginPath(); lc.moveTo(a0[0], a0[1]); lc.lineTo(a1[0], a1[1]); lc.stroke();
+      }
+      lc.lineCap = 'butt';
+      setScale(1);
+    }
+  };
+})();
 function landmarks() { return (TRACK.landmarks || []).filter((L) => L && L.art && LANDMARK_ART[L.art] && Array.isArray(L.at)); }
 function landmarkSlices(L) {
   const A = LANDMARK_ART[L.art], R = Math.max(8, +L.r || 60), key = L.art + ':' + R;
