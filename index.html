@@ -2370,10 +2370,10 @@ function startFall(s) {
 /* came down over nothing (or far off course): out for a moment, then back on the lane past the gap */
 function fallOut(s) {
   const N = T.N, from = s.airFrom >= 0 ? s.airFrom : s.idx;
-  let ri = -1, bd = 1e9;
+  let ri = -1, bd = 1e9, gap = null;
   for (const g of T.gaps) {
     const ahead = wrapIdx(g.a - from), inside = wrapIdx(s.idx - g.a) < g.n || wrapIdx(from - g.a) < g.n;
-    if (inside || ahead <= 70) { const d = inside ? -1 : ahead; if (d < bd) { bd = d; ri = wrapIdx(g.a + g.n + 6); } }
+    if (inside || ahead <= 70) { const d = inside ? -1 : ahead; if (d < bd) { bd = d; ri = wrapIdx(g.a + g.n + 6); gap = g; } }
   }
   const pit = s.pit; s.pit = null;
   if (pit) ri = wrapIdx(pit.b + 6);   // (out of a hole: back on just past it)
@@ -2383,6 +2383,12 @@ function fallOut(s) {
   CURH = s.h;
   burst(s.x, s.y, 10, 60, '#8ff3ff', 0.5, true);
   outAt(s, ri);
+  // (put back past a gap, it is also out for as long as crossing the gap would have taken, at the speed it needs:
+  //  missing the jump must not cost less than making it)
+  if (gap && !pit) {
+    const v = isFinite(gap.need) ? Math.max(250, gap.need) : CFG.top * s.st.top;
+    s.wreck += Math.min(2.5, (gap.n * T.step) / v);
+  }
   emit('fall', s, pit ? 'pit' : null);
 }
 /* out of the race for a moment, then put back on the lane at sample ri (a little lower on power) */
