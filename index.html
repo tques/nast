@@ -11473,6 +11473,10 @@ function loopItems3D(items, time) {
    same shadows dithered into pixel-art patterns; 'hd' the shadows drawn separately at the screen's full resolution and
    laid over the finished picture, so their edges are perfectly smooth. */
 const G3 = { cv: null, gl: null, ok: false, prog: null, vao: null, nIdx: 0, loc: {}, sand: null, shad: null, sandFor: null, out: null, outHD: null, style: 'soft' };
+/* the hills' mesh in tiles (squares a side), and how far beyond the scene's own window on the ground (world px) a tile
+   is still drawn. HILL_CULL false: the whole mesh every frame, as before */
+const HILL_TILE = 12, HILL_MARGIN = 160;
+let HILL_CULL = true;
 try { const st = localStorage.getItem('gatebreaker.shadows'); if (st === 'soft' || st === 'pixel' || st === 'hd') G3.style = st; } catch (e) { /* default */ }
 function setShadowStyle(st) { G3.style = st; try { localStorage.setItem('gatebreaker.shadows', st); } catch (e) { /* this visit only */ } }
 function g3Init() {
@@ -11654,12 +11658,19 @@ function g3Upload(lit) {
       for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) { const xx = cx + a, yy = cy + b; if (xx >= 0 && yy >= 0 && xx < NX && yy < NY) near[yy * NX + xx] = 1; }
     }
   }
-  const idx = [];
-  for (let gy = 0; gy < NY - 1; gy++) for (let gx = 0; gx < NX - 1; gx++) {
-    const k = gy * NX + gx;
-    if (!near[k] && !near[k + 1] && !near[k + NX] && !near[k + NX + 1]) continue;
-    idx.push(k, k + 1, k + NX + 1, k, k + NX + 1, k + NX);
+  // (in tiles of HILL_TILE x HILL_TILE squares, row after row of tiles, so a frame draws only the tiles in view, each row
+  //  of them in one go: see g3Pass)
+  const idx = [], TS = HILL_TILE, TX = Math.ceil((NX - 1) / TS), TY = Math.ceil((NY - 1) / TS), tiles = new Int32Array(TX * TY * 2);
+  for (let ty = 0; ty < TY; ty++) for (let tx = 0; tx < TX; tx++) {
+    const t0 = idx.length;
+    for (let gy = ty * TS; gy < Math.min(NY - 1, (ty + 1) * TS); gy++) for (let gx = tx * TS; gx < Math.min(NX - 1, (tx + 1) * TS); gx++) {
+      const k = gy * NX + gx;
+      if (!near[k] && !near[k + 1] && !near[k + NX] && !near[k + NX + 1]) continue;
+      idx.push(k, k + 1, k + NX + 1, k, k + NX + 1, k + NX);
+    }
+    tiles[(ty * TX + tx) * 2] = t0; tiles[(ty * TX + tx) * 2 + 1] = idx.length - t0;
   }
+  G3.tiles = tiles; G3.tx = TX; G3.ty = TY;
   G3.nIdx = idx.length;
   if (G3.vao) gl.deleteVertexArray(G3.vao);
   G3.vao = gl.createVertexArray(); gl.bindVertexArray(G3.vao);
@@ -11764,7 +11775,20 @@ function g3Pass(mode, vw, vh) {
   gl.uniform1i(L.mode, mode);
   gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, G3.shT); gl.uniform1i(L.shT, 3);
   gl.uniform2f(L.shO, G3.shO[0], G3.shO[1]); gl.uniform2f(L.shN, G3.shN[0], G3.shN[1]); gl.uniform1f(L.shStep, G3.shStep);
-  gl.bindVertexArray(G3.vao); gl.drawElements(gl.TRIANGLES, G3.nIdx, gl.UNSIGNED_INT, 0); gl.bindVertexArray(null);
+  gl.bindVertexArray(G3.vao);
+  if (!HILL_CULL || !G3.tiles) gl.drawElements(gl.TRIANGLES, G3.nIdx, gl.UNSIGNED_INT, 0);
+  else {
+    // only the tiles in view: the scene's own window on the ground, widened by a margin (a hill's top leans out from
+    // the middle of the screen as it rises, its sides further still), each row's run of them in one draw
+    const C = HILL.C, span = C * HILL_TILE, m = HILL_MARGIN, hx = VW / 2, hy = VH / 2;
+    const tx0 = clamp(Math.floor((CX - hx - m - HILL.x0) / span), 0, G3.tx - 1), tx1 = clamp(Math.floor((CX + hx + m - HILL.x0) / span), 0, G3.tx - 1);
+    const ty0 = clamp(Math.floor((CY - hy - m - HILL.y0) / span), 0, G3.ty - 1), ty1 = clamp(Math.floor((CY + hy + m - HILL.y0) / span), 0, G3.ty - 1);
+    for (let ty = ty0; ty <= ty1; ty++) {
+      const a = (ty * G3.tx + tx0) * 2, b = (ty * G3.tx + tx1) * 2, off = G3.tiles[a], n = G3.tiles[b] + G3.tiles[b + 1] - off;
+      if (n > 0) gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_INT, off * 4);
+    }
+  }
+  gl.bindVertexArray(null);
 }
 
 /* the hills' shadows, worked out once per track into a texture over the whole ground (they never move: the sun is
