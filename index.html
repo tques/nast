@@ -1030,7 +1030,16 @@ const PIT = { A: 1.45, EDGE: 5, DEPTH: 1.6 };
 const CRATER = {
   forest: { wall: ['#2a1d13', '#3e2b1c', '#57402a', '#755a3b'], back: '#1d140d', floor: '#100a06', lip: '#a8875e', under: '#2b1f15', crack: '#2c2016', chunk: ['#7a6148', '#5a4532', '#8c7254'], root: '#1a110b',
     // (what it is filled with, this far down: murky pond water, lily pads on it)
-    fill: { depth: 0.6, base: '#2c3c29', deep: '#1c281c', ripple: '#5f7c56', shine: '#a6c296', pad: ['#4c7636', '#3a5e2a'], splash: '#9fc08c' } }
+    fill: { depth: 0.6, base: '#2c3c29', deep: '#1c281c', ripple: '#5f7c56', shine: '#a6c296', bits: 'pad', bit: ['#4c7636', '#3a5e2a'], splash: '#9fc08c' } },
+  // (a sinkhole in the sand, half full of quicksand: pocked with bubbles, swirling slowly)
+  dunes: { wall: ['#6e4f2e', '#8a6538', '#a8804a', '#c49c62'], back: '#3e2a18', floor: '#22160c', lip: '#d8b27a', under: '#3a271f', crack: '#2e1f16', chunk: ['#654a3a', '#4a3428', '#c9a46c'],
+    fill: { depth: 0.55, base: '#7c5a34', deep: '#553b20', ripple: '#a8824e', shine: '#d6b47c', bits: 'bubble', bit: ['#553b20', '#a07848'], splash: '#c9a46c' } },
+  // (a fissure in the ice, down to dark freezing water with floes on it)
+  arctic: { wall: ['#4e6a86', '#6f8ca8', '#94b2cc', '#c2dbee'], back: '#26394e', floor: '#101a26', lip: '#eef8ff', under: '#3c5268', crack: '#1c212c', chunk: ['#434c5e', '#2c3442', '#dfe8f2'],
+    fill: { depth: 0.65, base: '#1d3650', deep: '#10223a', ripple: '#5c88ae', shine: '#d8f0ff', bits: 'floe', bit: ['#e6f4ff', '#b8d4ea'], splash: '#d8f0ff' } },
+  // (a cave-in down to dark lava, crusted over in plates, cracks of it glowing; the black rock's own cracks glow too)
+  volcano: { wall: ['#1e1818', '#2e2524', '#433634', '#5a4a46'], back: '#140e0e', floor: '#0c0808', lip: '#7a6a62', under: '#120c0c', crack: '#8a2e10', chunk: ['#443c3a', '#2a2424', '#5a4a46'],
+    fill: { depth: 0.6, base: '#8a2c0e', deep: '#4a160a', ripple: '#e8742a', shine: '#ffb860', bits: 'crust', bit: ['#2e1a14', '#3e2418'], glow: '#ff5a14', splash: '#ffb347' } }
 };
 // flight off a jump pad: rise H levels at RISE levels a second, hang for HOLD seconds, then fall under G (levels/s²)
 const AIR = { H: 1.25, RISE: 3.6, HOLD: 0.7, G: 5.5, VREF: 300, QMIN: 0.45, QMAX: 1.4 };
@@ -9936,11 +9945,27 @@ function pitFill(p, F, FL, time) {
   const hx = Math.round(cx - r * 0.35), hy = Math.round(cy - r * 0.3);
   lc.fillRect(hx - 5, hy, 10, 1); lc.fillRect(hx - 2, hy + 2, 6, 1);
   lc.globalAlpha = 1;
-  if (FL.pad) for (let k = 0; k < 3; k++) {   // (lily pads, each with its notch)
-    const x = Math.round(cx + (hash2(p.i, k, 113) - 0.5) * r * 1.1), y = Math.round(cy + (hash2(p.i, k, 127) - 0.5) * r * 0.7), w = 3 + Math.floor(hash2(p.i, k, 131) * 2);
-    lc.fillStyle = FL.pad[k % 2]; lc.beginPath(); lc.ellipse(x, y, w, w * 0.7, 0, 0.5, TAU); lc.lineTo(x, y); lc.fill();
+  // things floating on it, each where its seed puts it: lily pads, bubbles, ice floes or crusted plates
+  const nb = FL.bits === 'crust' ? 6 : FL.bits === 'bubble' ? 7 : FL.bits === 'floe' ? 5 : 3;
+  for (let k = 0; k < nb; k++) {
+    const x = Math.round(cx + (hash2(p.i, k, 113) - 0.5) * r * 1.1), y = Math.round(cy + (hash2(p.i, k, 127) - 0.5) * r * 0.7), w = 3 + Math.floor(hash2(p.i, k, 131) * (FL.bits === 'crust' ? 5 : 2));
+    lc.fillStyle = FL.bit[k % 2];
+    if (FL.bits === 'pad') { lc.beginPath(); lc.ellipse(x, y, w, w * 0.7, 0, 0.5, TAU); lc.lineTo(x, y); lc.fill(); }   // (each with its notch)
+    else if (FL.bits === 'bubble') {   // (a bubble swelling and popping, then another)
+      const u = (time * 0.6 + hash2(p.i, k, 137)) % 1, br = Math.round(1 + u * 2);
+      lc.strokeStyle = FL.bit[1]; lc.lineWidth = 1; lc.globalAlpha = 1 - u * 0.6; lc.beginPath(); lc.arc(x, y, br, 0, TAU); lc.stroke(); lc.globalAlpha = 1;
+    } else {   // (an angular floe, or a crusted plate: a few sided, lit on its upper-left edge)
+      lc.beginPath();
+      for (let q = 0; q < 5; q++) { const a = (q / 5) * TAU + hash2(p.i, k * 5 + q, 139), rr = w * (0.7 + 0.5 * hash2(p.i, k * 5 + q, 149)); lc.lineTo(x + Math.cos(a) * rr * 1.3, y + Math.sin(a) * rr * 0.8); }
+      lc.closePath(); lc.fill();
+      lc.fillStyle = FL.bits === 'crust' ? '#5a3424' : '#ffffff'; lc.fillRect(x - w, y - Math.round(w * 0.6), Math.max(1, w), 1);
+    }
   }
   lc.restore();
+  if (FL.glow) {   // (lava: its heat, glowing up out of the hole)
+    ec.setTransform(1, 0, 0, 1, 0, 0);
+    glow(ec, FL.glow, Math.round(r * 1.4 / 4) * 4, cx, cy, 0.3 + 0.08 * Math.sin(time * 1.6 + p.i));
+  }
 }
 function drawPitRim(p, time) {
   const f0 = fscale(T.h[p.i]);
