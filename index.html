@@ -10890,7 +10890,7 @@ function renderFrame(time) {
   // (every ship at the scale of its own height, the same as the deck at that height)
   for (const s of W.ships) {
     if (s.loop) continue;
-    if (s.pit && s.air) {   // (dropping into a hole: seen down inside it, under its rim)
+    if (s.pit && s.air && s.h < T.h[s.pit.i] - 0.02) {   // (dropping into a hole: seen down inside it, under its rim; not one only passing over it, jumping)
       const p = s.pit;
       items.push({ k: LKEY(T.h[p.i], p.i, 0.41), y: s.y, fn: () => {
         lc.save(); ec.save(); lc.setTransform(1, 0, 0, 1, 0, 0); ec.setTransform(1, 0, 0, 1, 0, 0);
