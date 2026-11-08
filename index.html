@@ -1649,7 +1649,7 @@ TRACKS.push(
     shortcuts: [{from: [-32, -42], to: [-318, 881], via: [[-90, 385]]}],
     elevation: [{from: 0.2948, to: 0.39272, level: -1}, {from: 0.43095, to: 0.66386, level: 1, rocks: true}, {from: 0.68618, to: 0.74042, level: 1}],
     barricades: [0.22108, 0.8063, 0.11226],
-    landmarks: [{at: [-870, 576], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-647, -587], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [750, -470], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1839, 748], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}]
+    landmarks: [{at: [247, -630], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-820, 287], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-615, -1668], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-46, 636], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1459, 849], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1338, -1183], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}]
   },
   {
     id: 'lagrange-knot', name: 'Rootknot', setting: 'forest', seed: 38,
@@ -8530,7 +8530,7 @@ LANDMARK_ART['jackpot-moon'] = (() => {
    the column swaying, and the whole of it drifting slowly about its spot. Its only slice is the scuffed patch of
    ground under it; the rest moves, so it is drawn each frame (over). */
 LANDMARK_ART['dust-devil'] = (() => {
-  const RINGS = 14, H = 1.4, DUST = ['#ead3a4', '#d2ae76', '#a88052', '#8a663e'];
+  const RINGS = 14, H = 1.4, DUST = ['#f4e3bb', '#dcb57c', '#93693e', '#6a4826'];   // (pale grit catching the light, to dark dust in shadow: it has to stand out from the sand)
   return {
     height: 0, n: 1, sizeK: 2.6, lit: true,
     slice(g, k, n, S, R) {   // (the patch of ground it scours)
@@ -8549,13 +8549,13 @@ LANDMARK_ART['dust-devil'] = (() => {
         RG.push([CX + (sx - CX) * fh, CY + (sy - CY) * fh, (R * 0.1 + R * 0.95 * Math.pow(t, 1.4)) * fh, t]);
       }
       // a haze of dust filling the funnel
-      for (const [cx, cy, rr, t] of RG) { lc.globalAlpha = 0.1 * (1 - t * 0.5); lc.fillStyle = DUST[1]; lc.beginPath(); lc.arc(cx, cy, rr, 0, TAU); lc.fill(); }
+      for (const [cx, cy, rr, t] of RG) { lc.globalAlpha = 0.14 * (1 - t * 0.5); lc.fillStyle = DUST[2]; lc.beginPath(); lc.arc(cx, cy, rr, 0, TAU); lc.fill(); }
       // spiral arms of dust, wound up the column and whirling round (the back of each darker than the front)
       const ARMS = 4, spin = time * 4.5 + seed;
       for (let j = 0; j < ARMS; j++) {
         for (let k = 0; k < RINGS; k++) {
           const A = RG[k], B = RG[k + 1], aa = spin + (j / ARMS) * TAU + k * 0.42, ab = spin + (j / ARMS) * TAU + (k + 1) * 0.42;
-          lc.globalAlpha = 0.85 * (1 - A[3] * 0.5); lc.strokeStyle = Math.sin(aa) > 0.2 ? DUST[3] : j % 2 ? DUST[0] : DUST[1]; lc.lineWidth = 1 + Math.round(A[3] * 3);
+          lc.globalAlpha = 0.95 * (1 - A[3] * 0.4); lc.strokeStyle = Math.sin(aa) > 0.2 ? DUST[3] : j % 2 ? DUST[0] : DUST[1]; lc.lineWidth = 1 + Math.round(A[3] * 3);
           lc.beginPath(); lc.moveTo(A[0] + Math.cos(aa) * A[2], A[1] + Math.sin(aa) * A[2] * 0.92); lc.lineTo(B[0] + Math.cos(ab) * B[2], B[1] + Math.sin(ab) * B[2] * 0.92); lc.stroke();
         }
       }
