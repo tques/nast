@@ -11139,8 +11139,8 @@ function rampTheme(j) {
   if (id === 'forest~corrupt') id = corruptAt(T.x[j.i], T.y[j.i]) > 0 ? 'forest~alien' : 'forest';   // (which side of the front it stands)
   return RAMP_THEMES[id] || RAMP_THEMES[worldId()] || RAMP_THEMES.space;
 }
-/* painted on the deck before each ramp: the speed (m/s, as the speedometer reads) it takes to clear the gap past it,
-   and BOOST under it where that is beyond the player's top speed. Road paint: it reads the way the lane runs */
+/* painted on the deck before a ramp whose gap takes more than the player's top speed to clear: BOOST (nothing before
+   the others). Road paint: it reads the way the lane runs */
 const PAINT_FONT = { 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001',
   5: '111100111001111', 6: '111100111101111', 7: '111001010010010', 8: '111101111101111', 9: '111101111001111',
   B: '110101110101110', O: '111101101101111', S: '111100111001111', T: '111010010010010' };
@@ -11176,11 +11176,12 @@ function paintSpeed(i, lo, hi, need, foot) {
     lc.fill();
     return along;
   };
-  lc.setTransform(1, 0, 0, 1, 0, 0);
-  lc.globalAlpha = 0.5; lc.fillStyle = '#eef1f6';
+  // (only where it takes a boost: at full speed anything else clears, so a number would only be clutter)
   const boost = W && W.ships[0] && need > CFG.top * W.ships[0].st.top;
-  const far = word(boost ? 'BOOST' : String(need), 18, boost ? 4 : 6);
-  if (boost && far) word(String(need), 18 + far + 12, 6);
+  if (!boost) return;
+  lc.setTransform(1, 0, 0, 1, 0, 0);
+  lc.globalAlpha = 0.68; lc.fillStyle = '#f4f6fa';
+  word('BOOST', 18, 6);
   lc.globalAlpha = 1;
 }
 function drawJump(j, time, f) {
