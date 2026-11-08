@@ -1697,7 +1697,7 @@ TRACKS.push(
     shortcuts: [{from: [-32, -42], to: [-318, 881], via: [[-90, 385]]}],
     elevation: [{from: 0.2948, to: 0.39272, level: -1}, {from: 0.43095, to: 0.66386, level: 1, rocks: true}, {from: 0.68618, to: 0.74042, level: 1}],
     barricades: [0.22108, 0.8063, 0.11226],
-    landmarks: [{at: [247, -630], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-820, 287], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-615, -1668], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-46, 636], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1459, 849], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1338, -1183], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}]
+    landmarks: [{at: [247, -630], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-820, 287], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-615, -1668], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-46, 636], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1459, 849], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1338, -1183], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-1064, -1223], r: 70, desc: 'A crashed flying saucer, burnt out: a long furrow ploughed through the sand, the saucer tilted and half buried at its end, hull scorched, dome cracked open, panels scattered, smoke still rising', art: 'crashed-ufo'}]
   },
   {
     id: 'lagrange-knot', name: 'Rootknot', setting: 'forest', look: 'corrupt', corrupt: {at: [-1500, 700], r: 1900}, seed: 38,   // (half overrun by the alien growth, spreading from the west lobe)
@@ -1759,7 +1759,8 @@ TRACKS.push(
     barricades: [0.7799, 0.58647, 0.5334],
     jumps: [{at: 0.39652}],
     gaps: [{from: 0.40714, to: 0.43511}],
-    holes: [{at: 0.87339, side: 'left'}, {at: 0.90751, side: 'right'}]
+    holes: [{at: 0.87339, side: 'left'}, {at: 0.90751, side: 'right'}],
+    landmarks: [{at: [104, -891], r: 55, desc: 'A crater blasted into the sand, ejecta streaked round it, the asteroid that made it lying charred in the bottom, its cracks glowing, steam rising off it', art: 'meteor-crater'}, {at: [1784, 1301], r: 60, desc: 'A crater blasted into the sand, ejecta streaked round it, the asteroid that made it lying charred in the bottom, its cracks glowing, steam rising off it', art: 'meteor-crater'}, {at: [-1657, 674], r: 52, desc: 'A crater blasted into the sand, ejecta streaked round it, the asteroid that made it lying charred in the bottom, its cracks glowing, steam rising off it', art: 'meteor-crater'}]
   },
   {
     id: 'frostline', name: 'Frostline', setting: 'arctic', look: 'toxic', seed: 87,   // (toxic: green-blue ice, crystal spires, vents of green gas)
@@ -1821,7 +1822,8 @@ TRACKS.push(
     points: [[5, -650], [200, -630], [485, -440], [860, -565], [975, -305], [775, -20], [985, 275], [810, 530], [395, 385], [0, 620], [-395, 135], [-770, 505], [-1060, 580], [-1215, 315], [-1145, 130], [-995, 80], [-805, 90], [-720, -40], [-870, -190], [-1035, -135], [-1200, -225], [-1165, -525], [-835, -535], [-400, -90], [-220, -85], [-185, -260], [-410, -425], [-395, -590], [-210, -635]],
     shortcuts: [{from: [791, -74], to: [398, 385], via: [[625, 210]]}],
     elevation: [{from: 0.83877, to: 0.96645, level: 1}, {from: 0.03666, to: 0.14095, level: -1}, {from: 0.32993, to: 0.40863, level: 1}, {from: 0.45828, to: 0.50864, level: 1}, {from: 0.54783, to: 0.62477, level: -1}, {from: 0.65345, to: 0.76559, level: -1}],
-    barricades: [0.21053, 0.80972]
+    barricades: [0.21053, 0.80972],
+    landmarks: [{at: [352, -669], r: 24, desc: 'A rusted car wreck half sunk in the sand', art: 'rusted-car'}, {at: [1091, 143], r: 50, desc: 'A ruined concrete building: walls broken off at different heights, window gaps, rubble and rebar, sand blown in', art: 'ruined-building'}, {at: [-397, 281], r: 22, desc: 'A rusted car wreck half sunk in the sand', art: 'rusted-car'}, {at: [-1218, 597], r: 36, desc: 'Rusted oil drums, some on their sides, a black leak in the sand, a heap of old tyres, a fire burning in one drum', art: 'barrel-fire'}, {at: [-1031, -701], r: 30, desc: 'A billboard toppled flat into the sand, its picture sun-bleached and peeling, its legs snapped off', art: 'toppled-billboard'}, {at: [-658, -187], r: 26, desc: 'A rusted car wreck half sunk in the sand', art: 'rusted-car'}]
   }
 );
 
@@ -9502,6 +9504,281 @@ LANDMARK_ART['bunker-entrance'] = {
     lc.fillStyle = '#5a3a10'; lc.fillRect(Math.round(p[0]) - 2, Math.round(p[1]) - 2, 5, 5);
     lc.fillStyle = '#ffb030'; lc.fillRect(Math.round(p[0] + Math.cos(a) * 2) - 1, Math.round(p[1] + Math.sin(a) * 2) - 1, 2, 2);
     glow(ec, '#ffb030', 16, Math.round(p[0] + Math.cos(a) * 8), Math.round(p[1] + Math.sin(a) * 8), 0.55);
+    setScale(1);
+  }
+};
+/* ---------- the dune world's wreckage: Sunscour's fallen asteroids, Dust Devil's crashed saucer, Dune Hopper's ruins ---------- */
+const SAND = { dark: [128, 86, 56], mid: [166, 116, 74], lite: [196, 146, 96], hi: [222, 176, 120], deep: [92, 58, 38] };
+const rgbS = (c, a) => a == null ? `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})` : `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+/* puffs rising from (x, y): steam or smoke, rolling up toward the camera, drifting off downwind, thinning out */
+function drawPuffs(X, Y, r, time, cols, o) {
+  const M = o.n || 8, list = [];
+  for (let j = 0; j < M; j++) {
+    const t = (time * (o.speed || 0.14) + j / M + (o.ph || 0)) % 1, sw = Math.sin(time * 1.1 + j * 2.3 + (o.ph || 0)) * 8 * t;
+    list.push({ t, h: (o.h0 || 0) + t * (o.rise || 0.6), x: X + o.wind[0] * t + sw * 0.6, y: Y + o.wind[1] * t + sw, r: r * (0.4 + t * (o.grow || 1.6)) });
+  }
+  list.sort((a, b) => a.h - b.h);
+  lc.setTransform(1, 0, 0, 1, 0, 0);
+  for (const p of list) {
+    const q = LMP(p.h, p.x, p.y), rr = Math.max(2, Math.round(p.r * q[2])), a = (o.alpha || 0.6) * Math.pow(Math.sin(Math.PI * p.t), 0.8) * Math.min(1, 0.3 + p.t * 3);
+    lc.globalAlpha = a * 0.8; lc.fillStyle = cols[0]; lc.beginPath(); lc.arc(Math.round(q[0]), Math.round(q[1]), rr, 0, TAU); lc.fill();
+    lc.globalAlpha = a * 0.8; lc.fillStyle = cols[1]; lc.beginPath(); lc.arc(Math.round(q[0] - rr * 0.18), Math.round(q[1] - rr * 0.22), Math.round(rr * 0.7), 0, TAU); lc.fill();
+    lc.globalAlpha = a * 0.6; lc.fillStyle = cols[2]; lc.beginPath(); lc.arc(Math.round(q[0] - rr * 0.36), Math.round(q[1] - rr * 0.4), Math.max(1, Math.round(rr * 0.3)), 0, TAU); lc.fill();
+  }
+  lc.globalAlpha = 1;
+}
+/* a lumpy rock or ball's slice: rr its width at this height, lit from the upper left, pal [dark .. light] */
+function paintLump(g, cx, cy, rr, R0, t, pal, seed, crack) {
+  if (rr < 1) return;
+  const im = g.getImageData(0, 0, g.canvas.width, g.canvas.height), d = im.data, W0 = g.canvas.width;
+  for (let y = Math.max(0, Math.floor(cy - rr * 1.2)); y < Math.min(W0, cy + rr * 1.2); y++) for (let x = Math.max(0, Math.floor(cx - rr * 1.2)); x < Math.min(W0, cx + rr * 1.2); x++) {
+    const dx = x + 0.5 - cx, dy = y + 0.5 - cy, a = Math.atan2(dy, dx), q = Math.hypot(dx, dy), lim = rr * (1 + 0.12 * Math.sin(3 * a + seed) + 0.07 * Math.sin(5 * a + seed * 2));
+    if (q > lim) continue;
+    const nz = Math.sqrt(Math.max(0, 1 - q * q / (R0 * R0))), lit = -(dx * 0.6 + dy * 0.8) / R0 * 0.62 + nz * 0.42 + (hash2(x, y, seed | 0) - 0.5) * 0.12;
+    let c = pal[clamp(Math.round((lit + 0.3) * (pal.length - 1) * 0.9), 0, pal.length - 1)];
+    if (crack && Math.abs(Math.sin(dx * 0.5 + seed) * 3 + Math.sin(dy * 0.43 - seed) * 3 + dx * 0.15 - dy * 0.1) < 0.35) c = crack;
+    const o = (y * W0 + x) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+  }
+  g.putImageData(im, 0, 0);
+}
+/* Sunscour: a crater blasted into the sand, ejecta streaked out round it, and down in it the asteroid that made it,
+   charred black, its cracks still glowing, steam rising off it */
+LANDMARK_ART['meteor-crater'] = (() => {
+  const ROCKP = [[22, 16, 16], [40, 30, 28], [62, 48, 42], [92, 74, 62]];
+  return {
+    height: 0.09, n: 8, sizeK: 2.8, lit: true,
+    slice(g, k, n, S, R) {
+      const c0 = S / 2, ar = R * 0.32;
+      if (k === 0) {
+        const im = g.createImageData(S, S), d = im.data;
+        for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+          const dx = x + 0.5 - c0, dy = y + 0.5 - c0, q = Math.hypot(dx, dy) / R, a = Math.atan2(dy, dx), o = (y * S + x) * 4;
+          let c = null, al = 255;
+          const rim = 1 + 0.06 * Math.sin(5 * a + R) + 0.04 * Math.sin(9 * a);
+          if (q < rim * 0.8) {   // the bowl: its far (lower-right) wall in the sun, the near one in shadow, deepest in the middle
+            const s = -(dx * 0.6 + dy * 0.8) / R;
+            c = s > 0.15 ? SAND.deep : s > -0.25 ? SAND.dark : SAND.mid;
+            if (q < 0.45) c = s > 0 ? [70, 44, 30] : SAND.dark;
+          } else if (q < rim) {   // the rim, thrown up: lit on its outside toward the sun
+            const s = -(dx * 0.6 + dy * 0.8) / R;
+            c = s > 0.2 ? SAND.hi : s > -0.4 ? SAND.lite : SAND.mid;
+          } else if (q < 2.4) {   // ejecta: streaks of darker sand and scattered stones flung out
+            const ray = Math.sin(a * 13 + Math.sin(a * 5) * 2), fall = (q - 1) / 1.4;
+            if (ray > 0.55 + fall * 0.4 && hash2(x, y, 7) > fall * 0.9) { c = SAND.dark; al = 150 * (1 - fall); }
+            else if (hash2(x, y, 9) > 0.985 - (1 - fall) * 0.02) c = ROCKP[1 + (hash2(x, y, 11) * 2 | 0)];
+          }
+          if (c) { d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = al; }
+        }
+        g.putImageData(im, 0, 0);
+        return;
+      }
+      // the asteroid, half sunk in the bottom of the bowl
+      const t = k / (n - 1), z = t * 0.95, rr = ar * Math.sqrt(Math.max(0, 1 - z * z));
+      paintLump(g, c0 + R * 0.04, c0 + R * 0.02, rr, ar, t, ROCKP, R * 0.37, [255, 120, 40]);
+    },
+    over(lc0, ec0, x, y, f, time, R, L) {
+      const X = L.at[0] + R * 0.04, Y = L.at[1] + R * 0.02, p = LMP(0.03, X, Y);
+      glow(ec, '#ff7a2a', Math.round(R * 0.55 * p[2]), Math.round(p[0]), Math.round(p[1]), 0.35 + 0.12 * Math.sin(time * 2.2 + R));
+      drawPuffs(X, Y, R * 0.16, time, ['#a89a8e', '#d8cec2', '#fff6ea'], { n: 7, wind: [60, -36], rise: 0.55, h0: 0.06, alpha: 0.55, speed: 0.12, ph: R * 0.1 });
+      setScale(1);
+    }
+  };
+})();
+/* (which way the saucer came from: the side away from the nearest lane, so its furrow never runs across the road) */
+function ufoFrom(L) {
+  if (L._from) return L._from;
+  let bi = 0, bd = 1e18;
+  for (let i = 0; i < T.N; i++) { const d = (T.x[i] - L.at[0]) ** 2 + (T.y[i] - L.at[1]) ** 2; if (d < bd) { bd = d; bi = i; } }
+  const dx = L.at[0] - T.x[bi], dy = L.at[1] - T.y[bi], l = Math.hypot(dx, dy) || 1;
+  return (L._from = [dx / l, dy / l]);
+}
+/* Dust Devil: a flying saucer come down hard. It ploughed a long furrow through the sand and lies tilted at the end of
+   it, half buried in the heap it pushed up, its hull scorched black, its dome cracked open; panels thrown off lie
+   about, a wisp of smoke still rising, and one light on its rim still flickers */
+LANDMARK_ART['crashed-ufo'] = (() => {
+  const HULL = [[34, 34, 40], [70, 72, 82], [118, 122, 134], [170, 176, 188], [214, 220, 230]], SOOT = [[22, 18, 18], [44, 36, 34]];
+  return {
+    height: 0.14, n: 12, sizeK: 3.6, lit: true,
+    slice(g, k, n, S, R, L) {
+      const c0 = S / 2, t = k / (n - 1), Rd = R * 0.62, tilt = R * 0.22, [fx, fy] = ufoFrom(L);
+      if (k === 0) {
+        // the furrow, from the upper left: a trough of churned dark sand between ridges thrown up either side, ending in
+        // the heap it pushed up; scorch round where it lies; panels and bits scattered
+        g.save(); g.translate(c0, c0); g.rotate(Math.atan2(-fy, -fx));
+        g.fillStyle = rgbS(SAND.lite); g.fillRect(-R * 1.55, -R * 0.36, R * 1.2, R * 0.72);
+        g.fillStyle = rgbS(SAND.dark); g.fillRect(-R * 1.55, -R * 0.26, R * 1.25, R * 0.52);
+        g.fillStyle = rgbS(SAND.deep); g.fillRect(-R * 1.55, -R * 0.12, R * 1.25, R * 0.2);
+        g.fillStyle = rgbS(SAND.hi); g.fillRect(-R * 1.55, -R * 0.36, R * 1.2, 2);
+        g.restore();
+        g.fillStyle = 'rgba(30,20,16,0.55)'; g.beginPath(); g.ellipse(c0 + R * 0.1, c0 + R * 0.08, R * 0.95, R * 0.8, 0.6, 0, TAU); g.fill();
+        g.fillStyle = 'rgba(30,20,16,0.35)'; g.beginPath(); g.ellipse(c0 + R * 0.2, c0 + R * 0.2, R * 1.2, R * 1.0, 0.6, 0, TAU); g.fill();
+        const Rr = rng(Math.round(R) * 3);
+        for (let i = 0; i < 9; i++) {
+          const a = Rr() * TAU, dd = R * (0.9 + Rr() * 0.6), px = c0 + Math.cos(a) * dd, py = c0 + Math.sin(a) * dd, w = 4 + Rr() * 7;
+          g.save(); g.translate(px, py); g.rotate(Rr() * 3);
+          g.fillStyle = rgbS(HULL[1]); g.fillRect(-w / 2, -2, w, 4); g.fillStyle = rgbS(HULL[3]); g.fillRect(-w / 2, -2, w, 1); g.restore();
+        }
+        return;
+      }
+      // the saucer: a lens, its rim widest low down, the upper hull doming in, the dome on top; each slice shifted a
+      // little further over as it rises, so it lies tilted
+      const ox = c0 - fx * tilt * (t - 0.5), oy = c0 - fy * tilt * (t - 0.5);
+      let rr = t < 0.25 ? Rd * (0.82 + 0.18 * t / 0.25) : Rd * Math.sqrt(Math.max(0, 1 - Math.pow((t - 0.25) / 0.6, 1.6)));
+      const dome = t > 0.55 ? Rd * 0.36 * Math.sqrt(Math.max(0, 1 - Math.pow((t - 0.55) / 0.45, 2))) : 0;
+      const im = g.getImageData(0, 0, S, S), d = im.data;
+      for (let y = Math.max(0, Math.floor(oy - Rd - 2)); y < Math.min(S, oy + Rd + 2); y++) for (let x = Math.max(0, Math.floor(ox - Rd - 2)); x < Math.min(S, ox + Rd + 2); x++) {
+        const dx = x + 0.5 - ox, dy = y + 0.5 - oy, q = Math.hypot(dx, dy), o = (y * S + x) * 4;
+        let c = null;
+        if (dome && q < dome) {   // the dome: dark glass, cracked open on one side
+          const br = dx * 0.7 + dy * 0.3 > dome * 0.25 && Math.sin(Math.atan2(dy, dx) * 7) > -0.3;
+          c = br ? [14, 12, 18] : q < dome * 0.5 && dx + dy < 0 ? [150, 200, 210] : [50, 80, 96];
+        } else if (q < rr) {
+          const lit = -(dx * 0.6 + dy * 0.8) / Rd * 0.7 + t * 0.4, ring = Math.abs(q - Rd * 0.7) < 1.2 && t < 0.4;
+          c = HULL[clamp(Math.round((lit + 0.3) * 3.4), 0, 4)];
+          if (ring) c = HULL[0];
+          const soot = vnoise(x / 9 + R, y / 9, 5) + (dx > 0 ? 0.15 : 0);   // (scorched, worst on the side it burned)
+          if (soot > 0.62) c = soot > 0.75 ? SOOT[0] : SOOT[1];
+          if (t < 0.25 && rr - q < 2.2 && Math.floor(Math.atan2(dy, dx) / TAU * 18 + 18) % 3 === 0) c = [20, 20, 26];   // (portholes round the rim)
+        }
+        // (buried: the near-left of it under the sand it pushed up, up to about half its height)
+        if (c && t < 0.5 && dx * fx + dy * fy > Rd * (0.3 + t)) c = SAND[t < 0.25 ? 'lite' : 'hi'];
+        if (c) { d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255; }
+      }
+      g.putImageData(im, 0, 0);
+    },
+    over(lc0, ec0, x, y, f, time, R, L) {
+      const Rd = R * 0.62, tilt = R * 0.22, a = 0.9, X = L.at[0], Y = L.at[1];
+      // one rim light still flickering
+      const p = LMP(0.03, X + Math.cos(a) * Rd * 0.97 - tilt * 0.3, Y + Math.sin(a) * Rd * 0.97 - tilt * 0.25), on = Math.sin(time * 23) + Math.sin(time * 7.3) > 0.4;
+      lc.setTransform(1, 0, 0, 1, 0, 0);
+      if (on) { lc.fillStyle = '#9affea'; lc.fillRect(Math.round(p[0]) - 1, Math.round(p[1]) - 1, 3, 3); glow(ec, '#6affe0', 10, Math.round(p[0]), Math.round(p[1]), 0.7); }
+      drawPuffs(X + Rd * 0.25, Y + Rd * 0.1, R * 0.14, time, ['#2a2422', '#4a4240', '#6a605c'], { n: 7, wind: [70, -40], rise: 0.7, h0: 0.12, alpha: 0.5, speed: 0.1, grow: 2 });
+      setScale(1);
+    }
+  };
+})();
+/* Dune Hopper: what is left of the people who lived here. Rusted wrecks of cars half sunk in the sand */
+const RUST = [[48, 22, 14], [86, 40, 22], [134, 66, 36], [182, 104, 62], [214, 146, 96]];
+LANDMARK_ART['rusted-car'] = {
+  height: 0.06, n: 6, sizeK: 2.6, lit: true,
+  slice(g, k, n, S, R) {
+    const c0 = S / 2, t = k / (n - 1), ang = (R * 0.37) % Math.PI, L = R * 0.95, W2 = R * 0.42, cab = t > 0.55;
+    const Rr = rng(Math.round(R) * 7 + k);
+    g.save(); g.translate(c0, c0); g.rotate(ang);
+    if (k === 0) {   // its shadow and the sand drifted up against one side
+      g.fillStyle = 'rgba(60,30,20,0.35)'; g.fillRect(-L + 3, -W2 + 4, L * 2, W2 * 2);
+      g.restore(); return;
+    }
+    const l = cab ? L * 0.48 : L * (1 - 0.05 * t), w = cab ? W2 * 0.82 : W2 * (1 - 0.06 * t), ox = cab ? -L * 0.08 : 0;
+    const im = g.getImageData(0, 0, S, S); g.restore();
+    const d = im.data, ca = Math.cos(ang), sa = Math.sin(ang);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const dx = x + 0.5 - c0, dy = y + 0.5 - c0, u = dx * ca + dy * sa - ox, v = -dx * sa + dy * ca;
+      if (Math.abs(u) > l || Math.abs(v) > w) continue;
+      const corner = Math.abs(u) > l - 3 && Math.abs(v) > w - 3 && Math.hypot(Math.abs(u) - l + 3, Math.abs(v) - w + 3) > 3;
+      if (corner) continue;
+      const o = (y * S + x) * 4, edge = Math.abs(u) > l - 1.5 || Math.abs(v) > w - 1.5, lit = -(dx * 0.6 + dy * 0.8) / L;
+      let c = RUST[clamp(Math.round(2 + lit * 2.5 + (hash2(x, y, k) - 0.5) * 1.4), 0, 4)];
+      if (edge) c = RUST[lit > 0 ? 3 : 0];
+      if (vnoise(x / 5 + R, y / 5, 3) > 0.7 && !edge) c = [74, 112, 108];   // (flecks of its old paint)
+      if (cab && Math.abs(u) < l * 0.75 && Math.abs(v) < w * 0.75 && (Math.abs(u) > l * 0.45)) c = [20, 16, 16];   // (windscreen gone)
+      if (!cab && t > 0.3 && Math.abs(u) > L * 0.55 && Math.abs(v) < w * 0.7 && u > 0) c = vnoise(x / 3, y / 3, 9) > 0.5 ? RUST[1] : RUST[2];   // (the bonnet, rusted through)
+      if (t < 0.5 && v < -w * 0.2 + (u / L) * w * 0.4) c = SAND[t < 0.25 ? 'mid' : 'lite'];   // (half under the sand)
+      d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+    }
+    g.putImageData(im, 0, 0);
+    void Rr;
+  }
+};
+/* a ruined building: concrete walls broken off at different heights, window gaps, a corner standing taller, rubble
+   heaped inside and out, rusted rebar sticking up, and sand blown in */
+LANDMARK_ART['ruined-building'] = {
+  height: 0.22, n: 12, sizeK: 2.6, lit: true,
+  slice(g, k, n, S, R) {
+    const c0 = S / 2, t = k / (n - 1), w = R * 0.78, h = R * 0.62, th = Math.max(4, R * 0.12), CON = [[70, 62, 58], [112, 104, 98], [150, 142, 134], [188, 180, 170]];
+    const Rr = rng(Math.round(R) * 11);
+    // (each wall run: how high it still stands along its length)
+    const hAt = (u, side) => clamp(0.25 + 0.75 * vnoise(u / (R * 0.18) + side * 7, side, Math.round(R)) - (side === 2 ? 0.35 : 0) + (u < 0.15 * R && side === 0 ? 0.5 : 0), 0, 1);
+    if (k === 0) {
+      g.fillStyle = rgbS(SAND.lite); g.fillRect(Math.round(c0 - w + th), Math.round(c0 - h + th), Math.round(w * 2 - th * 2), Math.round(h * 2 - th * 2));
+      for (let i = 0; i < 26; i++) { const px = c0 + (Rr() - 0.5) * w * 2.6, py = c0 + (Rr() - 0.5) * h * 2.6, sz = 2 + Rr() * 5; g.fillStyle = rgbS(CON[1 + (Rr() * 2 | 0)]); g.fillRect(Math.round(px), Math.round(py), Math.round(sz), Math.round(sz * 0.8)); g.fillStyle = rgbS(CON[0]); g.fillRect(Math.round(px), Math.round(py + sz * 0.8), Math.round(sz), 1); }
+    }
+    const top = (y, x) => [x, y];
+    void top;
+    for (let side = 0; side < 4; side++) {
+      const horiz = side % 2 === 0, len = horiz ? w : h, steps = Math.ceil(len * 2);
+      for (let s = 0; s < steps; s++) {
+        const u = s - len, hh = hAt(u + len, side);
+        if (hh < t || (t > 0.3 && t < 0.62 && Math.abs(Math.sin((u + len) / (R * 0.12))) > 0.8 && hh < 0.95)) continue;   // (broken off below here, or a window gap)
+        const x = horiz ? c0 + u : c0 + (side === 1 ? w - th : -w), y = horiz ? c0 + (side === 0 ? -h : h - th) : c0 + u;
+        const capTop = hh - t < 1 / (n - 1);
+        g.fillStyle = rgbS(capTop ? CON[3] : CON[side === 0 || side === 3 ? 2 : 1]);
+        g.fillRect(Math.round(x), Math.round(y), horiz ? 1 : Math.round(th), horiz ? Math.round(th) : 1);
+      }
+    }
+    if (k === n - 1 || k === n - 3) for (let i = 0; i < 5; i++) { g.fillStyle = '#5a2a18'; g.fillRect(Math.round(c0 - w + 3 + i * 3), Math.round(c0 - h + 1), 1, 2); }   // (rebar)
+  }
+};
+/* a billboard toppled flat into the sand, its paint sun-bleached, its legs snapped off and lying by it */
+LANDMARK_ART['toppled-billboard'] = {
+  height: 0, n: 1, sizeK: 2.6, lit: true,
+  slice(g, k, n, S, R) {
+    const c0 = S / 2;
+    g.save(); g.translate(c0, c0); g.rotate(-0.35 + (R % 7) * 0.05);
+    const w = R * 0.95, h = R * 0.42;
+    g.fillStyle = 'rgba(60,30,20,0.35)'; g.fillRect(-w + 3, -h + 4, w * 2, h * 2);
+    g.fillStyle = '#4a4440'; g.fillRect(-w - 2, -h - 2, w * 2 + 4, h * 2 + 4);
+    // its faded picture: a sky going pale, a sun, a road, a car, the last of the words
+    g.fillStyle = '#9ab8c0'; g.fillRect(-w, -h, w * 2, h * 1.1);
+    g.fillStyle = '#d8b878'; g.fillRect(-w, -h + h * 1.1, w * 2, h * 0.9);
+    g.fillStyle = '#f0d8a0'; g.beginPath(); g.arc(-w * 0.55, -h * 0.45, h * 0.32, 0, TAU); g.fill();
+    g.fillStyle = '#b05a4a'; g.fillRect(w * 0.05, h * 0.05, w * 0.5, h * 0.3);
+    g.fillStyle = '#e8e0d0'; for (let i = 0; i < 6; i++) if (i !== 3) g.fillRect(-w * 0.8 + i * w * 0.18, -h * 0.85, w * 0.12, h * 0.16);
+    // peeled and sand-blown: patches of bare board and drifted sand
+    for (let i = 0; i < 40; i++) { const px = -w + hash2(i, 1, R) * w * 2, py = -h + hash2(i, 2, R) * h * 2; g.fillStyle = i % 3 ? '#6a5a48' : rgbS(SAND.lite); g.fillRect(Math.round(px), Math.round(py), 2 + (i % 4), 2); }
+    g.fillStyle = rgbS(SAND.lite); g.beginPath(); g.ellipse(w * 0.7, h * 0.8, w * 0.45, h * 0.5, 0.2, 0, TAU); g.fill();
+    // its legs, snapped
+    g.fillStyle = '#5a3a28'; g.fillRect(-w * 0.6, h + 6, w * 0.7, 4); g.fillRect(w * 0.15, h + 12, w * 0.6, 4);
+    g.fillStyle = '#8a5a3a'; g.fillRect(-w * 0.6, h + 6, w * 0.7, 1); g.fillRect(w * 0.15, h + 12, w * 0.6, 1);
+    g.restore();
+  }
+};
+/* oil drums, rusted, some standing, some on their sides, a leak gone black in the sand, a heap of old tyres, and a
+   fire burning in one drum, smoke going up from it */
+LANDMARK_ART['barrel-fire'] = {
+  height: 0.05, n: 5, sizeK: 2.8, lit: true,
+  slice(g, k, n, S, R) {
+    const c0 = S / 2, t = k / (n - 1), br = R * 0.16;
+    const drums = [[-0.3, -0.25, 1], [0.05, -0.38, 1], [0.32, -0.12, 1], [-0.05, 0.05, 0], [0.4, 0.35, 2], [-0.45, 0.3, 2]];
+    if (k === 0) {
+      g.fillStyle = 'rgba(20,14,12,0.6)'; g.beginPath(); g.ellipse(c0 + R * 0.1, c0 + R * 0.3, R * 0.5, R * 0.25, 0.3, 0, TAU); g.fill();   // (the leak)
+      for (const [tx, ty] of [[-0.75, -0.6], [-0.62, -0.5], [-0.8, -0.42]]) { g.strokeStyle = '#1e1c1e'; g.lineWidth = br * 0.55; g.beginPath(); g.arc(c0 + tx * R, c0 + ty * R, br * 0.9, 0, TAU); g.stroke(); g.strokeStyle = '#3a3638'; g.lineWidth = 1; g.beginPath(); g.arc(c0 + tx * R - 1, c0 + ty * R - 1, br * 0.9, 3.4, 5.2); g.stroke(); }
+      for (const [dx, dy, st] of drums) if (st === 2) {   // (on their sides)
+        g.save(); g.translate(c0 + dx * R, c0 + dy * R); g.rotate(dx * 3);
+        g.fillStyle = rgbS(RUST[1]); g.fillRect(-br * 1.4, -br, br * 2.8, br * 2); g.fillStyle = rgbS(RUST[3]); g.fillRect(-br * 1.4, -br, br * 2.8, 2);
+        g.fillStyle = rgbS(RUST[0]); for (const e of [-0.5, 0.5]) g.fillRect(e * br * 2.8 - 1, -br, 2, br * 2); g.restore();
+      }
+      return;
+    }
+    for (const [dx, dy, st] of drums) {
+      if (st === 2) continue;
+      const x = c0 + dx * R, y = c0 + dy * R;
+      if (k === n - 1) {   // the drum's top: a rim, the lid (or, for the burning one, its open dark mouth)
+        g.fillStyle = rgbS(RUST[0]); g.beginPath(); g.arc(x, y, br, 0, TAU); g.fill();
+        g.fillStyle = rgbS(st === 0 ? [30, 18, 14] : RUST[2]); g.beginPath(); g.arc(x, y, br - 1.5, 0, TAU); g.fill();
+        if (st) { g.fillStyle = rgbS(RUST[3]); g.beginPath(); g.arc(x - 1, y - 1, br * 0.45, 0, TAU); g.fill(); }
+      } else { g.fillStyle = rgbS(RUST[t < 0.3 ? 0 : 1]); g.beginPath(); g.arc(x, y, br, 0, TAU); g.fill(); }
+    }
+  },
+  over(lc0, ec0, x, y, f, time, R, L) {
+    const X = L.at[0] - 0.05 * R, Y = L.at[1] + 0.05 * R, p = LMP(0.05, X, Y), fl = 0.7 + 0.3 * Math.sin(time * 17) * Math.sin(time * 5.3);
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    for (let i = 0; i < 5; i++) {   // flames licking up out of it
+      const a = time * 9 + i * 1.7, q = LMP(0.06 + 0.015 * ((i + time * 4) % 3), X + Math.cos(a) * R * 0.05, Y + Math.sin(a) * R * 0.05);
+      lc.fillStyle = i % 2 ? '#ffd24a' : '#ff7a2a'; lc.fillRect(Math.round(q[0]) - 1, Math.round(q[1]) - 1, 3, 3);
+    }
+    glow(ec, '#ff8a3a', Math.round(R * 0.4 * p[2]), Math.round(p[0]), Math.round(p[1]), 0.5 * fl);
+    drawPuffs(X, Y, R * 0.1, time, ['#2a2422', '#443c3a', '#5e5450'], { n: 7, wind: [60, -36], rise: 0.6, h0: 0.07, alpha: 0.5, speed: 0.16, grow: 2.2 });
     setScale(1);
   }
 };
