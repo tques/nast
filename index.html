@@ -16519,6 +16519,8 @@ function chatShow(p) {
 function chatTick(dt) {
   const el = $('chat'), on = (mode === 'race' || mode === 'results') && CHAT_ON && PLAY !== 'trial' && W && W.ships.length > 1;
   if (!on) { if (!el.hidden) { chatReset(); el.hidden = true; } return; }
+  // (nothing during the flyover: the track's name and the shots have the screen; the grid line waits for the grid)
+  if (flyOn()) { el.hidden = true; return; }
   // (it stays up over the results, until the next race or the menu)
   el.hidden = false; el.classList.toggle('after', mode === 'results');
   CHT.clock += dt;
