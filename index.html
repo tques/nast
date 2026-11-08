@@ -1028,7 +1028,9 @@ const PIT = { A: 1.45, EDGE: 5, DEPTH: 1.6 };
 /* a crater's look, by world: its earth walls (dark to lit), the dark back and floor, the broken road edge (lip, lit; and
    its shadowed underside), cracks out across the road, loose chunks of road, and roots hanging in the walls */
 const CRATER = {
-  forest: { wall: ['#2a1d13', '#3e2b1c', '#57402a', '#755a3b'], back: '#1d140d', floor: '#100a06', lip: '#a8875e', under: '#2b1f15', crack: '#2c2016', chunk: ['#7a6148', '#5a4532', '#8c7254'], root: '#1a110b' }
+  forest: { wall: ['#2a1d13', '#3e2b1c', '#57402a', '#755a3b'], back: '#1d140d', floor: '#100a06', lip: '#a8875e', under: '#2b1f15', crack: '#2c2016', chunk: ['#7a6148', '#5a4532', '#8c7254'], root: '#1a110b',
+    // (what it is filled with, this far down: murky pond water, lily pads on it)
+    fill: { depth: 0.6, base: '#2c3c29', deep: '#1c281c', ripple: '#5f7c56', shine: '#a6c296', pad: ['#4c7636', '#3a5e2a'], splash: '#9fc08c' } }
 };
 // flight off a jump pad: rise H levels at RISE levels a second, hang for HOLD seconds, then fall under G (levels/s²)
 const AIR = { H: 1.25, RISE: 3.6, HOLD: 0.7, G: 5.5, VREF: 300, QMIN: 0.45, QMAX: 1.4 };
@@ -2342,6 +2344,8 @@ function fallOut(s) {
   }
   const pit = s.pit; s.pit = null;
   if (pit) ri = wrapIdx(pit.b + 6);   // (out of a hole: back on just past it)
+  const FL = pit && pit.jag && CRATER[TRACK.setting] && CRATER[TRACK.setting].fill;
+  if (FL) burst(s.x, s.y, 18, 90, FL.splash, 0.6, false);   // (a splash: into what fills it)
   if (ri < 0) { const on = wrapIdx(s.idx - from); ri = on > 12 && on < N / 2 ? s.idx : wrapIdx(from + 12); }
   CURH = s.h;
   burst(s.x, s.y, 10, 60, '#8ff3ff', 0.5, true);
@@ -9875,7 +9879,8 @@ const PIT_COL = { floor: '#09080e', back: '#16121e', wall: ['#211c2b', '#352e44'
 function pitScreen(P, f) { const o = []; for (const q of P) o.push([VW / 2 + (q[0] - CX) * f, VH / 2 + (q[1] - CY) * f]); return o; }
 function pitPath(ctx, P) { ctx.beginPath(); ctx.moveTo(P[0][0], P[0][1]); for (let k = 1; k < P.length; k++) ctx.lineTo(P[k][0], P[k][1]); ctx.closePath(); }
 function drawPit(p, time) {
-  const h = T.h[p.i], f0 = fscale(h), f1 = fscale(h - PIT.DEPTH), PC = (p.jag && CRATER[TRACK.setting]) || PIT_COL;
+  const PC = (p.jag && CRATER[TRACK.setting]) || PIT_COL, FL = PC.fill;
+  const h = T.h[p.i], f0 = fscale(h), f1 = fscale(h - (FL ? FL.depth : PIT.DEPTH));   // (filled: its walls only down to what fills it)
   if (offscreen(p.x, p.y, f0, p.R + 10)) return;
   const R = pitScreen(p.rim, f0), F = pitScreen(p.rim, f1), K = R.length;
   const cx = R.reduce((a, q) => a + q[0], 0) / K, cy = R.reduce((a, q) => a + q[1], 0) / K;
@@ -9905,7 +9910,36 @@ function drawPit(p, time) {
       lc.beginPath(); lc.moveTo(R[k][0], R[k][1]); lc.lineTo((R[k][0] + x) / 2 + 2, (R[k][1] + y) / 2); lc.lineTo(x, y); lc.stroke();
     }
   }
-  pitPath(lc, F); lc.fillStyle = PC.floor; lc.fill();
+  pitPath(lc, F); lc.fillStyle = FL ? FL.base : PC.floor; lc.fill();
+  if (FL) pitFill(p, F, FL, time);
+  lc.restore();
+}
+/* what a crater is filled with (its surface, F: on screen), drawn on it: darker toward its edges, slow ripples, a
+   highlight toward the light, and a few things floating on it */
+function pitFill(p, F, FL, time) {
+  const K = F.length, cx = F.reduce((a, q) => a + q[0], 0) / K, cy = F.reduce((a, q) => a + q[1], 0) / K;
+  let r = 0; for (const q of F) r = Math.max(r, Math.hypot(q[0] - cx, q[1] - cy));
+  lc.save(); pitPath(lc, F); lc.clip();
+  pitPath(lc, F); lc.strokeStyle = FL.deep; lc.lineWidth = 7; lc.stroke();   // (darker where it meets the walls)
+  // ripples: rings spreading slowly from a couple of points, fading as they go
+  lc.strokeStyle = FL.ripple; lc.lineWidth = 1;
+  for (let k = 0; k < 2; k++) {
+    const ox = cx + (hash2(p.i, k, 107) - 0.5) * r, oy = cy + (hash2(p.i, k, 109) - 0.5) * r * 0.6;
+    for (let q = 0; q < 2; q++) {
+      const u = ((time * 0.35 + k * 0.5 + q * 0.5) % 1), rr = 2 + u * r * 0.6;
+      lc.globalAlpha = 0.7 * (1 - u); lc.beginPath(); lc.ellipse(Math.round(ox), Math.round(oy), rr, rr * 0.6, 0, 0, TAU); lc.stroke();
+    }
+  }
+  lc.globalAlpha = 1;
+  // the light caught on it, toward the upper left
+  lc.fillStyle = FL.shine; lc.globalAlpha = 0.5;
+  const hx = Math.round(cx - r * 0.35), hy = Math.round(cy - r * 0.3);
+  lc.fillRect(hx - 5, hy, 10, 1); lc.fillRect(hx - 2, hy + 2, 6, 1);
+  lc.globalAlpha = 1;
+  if (FL.pad) for (let k = 0; k < 3; k++) {   // (lily pads, each with its notch)
+    const x = Math.round(cx + (hash2(p.i, k, 113) - 0.5) * r * 1.1), y = Math.round(cy + (hash2(p.i, k, 127) - 0.5) * r * 0.7), w = 3 + Math.floor(hash2(p.i, k, 131) * 2);
+    lc.fillStyle = FL.pad[k % 2]; lc.beginPath(); lc.ellipse(x, y, w, w * 0.7, 0, 0.5, TAU); lc.lineTo(x, y); lc.fill();
+  }
   lc.restore();
 }
 function drawPitRim(p, time) {
