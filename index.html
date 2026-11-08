@@ -9248,11 +9248,42 @@ function railChunks() {
   RAIL.key = key; RAIL.chunks = out;
   return out;
 }
+/* where raised stretches' decks are on screen just now (each at its own height's scale), as one path, for drawRails to
+   keep the lane's walls out from under them: the walls of a lane running beneath an overpass are hidden by its deck,
+   glow and all (a deck of dots is mostly see-through, but not to the walls under it) */
+function overDecks(ctx) {
+  let any = false;
+  const hw = T.hw + 2, N = T.N;
+  for (const run of T.runs) {
+    if (run.lv <= 0) continue;
+    let open = false;
+    const L = [], R = [];
+    const flush = () => {
+      if (L.length > 1) { ctx.moveTo(L[0][0], L[0][1]); for (let k = 1; k < L.length; k++) ctx.lineTo(L[k][0], L[k][1]); for (let k = R.length - 1; k >= 0; k--) ctx.lineTo(R[k][0], R[k][1]); ctx.closePath(); any = true; }
+      L.length = 0; R.length = 0;
+    };
+    for (let q = 0; q < run.n; q++) {
+      const i = (run.s + q) % N, h = T.h[i];
+      if (h < 0.5 || T.gap[i]) { if (open) { flush(); open = false; } continue; }
+      const f = fscale(h), x = VW / 2 + (T.x[i] - CX) * f, y = VH / 2 + (T.y[i] - CY) * f, w = hw * f;
+      if (Math.abs(x - VW / 2) > VW / 2 + 200 || Math.abs(y - VH / 2) > VH / 2 + 200) { if (open) { flush(); open = false; } continue; }
+      L.push([x + T.nx[i] * w, y + T.ny[i] * w]); R.push([x - T.nx[i] * w, y - T.ny[i] * w]); open = true;
+    }
+    if (open) flush();
+  }
+  return any;
+}
 function drawRails() {
   const C = railCols(), f0 = fscale(0), m = 40;
   const vx0 = CX - VW / (2 * f0) - m, vx1 = CX + VW / (2 * f0) + m, vy0 = CY - VH / (2 * f0) - m, vy1 = CY + VH / (2 * f0) + m;
   const vis = railChunks().filter((c) => c.x1 > vx0 && c.x0 < vx1 && c.y1 > vy0 && c.y0 < vy1);
   if (!vis.length) return;
+  // (nothing of them under an overpass: everywhere but where a raised deck is, on screen)
+  let clipped = false;
+  if (T.runs.some((r) => r.lv > 0)) for (const ctx of [lc, ec]) {
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.beginPath(); ctx.rect(-50, -50, VW + 100, VH + 100);
+    if (overDecks(ctx)) { ctx.clip('evenodd'); clipped = true; } else { ctx.restore(); }
+  }
   lc.lineJoin = 'round'; lc.lineCap = 'round'; ec.lineJoin = 'round'; ec.lineCap = 'round';
   // the shadow on the deck
   lc.setTransform(f0, 0, 0, f0, VW / 2 - f0 * CX + 3, VH / 2 - f0 * CY + 4);
@@ -9265,6 +9296,7 @@ function drawRails() {
   }
   ec.globalAlpha = 0.45; ec.strokeStyle = COL.rim; ec.lineWidth = 3; for (const c of vis) ec.stroke(c.p); ec.globalAlpha = 1;
   lc.lineCap = 'butt'; ec.lineCap = 'butt';
+  if (clipped) { lc.restore(); ec.restore(); }
   setScale(1);
 }
 /* a raised (or, without 3D, sunken) stretch's edges as the same wall: slices from its deck up (see drawRun) */
