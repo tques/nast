@@ -12965,6 +12965,9 @@ function cutOverpassDecks(ctx) {
    steps, darken in steps toward the foot, and carry rows of lit windows (stem.lights). Uses the WebGL2 context the hills
    use (G3); with none, the old flat trunks are drawn instead (see drawStems). */
 const T3 = { prog: null, vao: null, n: 0, loc: {}, for: null, failed: false };
+/* the towers' tiles (world px a side); TOWER_CULL false: all of them every frame, as before */
+const TOWER_TILE = 400;
+let TOWER_CULL = true;
 function t3Init() {
   if (T3.prog || T3.failed) return !!T3.prog;
   if (!g3Init()) { T3.failed = true; return false; }
@@ -13051,8 +13054,12 @@ function t3Outline(E, inset) {
 }
 /* every tower, mast and skybridge, as triangles: worked out once per track (and again when the scenery is rebuilt) */
 function t3Build() {
-  const sc = SET.scenery.stem, fl = SET.floating.stem, V = [];
-  const put = (x, y, h, mat, nx, ny, u, fw, top, foot, seed, flags, col) => V.push(x, y, h, mat, nx, ny, u, fw, top, foot, seed, flags, col[0], col[1], col[2]);
+  const sc = SET.scenery.stem, fl = SET.floating.stem;
+  // (each tower and skybridge goes into the tile of TOWER_TILE its middle is in, so a frame draws only the tiles near
+  //  the view: see drawTowers3D. at(x, y, r): the tile for the next piece, r how far it reaches from there)
+  const TILES = new Map(); let V = null, low = 0, reach = 0;
+  const at = (x, y, r) => { const tx = Math.floor(x / TOWER_TILE), ty = Math.floor(y / TOWER_TILE), k = ty * 100000 + tx; if (!TILES.has(k)) TILES.set(k, { tx, ty, V: [] }); V = TILES.get(k).V; reach = Math.max(reach, r); };
+  const put = (x, y, h, mat, nx, ny, u, fw, top, foot, seed, flags, col) => { V.push(x, y, h, mat, nx, ny, u, fw, top, foot, seed, flags, col[0], col[1], col[2]); if (h < low) low = h; };
   const black = [0, 0, 0];
   // one ring of walls round a shaft, from outline A at height ha down to outline B at height hb
   const ring = (cx, cy, A, B, ha, hb, mat, top, foot, seed, sharp, win) => {
@@ -13072,6 +13079,7 @@ function t3Build() {
     const A = t3Outline(E, pole ? 0 : 1.5), fl2 = pole ? 1.3 : stem.flare3d || 1.2;
     const B = A.map(([x, y]) => [x * fl2, y * fl2]), seed = hash2(Math.round(o.x), Math.round(o.y), 71) * 100;
     const sharp = E.shape === 'rect' || pole;
+    at(o.x, o.y, B.reduce((m, [x, y]) => Math.max(m, Math.hypot(x, y)), 0));
     ring(o.x, o.y, A, B, top, foot, pole ? 2 : mat, top, foot, seed, sharp, !pole && E.w > 14);
     if (stem.keel && !pole) ring(o.x, o.y, B, B.map(([x, y]) => [x * 0.6, y * 0.6]), foot, foot - stem.keel, mat, top, foot, seed, sharp, false);
   };
@@ -13083,6 +13091,7 @@ function t3Build() {
     const ax = b.a.x, ay = b.a.y, bx = b.b.x, by = b.b.y, L = Math.hypot(bx - ax, by - ay);
     if (L < 2) continue;
     const ux = (bx - ax) / L, uy = (by - ay) / L, px = -uy, py = ux, w = b.w / 2, top = b.h, bot = b.h - 0.07, seed = b.ph * 10;
+    at((ax + bx) / 2, (ay + by) / 2, L / 2 + w);
     const col = hexRgb(BR.neon[Math.floor(b.ph * 10) % BR.neon.length]).map((v) => v / 255), mat = 3;
     for (const s of [1, -1]) {   // its two sides
       const ox = px * w * s, oy = py * w * s;
@@ -13092,17 +13101,21 @@ function t3Build() {
     const q = [[ax + px * w, ay + py * w, 0], [bx + px * w, by + py * w, 1], [bx - px * w, by - py * w, 1], [ax - px * w, ay - py * w, 0]];
     for (const k of [0, 1, 2, 0, 2, 3]) put(q[k][0], q[k][1], top, mat, 0, 0, q[k][2], L, top, bot, seed, 0, col);
   }
+  // (the tiles row by row, each one's vertices in a run)
+  const order = [...TILES.values()].sort((a, b) => a.ty - b.ty || a.tx - b.tx), all = [];
+  T3.tiles = order.map((t) => { const o = { tx: t.tx, ty: t.ty, off: all.length / 15, n: t.V.length / 15 }; for (const v of t.V) all.push(v); return o; });
+  T3.low = low; T3.reach = reach;
   const gl = G3.gl;
   if (T3.vao) gl.deleteVertexArray(T3.vao);
   T3.vao = gl.createVertexArray(); gl.bindVertexArray(T3.vao);
-  const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(V), gl.STATIC_DRAW);
+  const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(all), gl.STATIC_DRAW);
   const S = 15 * 4;
   gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, S, 0);
   gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, S, 16);
   gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, S, 32);
   gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 3, gl.FLOAT, false, S, 48);
   gl.bindVertexArray(null);
-  T3.n = V.length / 15;
+  T3.n = all.length / 15;
   T3.for = LIVE;
 }
 /* draw them for this frame onto the scene; false: not drawn (no WebGL2, or the scenery isn't laid out yet) */
@@ -13121,7 +13134,23 @@ function drawTowers3D() {
   gl.uniform3fv(L.lo, c(sc.lo)); gl.uniform3fv(L.base, c(sc.base)); gl.uniform3fv(L.hi, c(sc.hi));
   const pal = []; for (let i = 0; i < 4; i++) pal.push(...c(sc.lights[i % sc.lights.length]));
   gl.uniform3fv(L.pal, pal);
-  gl.bindVertexArray(T3.vao); gl.drawArrays(gl.TRIANGLES, 0, T3.n); gl.bindVertexArray(null);
+  gl.bindVertexArray(T3.vao);
+  if (!TOWER_CULL || !T3.tiles) gl.drawArrays(gl.TRIANGLES, 0, T3.n);
+  else {
+    // only the tiles that can reach the screen: the view's window on the ground, widened by as far in as the lowest foot
+    // is drawn (deep below, everything is drawn closer to the middle of the screen) and by the widest piece
+    const f = Math.min(1, fscale(T3.low)), hx = VW / 2 / f + T3.reach + 20, hy = VH / 2 / f + T3.reach + 20;
+    const x0 = Math.floor((CX - hx) / TOWER_TILE), x1 = Math.floor((CX + hx) / TOWER_TILE), y0 = Math.floor((CY - hy) / TOWER_TILE), y1 = Math.floor((CY + hy) / TOWER_TILE);
+    let run0 = -1, runN = 0;
+    for (const t of T3.tiles) {
+      if (t.tx < x0 || t.tx > x1 || t.ty < y0 || t.ty > y1) continue;
+      if (run0 >= 0 && t.off === run0 + runN) { runN += t.n; continue; }   // (next to the last one drawn: one draw for both)
+      if (runN) gl.drawArrays(gl.TRIANGLES, run0, runN);
+      run0 = t.off; runN = t.n;
+    }
+    if (runN) gl.drawArrays(gl.TRIANGLES, run0, runN);
+  }
+  gl.bindVertexArray(null);
   lc.setTransform(1, 0, 0, 1, 0, 0); lc.drawImage(G3.cv, 0, G3.cv.height - VH, VW, VH, 0, 0, VW, VH);
   setScale(1);
   return true;
