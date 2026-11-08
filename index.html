@@ -1046,7 +1046,9 @@ function segDist(px, py, ax, ay, bx, by) {
      setting     the world around the track (see "settings: the world around the track"): 'space' if left out. A sunken stretch's canopy
                  names one of that setting's overhead types.
      look        a variant of that world's look, where it has one (the setting '<world>~<look>'): 'alien' on the forest
-                 (Briar Hollow) is the same world with alien plants in violet, red-violet and teal. Optional.
+                 (Briar Hollow) is the same world with alien plants in violet, red-violet and teal; 'corrupt' on the
+                 forest (Rootknot) is the forest half overrun by that alien growth, spreading from corrupt.at to about
+                 corrupt.r units away ({at: [x, y], r}), with a ragged front. Optional.
      landmarks   one-off pieces of scenery beside the track, from the editor's Landmark tool: {at: [x, y], r, desc,
                  art?}. Drawn only when art names an entry in LANDMARK_ART (see the landmarks section): the
                  description says what it should look like, for whoever draws it.
@@ -1694,7 +1696,7 @@ TRACKS.push(
     landmarks: [{at: [247, -630], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-820, 287], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-615, -1668], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [-46, 636], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1459, 849], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}, {at: [1338, -1183], r: 75, desc: 'A dust devil: a whirlwind of dust spinning over the sand beside the track', art: 'dust-devil'}]
   },
   {
-    id: 'lagrange-knot', name: 'Rootknot', setting: 'forest', seed: 38,
+    id: 'lagrange-knot', name: 'Rootknot', setting: 'forest', look: 'corrupt', corrupt: {at: [-1500, 700], r: 1900}, seed: 38,   // (half overrun by the alien growth, spreading from the west lobe)
     points: [[405, 85], [265, 345], [100, 585], [-100, 800], [-325, 985], [-640, 960], [-855, 1220], [-1145, 1230], [-1265, 1100], [-1215, 880], [-1410, 740], [-1705, 775], [-1790, 565], [-1620, 235], [-1325, 95], [-970, 45], [-850, -240], [-575, -345], [-290, -405], [0, -425], [290, -405], [575, -345], [850, -240], [1100, -90], [1320, 100], [1490, 335], [1760, 295], [1905, 470], [1565, 900], [1390, 1130], [1135, 1410], [810, 1260], [555, 1125], [305, 975], [80, 790], [-110, 570], [-275, 330], [-410, 70], [-515, -200], [-590, -485], [-540, -780], [-620, -1065], [-565, -1355], [-455, -1620], [-265, -1840], [5, -1930], [275, -1830], [460, -1605], [570, -1335], [620, -1050], [625, -967], [530, -745], [585, -465], [510, -185]],
     shortcuts: [{from: [-560, -1370], to: [602, -918], via: [[-393, -1446], [-251, -1548], [-97, -1616], [65, -1634], [218, -1583], [337, -1479], [419, -1344], [465, -1199]]}],   // (smoothed and balanced: tools/shortcuts.js)
     elevation: [{from: 0.36058, to: 0.4148, level: -1, canopy: 'ice'}, {from: 0.62938, to: 0.6836, level: -1, canopy: 'gas'}, {from: 0.70394, to: 0.76023, level: -1, canopy: 'ice'}, {from: 0.07408, to: 0.23187, level: -1, canopy: 'gas'}, {from: 0.46155, to: 0.61111, level: 1, rocks: true}, {from: 0.29709, to: 0.33366, level: 1}],
@@ -2230,7 +2232,7 @@ function buildCourse() {
 }
 function spawnRock(slot, tier, x, y, idx) {
   const a = Math.random() * TAU, s = 8 + Math.random() * 14;
-  W.rocks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: TIER_R[tier], tier, slot, idx, h: T.h[idx], v: Math.floor(Math.random() * 4) });
+  W.rocks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: TIER_R[tier], tier, slot, idx, h: T.h[idx], v: Math.floor(Math.random() * 4) + (CORRUPT.on && corruptAt(x, y) > 0 ? 8 : 0) });
 }
 
 /* a race (solo: a time trial, the player alone on the grid, no Stingers to pick up: there is no one to use them on) */
@@ -3009,7 +3011,7 @@ function breakRock(r) {
   if (r.tier > 1) {
     for (let k = 0; k < 2; k++) {
       const a = Math.random() * TAU;
-      W.rocks.push({ x: r.x, y: r.y, vx: r.vx + Math.cos(a) * 45, vy: r.vy + Math.sin(a) * 45, r: TIER_R[r.tier - 1], tier: r.tier - 1, slot: r.slot, idx: r.idx, h: r.h, v: Math.floor(Math.random() * 4) });
+      W.rocks.push({ x: r.x, y: r.y, vx: r.vx + Math.cos(a) * 45, vy: r.vy + Math.sin(a) * 45, r: TIER_R[r.tier - 1], tier: r.tier - 1, slot: r.slot, idx: r.idx, h: r.h, v: Math.floor(Math.random() * 4) + (r.v & 8) });
     }
     sl.left += 1;
   } else sl.left -= 1;
@@ -6313,7 +6315,7 @@ function glowcapStack(r, v, far) {
   return st;
 }
 
-defineSetting(Object.assign({}, FOREST_DEF, {
+const ALIEN_FOREST_DEF = defineSetting(Object.assign({}, FOREST_DEF, {
   id: 'forest~alien', base: 'forest', floating: null,
   palette: {
     dot: '#2a3048', dotHi: '#323a56', side: '#120c18', rim: '#f0dcc4', overDeck: '#2a2436', overDeckHi: '#332c42', map: '200,150,236',
@@ -6410,6 +6412,106 @@ defineSetting(Object.assign({}, FOREST_DEF, {
     })
   }
 }));
+
+/* ================= the forest world, corrupted (a track with look: 'corrupt'; Rootknot) =================
+   Half the world is the forest as it was; the other half has been overrun by the alien growth (the forest's alien
+   look), spreading out from a point (the track's corrupt: {at: [x, y], r}) to about r away. Its front is ragged,
+   reaching out in tendrils. Ahead of it, glowing violet veins run through the green moss and spores are blown ahead; along it, pines and broad
+   trees are turning, violet from the top down, and here and there one has turned far out in the green on its own.
+   Beyond it, the ground, plants, meadows and thorn bushes are the alien forest's. */
+const CORRUPT = { on: false, s: 2, x0: 0, y0: 0, mask: null, veins: null, cv: null, key: '' };
+// (how far into the alien growth a point is: above 0 overrun, below 0 not yet; about 1 per 260 units, the front ragged)
+function corruptAt(x, y) {
+  const c = TRACK.corrupt;
+  if (!c) return -9;
+  return (c.r - Math.hypot(x - c.at[0], y - c.at[1])) / 260 + (vnoise(x / 260, y / 260, 71) - 0.5) * 1.8 + (vnoise(x / 80, y / 80, 73) - 0.5) * 0.7;
+}
+/* (smooth noise for the veins: two copies turned different ways and blended, so its lines wander instead of following
+   the noise's grid) */
+const veinField = (x, y, sc, sd) => 0.55 * vnoise((x * 0.8 + y * 0.6) / sc, (y * 0.8 - x * 0.6) / sc, sd) + 0.45 * vnoise((x * 0.26 - y * 0.97) / (sc * 0.7), (x * 0.97 + y * 0.26) / (sc * 0.7), sd + 1);
+/* the overrun ground as a mask over the whole track, and the veins ahead of it (each pixel CORRUPT.s units across) */
+function buildCorrupt() {
+  CORRUPT.on = !!(SET.corrupt && TRACK.corrupt);
+  if (!CORRUPT.on) { CORRUPT.mask = CORRUPT.veins = null; return; }
+  const key = TRACK.id + ':' + T.N + ':' + JSON.stringify(TRACK.corrupt);
+  if (CORRUPT.key === key) return;
+  CORRUPT.key = key;
+  const B = T.bounds, s = CORRUPT.s, x0 = Math.floor(B.x0 - 600), y0 = Math.floor(B.y0 - 600), w = Math.ceil((B.x1 - B.x0 + 1200) / s), h = Math.ceil((B.y1 - B.y0 + 1200) / s);
+  const mk = mkCanvas(w, h), vk = mkCanvas(w, h), mi = mk.getContext('2d').createImageData(w, h), vi = vk.getContext('2d').createImageData(w, h), md = mi.data, vd = vi.data;
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const x = x0 + i * s, y = y0 + j * s, c0 = corruptAt(x, y), o = (j * w + i) * 4;
+    if (c0 > 1.2) { md[o + 3] = 255; continue; }
+    if (c0 < -1.2) continue;
+    // (the front, ragged close up too: creeping in small lobes, and speckled where it is just taking hold)
+    const c = c0 + (vnoise(x / 26, y / 26, 75) - 0.5) * 0.7;
+    if (c + (hash2(i, j, 83) - 0.5) * 0.4 > 0) { md[o + 3] = 255; continue; }
+    if (c < -0.8) continue;
+    // veins ahead of it: a few long wandering ones, branching nearer the front, thinner the further out
+    // (each the line where a smooth noise crosses one half, its width even: the distance to that line, by the slope)
+    const k = 1 + c / 0.8, line = (sc, sd) => { const r = veinField(x, y, sc, sd), gx = veinField(x + 2, y, sc, sd) - r, gy = veinField(x, y + 2, sc, sd) - r; return Math.abs(r - 0.5) / (Math.hypot(gx, gy) / 2 + 1e-6); };
+    if (line(130, 79) < 2 * k || (c > -0.35 && line(55, 77) < 1.4 * k)) {
+      const hot = c > -0.3; vd[o] = hot ? 210 : 150; vd[o + 1] = hot ? 96 : 58; vd[o + 2] = hot ? 236 : 190; vd[o + 3] = 255;
+    } else if (hash2(i, j, 81) < 0.003 * k) { vd[o] = 240; vd[o + 1] = 110; vd[o + 2] = 206; vd[o + 3] = 255; }   // (a spore, blown ahead)
+  }
+  mk.getContext('2d').putImageData(mi, 0, 0); vk.getContext('2d').putImageData(vi, 0, 0);
+  Object.assign(CORRUPT, { x0, y0, mask: mk, veins: vk, cv: CORRUPT.cv || mkCanvas(VW, VH) });
+}
+/* lay the overrun ground over the forest's (g: the ground canvas, already in world space at the ground's scale) */
+function corruptGround(g, f0) {
+  const C = CORRUPT, A = C.cv.getContext('2d'), s = C.s;
+  A.imageSmoothingEnabled = false;
+  A.setTransform(1, 0, 0, 1, 0, 0); A.globalCompositeOperation = 'source-over'; A.clearRect(0, 0, VW, VH);
+  A.setTransform(f0, 0, 0, f0, VW / 2 - f0 * CX, VH / 2 - f0 * CY);
+  const pat = GROUND_PAT[SET.corrupt.id] || (GROUND_PAT[SET.corrupt.id] = A.createPattern(DECOR_CACHE[SET.corrupt.id + ':ground'] || (DECOR_CACHE[SET.corrupt.id + ':ground'] = SET.corrupt.ground.tile(...(SET.corrupt.ground.size || [512, 512]))), 'repeat'));
+  A.fillStyle = pat; A.fillRect(CX - VW / (2 * f0) - 8, CY - VH / (2 * f0) - 8, VW / f0 + 16, VH / f0 + 16);
+  A.globalCompositeOperation = 'destination-in';
+  A.drawImage(C.mask, C.x0, C.y0, C.mask.width * s, C.mask.height * s);
+  A.globalCompositeOperation = 'source-over';
+  A.drawImage(C.veins, C.x0, C.y0, C.veins.width * s, C.veins.height * s);
+  A.setTransform(1, 0, 0, 1, 0, 0);
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(C.cv, 0, 0); g.restore();
+}
+/* the hills take the overrun ground's colour where it has reached them, keeping their own light and shade */
+function corruptHills(o) {
+  const C = CORRUPT, t = C.hcv || (C.hcv = mkCanvas(VW, VH)), g = t.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalCompositeOperation = 'copy'; g.drawImage(o.canvas, 0, 0);
+  g.globalCompositeOperation = 'color'; g.drawImage(C.cv, 0, 0);
+  g.globalCompositeOperation = 'destination-in'; g.drawImage(o.canvas, 0, 0);
+  g.globalCompositeOperation = 'source-over';
+  o.save(); o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'copy'; o.drawImage(t, 0, 0); o.restore();
+}
+/* a tree turning: the top of it (from t up) gone over to violet */
+const turningStack = (base, from) => (r, v, far) => base(r, v, far).map((sl) => (sl.t >= from ? (alienTint(sl.c), sl) : sl));
+defineSetting(Object.assign({}, FOREST_DEF, {
+  id: 'forest~corrupt', base: 'forest', floating: null, corrupt: ALIEN_FOREST_DEF,
+  ground: Object.assign({}, FOREST_DEF.ground, {
+    bank: { hi: '#5e9c84', lo: '#284640' },   // (the trenches' banks: between the two halves' mosses, at home in either)
+    patches: [Object.assign({}, FOREST_DEF.ground.patches[0], {
+      draw(l, x, y, ...a) { return (corruptAt(x, y) > 0 ? ALIEN_FOREST_DEF : FOREST_DEF).ground.patches[0].draw(l, x, y, ...a); }
+    })]
+  }),
+  scenery: {
+    q: 3, sprite: FOREST_DEF.scenery.sprite,
+    // (zone: which side of the front each grows on; see buildPlants)
+    kinds: FOREST_DEF.scenery.kinds.map((k) => Object.assign({}, k, { zone: 'normal' }))
+      .concat(ALIEN_FOREST_DEF.scenery.kinds.map((k) => Object.assign({}, k, { zone: 'alien' })))
+      .concat([
+        { name: 'pine, turning', share: 0.32, clump: 1.2, zone: 'turning', stack: turningStack(pineStack, 0.45), height: [0.14, 0.22], fixed: true },
+        { name: 'tree, turning', share: 0.24, clump: 1.2, zone: 'turning', stack: turningStack(oakStack, 0.6), height: [0.12, 0.18], fixed: true }
+      ]),
+    fill: FOREST_DEF.scenery.fill, patchy: FOREST_DEF.scenery.patchy
+  },
+  // thorn bushes: the forest's, or (spawned in the overrun half: v from 8 up) the alien forest's
+  hazard: { q: 0, sprite(r, v) { return v >= 8 ? ALIEN_FOREST_DEF.hazard.sprite(r, v - 8) : FOREST_DEF.hazard.sprite(r, v); } }
+}));
+/* how likely a plant of this zone is at a point c into the growth (see corruptAt) */
+function zoneWeight(z, c) {
+  if (!z) return 1;
+  if (z === 'alien') return c > 0 ? 1 : 0;
+  if (z === 'normal') return c > 0 ? 0 : 1;
+  return c > 0 ? 0 : c > -0.9 ? 1.8 * (1 + c / 0.9) : 0.05;   // (turning: thick along the front, and now and then far out on its own)
+}
 
 /* ================= setting: volcano =================
    A mining world on a volcano: black basalt ground dusted with ash and split by faintly glowing cracks, cinder cones
@@ -7565,6 +7667,7 @@ function trackGfx() {
   const N = T.N;
   // the track's own setting supplies everything around it
   useSetting(TRACK.look && SETTINGS[TRACK.setting + '~' + TRACK.look] ? TRACK.setting + '~' + TRACK.look : TRACK.setting);   // (a track can ask for a variant of its world: look)
+  buildCorrupt();
   if (OW) buildGrade();
   for (let t = 1; t <= 3; t++) for (let v = 0; v < 4; v++) decorSprite('hazard', TIER_R[t], v, false);
   TRACK_PATH = new Path2D();
@@ -8489,7 +8592,8 @@ function buildPlants() {
     // (thinned out in patches: open stretches here, crowded outcrops there)
     if (PT) { const nz = vnoise(o.x / (PT.scale || 400), o.y / (PT.scale || 400), seed + 91), kp = PT.keep || [0.2, 1]; if (R() > kp[0] + (kp[1] - kp[0]) * clamp((nz - 0.25) * 2, 0, 1)) continue; }
     // (which kind: by share, those that grow in groups far likelier where their own patches are)
-    const wt = K.map((k, i) => k.share * (k.clump ? 0.3 + clamp((vnoise(o.x / 300, o.y / 300, seed + 37 * i) - 0.45) * 2 * k.clump, 0, 4) : 1));
+    const cz = CORRUPT.on ? corruptAt(o.x, o.y) : 0;
+    const wt = K.map((k, i) => k.share * zoneWeight(k.zone, cz) * (k.clump ? 0.3 + clamp((vnoise(o.x / 300, o.y / 300, seed + 37 * i) - 0.45) * 2 * k.clump, 0, 4) : 1));
     const tw = wt.reduce((a, b) => a + b, 0);
     let u = R() * tw, ki = 0;
     while (ki < K.length - 1 && u >= wt[ki]) u -= wt[ki++];
@@ -9617,6 +9721,7 @@ function drawGround() {
   gc.setTransform(1, 0, 0, 1, 0, 0); gc.clearRect(0, 0, VW, VH);
   gc.setTransform(f0, 0, 0, f0, VW / 2 - f0 * CX, VH / 2 - f0 * CY);
   gc.fillStyle = pat; gc.fillRect(CX - VW / (2 * f0) - 8, CY - VH / (2 * f0) - 8, VW / f0 + 16, VH / f0 + 16);
+  if (CORRUPT.on) corruptGround(gc, f0);   // (the overrun half: see 'the forest world, corrupted')
   gc.lineJoin = 'round'; gc.lineCap = 'butt';
   const holes = (w) => { gc.lineWidth = w; for (const P of FLAT_GAPS) { gc.beginPath(); P.forEach((p, k) => (k ? gc.lineTo(p.x, p.y) : gc.moveTo(p.x, p.y))); gc.stroke(); } };
   const trenches = (fill) => { for (const P of TRENCH_POLYS) { if (fill) { fillOpening(gc, P); continue; } gc.beginPath(); P.forEach((p, k) => (k ? gc.lineTo(p[0], p[1]) : gc.moveTo(p[0], p[1]))); gc.closePath(); gc.stroke(); } };
@@ -12136,6 +12241,7 @@ function drawHills3D() {
   // onto the scene, with the trench and chasm openings cut out (a hill's shadow does not fall into them)
   const o = G3.out.getContext('2d');
   o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'copy'; o.drawImage(G3.cv, 0, G3.cv.height - VH, VW, VH, 0, 0, VW, VH); o.globalCompositeOperation = 'source-over';
+  if (CORRUPT.on && CORRUPT.cv) corruptHills(o);
   g3CutOpenings(o, 1);
   lc.setTransform(1, 0, 0, 1, 0, 0); lc.drawImage(G3.out, 0, 0);
   setScale(1);
@@ -16081,6 +16187,7 @@ function trackFromCode(text) {
   const def = { id: '', name, custom: true, seed: (hsh >>> 0) % 997 + 3, points: d.points };
   if (d.setting && SETTINGS[d.setting]) def.setting = d.setting;
   if (typeof d.look === 'string' && d.look) def.look = d.look;   // (a variant of its world's look: see 'the circuits')
+  if (d.corrupt && Array.isArray(d.corrupt.at)) def.corrupt = { at: [+d.corrupt.at[0], +d.corrupt.at[1]], r: +d.corrupt.r || 1500 };
   for (const k of ['shortcuts', 'elevation', 'barricades', 'jumps', 'gaps', 'holes', 'loops', 'slingshots', 'landmarks']) if (Array.isArray(d[k]) && d[k].length) def[k] = d[k];   // (landmarks come without art: not drawn)
   // (its id comes from everything in it, not just its shape: a track edited in the editor and pasted again is a new
   //  track to the caches, best times and ghosts, never the old one under the same name)
