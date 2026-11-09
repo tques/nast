@@ -1887,7 +1887,7 @@ const CFG = {
   cornerG: 340, cornerBoost: 0.75,   // cornering: how hard a racer can pull its path round (px/s^2, times grip x sqrt(turn)); less while boosting
   boostCost: 18, boostTime: 0.55, energyMax: 100,   // power is boost and hull in one: it never recharges on its own
   cellPower: 30, cellCd: 12, targetPower: 10, wreckTime: 2.4, respawnPower: 60,
-  fireCd: 0.17, bulletV: 720, bulletLife: 0.5, stingCharge: 0.8,   // (a shot reaches about 400 px: roughly the edge of the view)
+  fireCd: 0.17, bulletV: 720, bulletLife: 0.5, stingCharge: 0.8, stingShow: 0.3, stingFade: 0.2,   // (a shot reaches about 400 px: roughly the edge of the view)
   shipR: 6, targetR: 10,
   gateSlowT: 2.2, gateSlowMul: 0.62,   // (Easy and Normal: through a shut shortcut gate with a shield, which it loses: slow for gateSlowT s, its top speed gateSlowMul times, guns still up)
   shatterSlow: 0.72, shatterDmg: 4,   // a shut shortcut gate is glass for a moment: smash through it at a cost
@@ -10992,16 +10992,23 @@ function drawPickup(p, time, f) {
 /* a Stinger charging: a pink glow swelling at the nose and a dashed beam out along where it will go, brighter and
    flickering faster as it fills, so whoever is in front sees it coming */
 function drawCharge(s, time) {
+  // (not for a tap: the beam waits until fire has been held a moment, then fades in, so a quick normal shot never shows it)
+  const hold = (s.charge - CFG.stingShow) / CFG.stingFade;
+  if (hold <= 0) return;
+  const fade = clamp(hold, 0, 1);
+  drawChargeBeam(s, time, fade);
+}
+function drawChargeBeam(s, time, fade) {
   const k = clamp(s.charge / CFG.stingCharge, 0, 1), fx = Math.cos(s.ang), fy = Math.sin(s.ang);
   const nx = s.x + fx * 11, ny = s.y + fy * 11, L = CFG.bulletV * CFG.bulletLife * (0.35 + 0.65 * k);
   const fl = 0.7 + 0.3 * Math.sin(time * (14 + 40 * k));
   lc.save(); lc.setLineDash([4, 5]); lc.lineDashOffset = -time * 90;
-  lc.globalAlpha = (0.25 + 0.6 * k) * fl; lc.strokeStyle = '#ff7ac0'; lc.lineWidth = 1 + k;
+  lc.globalAlpha = (0.25 + 0.6 * k) * fl * fade; lc.strokeStyle = '#ff7ac0'; lc.lineWidth = 1 + k;
   lc.beginPath(); lc.moveTo(nx, ny); lc.lineTo(nx + fx * L, ny + fy * L); lc.stroke(); lc.restore();
-  ec.save(); ec.globalAlpha = 0.35 * k * fl; ec.strokeStyle = '#ff5ab0'; ec.lineWidth = 4;
+  ec.save(); ec.globalAlpha = 0.35 * k * fl * fade; ec.strokeStyle = '#ff5ab0'; ec.lineWidth = 4;
   ec.beginPath(); ec.moveTo(nx, ny); ec.lineTo(nx + fx * L, ny + fy * L); ec.stroke(); ec.restore();
-  glow(lc, '#ff7ac0', 5 + 9 * k, nx, ny, 0.5 + 0.4 * k * fl); glow(ec, '#ff5ab0', 8 + 14 * k, nx, ny, 0.6 * k * fl);
-  lc.fillStyle = '#ffe0f0'; const r = Math.round(1 + 2 * k); lc.fillRect(Math.round(nx) - r, Math.round(ny) - r, r * 2, r * 2);
+  glow(lc, '#ff7ac0', 5 + 9 * k, nx, ny, (0.5 + 0.4 * k * fl) * fade); glow(ec, '#ff5ab0', 8 + 14 * k, nx, ny, 0.6 * k * fl * fade);
+  lc.globalAlpha = fade; lc.fillStyle = '#ffe0f0'; const r = Math.round(1 + 2 * k); lc.fillRect(Math.round(nx) - r, Math.round(ny) - r, r * 2, r * 2); lc.globalAlpha = 1;
 }
 /* a mine: a dark spiked disc with a light in its owner's colour, blinking faster once armed (dim until then) */
 function drawMine(m, time, f) {
