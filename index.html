@@ -2388,6 +2388,7 @@ function gateEntered(g) { if (gateShared(g) && g.st === 1 && g.closeT < 0) g.clo
 function gateRam(s, g, inward) {
   const sg = g.seg;
   if (segDist(s.x, s.y, sg.x1, sg.y1, sg.x2, sg.y2) >= CFG.shipR + 2) return;
+  if (!weaponsLive(s)) { segPush(s, CFG.shipR, sg.x1, sg.y1, sg.x2, sg.y2, 3, 0.35); return; }   // (lap 1: the shortcuts are not open yet: a gate is just a wall to bounce off, whatever the difficulty or the shield)
   if (g.kind === 'door' && inward < 60) { segPush(s, CFG.shipR, sg.x1, sg.y1, sg.x2, sg.y2, 3, 0.35); return; }
   if (gateShared(g) && g.st === 2 && s.shield >= CFG.shieldMax) {   // (a full shield only: anything less and it crashes)
     s.shield = 0; s.shieldT = 0; s.shieldFlash = 0.4; g.broke[s.id] = true; s.passT[g.id] = 1;   // (through: on its way)
