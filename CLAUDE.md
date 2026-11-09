@@ -8,7 +8,7 @@ The user designs tracks in the editor and pastes its **track code** (JSON, `"for
 into the game:
 
 1. Add an entry to `const TRACKS = [...]` in `index.html` (follow the existing entries): an `id` (kebab-case of the
-   name), `name`, `setting`, a `seed` (any small number not already used), the code's `look` (and `corrupt`) if it has them, and the code's `points`, `shortcuts`,
+   name), `name`, `setting`, a `seed` (any small number not already used), the code's `look` (and `corrupt`, `planet`) if it has them, and the code's `points`, `shortcuts`,
    `elevation`, `barricades`, `jumps`, `gaps`, `holes`, `loops`, `slingshots` and `landmarks` as they are. The track format is documented in
    the comment above `const TRACKS` ("the circuits"). A track that is in none of the cups (`const CUPS`: four tracks
    each, no world twice in a cup) is always open; one in a cup unlocks with that cup.

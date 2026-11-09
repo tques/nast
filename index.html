@@ -1104,6 +1104,8 @@ function segDist(px, py, ax, ay, bx, by) {
                  forest (Rootknot) is the forest half overrun by that alien growth, spreading from corrupt.at to about
                  corrupt.r units away ({at: [x, y], r}), with a ragged front; 'toxic' on the arctic (Frostline) has green-blue
                  ice, crystal spires and vents spewing green gas. Optional.
+     planet      on a space track, which planet hangs in the background: 'ringed' (a gas giant with a ring, the default) or
+                 'ocean' (a teal world of violet continents, with a moon). Optional.
      landmarks   one-off pieces of scenery beside the track, from the editor's Landmark tool: {at: [x, y], r, desc,
                  art?}. Drawn only when art names an entry in LANDMARK_ART (see the landmarks section): the
                  description says what it should look like, for whoever draws it.
@@ -1795,7 +1797,7 @@ TRACKS.push(
     landmarks: [{at: [-1175, 1230], r: 180, desc: 'Very big queen jelly. Looks old battered and mean.', art: 'queen-jelly'}]
   },
   {
-    id: 'tether-yards', name: 'Tether Yards', setting: 'space', look: 'cargo', seed: 73,   // (a cargo port: see the 'cargo' look of the space world)
+    id: 'tether-yards', name: 'Tether Yards', setting: 'space', look: 'cargo', planet: 'ocean', seed: 73,   // (a cargo port: see the 'cargo' look of the space world)
     points: [[2076, -469], [2250, -370], [2490, -210], [2535, 95], [2785, 270], [2700, 540], [2490, 740], [2235, 885], [1840, 645], [1605, 925], [1415, 1185], [1140, 1275], [855, 1345], [570, 1390], [280, 1395], [-10, 1365], [-295, 1305], [-770, 1060], [-700, 860], [-380, 935], [-200, 830], [-280, 615], [-640, 410], [-1170, 460], [-1385, 890], [-1705, 960], [-1950, 800], [-2115, 565], [-2170, 280], [-2215, -10], [-2320, -280], [-2430, -550], [-2460, -835], [-2345, -1100], [-2115, -1275], [-1875, -1320], [-1695, -1225], [-1400, -805], [-1055, -885], [-985, -1325], [-630, -1450], [-355, -1340], [-110, -1240], [180, -1250], [475, -1265], [650, -580], [1080, -625], [1300, -1040], [1655, -1000], [1745, -660], [1995, -515]],
     shortcuts: [{from: [-1053, -887], to: [-120, -1242], target: [0.7178, 42]}],
     elevation: [{from: 0.19254, to: 0.24833, level: 1}, {from: 0.81292, to: 0.96255, level: -1}],
@@ -4972,8 +4974,8 @@ function groundTileOf() {
   return DECOR_CACHE[key] || (DECOR_CACHE[key] = SET.ground.tile(w, h));
 }
 function backdropOf() {
-  const key = SET.id + ':backdrop';
-  return DECOR_CACHE[key] || (DECOR_CACHE[key] = SET.backdrop(960, 540));
+  const key = SET.id + ':backdrop' + (TRACK && TRACK.planet ? ':' + TRACK.planet : '');   // (a track may pick its planet)
+  return DECOR_CACHE[key] || (DECOR_CACHE[key] = SET.backdrop(960, 540, TRACK));
 }
 
 function shadeOf() {
@@ -5048,6 +5050,70 @@ function paintRock(r, v, col, far, craters) {
   return { c: out, w: S, h: S };
 }
 
+/* ---------- planets for the space world's backdrop (a track's planet field): each draws itself onto the 960 x 540 tile ---------- */
+const PLANETS = {
+  // a gas giant with an amber-lit limb and a complete ring: its far half passes behind the planet, its near half in front
+  ringed(x) {
+    const px = 690, py = 205, pr = 92;
+    const ring = (a0, a1) => {
+      x.save(); x.translate(px, py); x.rotate(-0.38);
+      for (const [k, w, col] of [[1.42, 4, 'rgba(232,170,120,0.52)'], [1.56, 8, 'rgba(244,196,146,0.46)'], [1.7, 3, 'rgba(206,152,112,0.36)'], [1.92, 5, 'rgba(150,120,200,0.30)']]) {
+        x.strokeStyle = col; x.lineWidth = w; x.beginPath(); x.ellipse(0, 0, pr * k, pr * k * 0.24, 0, a0, a1); x.stroke();
+      }
+      x.restore();
+    };
+    ring(Math.PI, TAU);   // (behind it)
+    x.save();
+    x.beginPath(); x.arc(px, py, pr, 0, TAU); x.clip();
+    x.fillStyle = '#17123a'; x.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+    const lg = x.createRadialGradient(px - pr * 0.55, py - pr * 0.6, 4, px - pr * 0.3, py - pr * 0.3, pr * 1.35);
+    lg.addColorStop(0, 'rgba(255,196,120,0.95)'); lg.addColorStop(0.35, 'rgba(214,112,86,0.55)'); lg.addColorStop(1, 'rgba(30,20,70,0)');
+    x.fillStyle = lg; x.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+    for (let i = 0; i < 6; i++) { x.fillStyle = `rgba(20,12,50,${0.10 + (i % 2) * 0.08})`; x.fillRect(px - pr, py - pr + 16 + i * 28, pr * 2, 9 + (i % 3) * 5); }
+    x.restore();
+    ring(0, Math.PI);   // (in front of it)
+  },
+  // a teal world of violet continents under pink cloud, its night side spangled with city lights, an atmosphere on its lit limb, a moon
+  ocean(x) {
+    const px = 300, py = 330, pr = 112, R = rng(4242);
+    let q = x.createRadialGradient(px, py, pr * 0.9, px, py, pr * 1.3);   // (the haze round it)
+    q.addColorStop(0, 'rgba(110,230,215,0.20)'); q.addColorStop(1, 'rgba(110,230,215,0)'); x.fillStyle = q; x.fillRect(px - pr * 1.4, py - pr * 1.4, pr * 2.8, pr * 2.8);
+    x.save();
+    x.beginPath(); x.arc(px, py, pr, 0, TAU); x.clip();
+    q = x.createRadialGradient(px - pr * 0.4, py - pr * 0.45, pr * 0.1, px, py, pr * 1.2);
+    q.addColorStop(0, '#a4f4e8'); q.addColorStop(0.4, '#2aaab0'); q.addColorStop(0.8, '#1a5a96'); q.addColorStop(1, '#0c1a48');
+    x.fillStyle = q; x.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+    for (let k = 0; k < 6; k++) {   // continents: lumpy masses of overlapping blobs, violet and rust
+      const a = R() * TAU, d = Math.sqrt(R()) * pr * 0.75, cx = px + Math.cos(a) * d, cy = py + Math.sin(a) * d, big = pr * (0.1 + R() * 0.12), col = R() < 0.72 ? '138,90,200' : '190,112,90';
+      for (let m = 0; m < 14; m++) {
+        const b = R() * TAU, e = R() * big * 1.6;
+        x.fillStyle = `rgba(${col},0.8)`; x.beginPath(); x.arc(cx + Math.cos(b) * e, cy + Math.sin(b) * e * 0.8, big * (0.3 + R() * 0.5), 0, TAU); x.fill();
+      }
+    }
+    for (let k = 0; k < 18; k++) {   // cloud, in long streaks along the latitudes
+      const yy = py + (R() - 0.5) * pr * 1.9, xx = px + (R() - 0.5) * pr * 1.9, w = pr * (0.2 + R() * 0.4);
+      x.fillStyle = `rgba(255,226,244,${0.14 + R() * 0.2})`; x.beginPath(); x.ellipse(xx, yy, w, w * 0.14, (R() - 0.5) * 0.3, 0, TAU); x.fill();
+    }
+    q = x.createRadialGradient(px - pr * 0.55, py - pr * 0.6, pr * 0.7, px - pr * 0.55, py - pr * 0.6, pr * 1.8);   // (the night side, the far lower right)
+    q.addColorStop(0, 'rgba(4,6,24,0)'); q.addColorStop(0.5, 'rgba(4,6,24,0.14)'); q.addColorStop(1, 'rgba(4,6,24,0.92)');
+    x.fillStyle = q; x.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+    for (let k = 0; k < 110; k++) {   // cities
+      const a = R() * TAU, d = Math.sqrt(R()) * pr * 0.94, cx = px + Math.cos(a) * d, cy = py + Math.sin(a) * d;
+      if ((cx - px) * 0.6 + (cy - py) * 0.8 < pr * 0.42) continue;
+      x.fillStyle = R() < 0.8 ? 'rgba(255,222,140,0.9)' : 'rgba(255,150,210,0.9)'; x.fillRect(Math.round(cx), Math.round(cy), 1 + (R() < 0.15 ? 1 : 0), 1);
+    }
+    x.restore();
+    x.strokeStyle = 'rgba(170,250,236,0.45)'; x.lineWidth = 3; x.beginPath(); x.arc(px, py, pr + 1, Math.PI * 0.82, Math.PI * 1.62); x.stroke();   // (the atmosphere on its lit limb)
+    // its moon
+    const mx = px + 215, my = py - 125, mr = 24;
+    x.save(); x.beginPath(); x.arc(mx, my, mr, 0, TAU); x.clip();
+    q = x.createRadialGradient(mx - mr * 0.4, my - mr * 0.45, 2, mx, my, mr * 1.2); q.addColorStop(0, '#d8d4d0'); q.addColorStop(0.5, '#8a8690'); q.addColorStop(1, '#241f2e');
+    x.fillStyle = q; x.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+    for (let k = 0; k < 7; k++) { const a = R() * TAU, d = R() * mr * 0.8, cr = 2 + R() * 4; x.fillStyle = 'rgba(40,36,50,0.45)'; x.beginPath(); x.arc(mx + Math.cos(a) * d, my + Math.sin(a) * d, cr, 0, TAU); x.fill(); }
+    x.restore();
+  }
+};
+
 /* ================= setting: deep space =================
    The original world: a nebula with a ringed planet far below, stars at three depths, purple asteroids beside
    the lane (amber-lit), molten-looking asteroids drifting onto it, and gas clouds or ice over sunken stretches. */
@@ -5055,8 +5121,8 @@ const SPACE_DEF = defineSetting({
   id: 'space', name: 'Deep space', words: { scenery: 'asteroids' },
   palette: {},   // the defaults (SETTING_DEFAULTS) are this setting's colours
 
-  backdrop(W0, H0) {
-    const c = mkCanvas(W0, H0), x = c.getContext('2d');
+  backdrop(W0, H0, TR) {
+    const c = mkCanvas(W0, H0), x = c.getContext('2d'), ocean = TR && TR.planet === 'ocean';
     const g = x.createLinearGradient(0, 0, 0, H0);
     g.addColorStop(0, '#0b0a1e'); g.addColorStop(0.55, '#120e2b'); g.addColorStop(1, '#1b1033');
     x.fillStyle = g; x.fillRect(0, 0, W0, H0);
@@ -5065,30 +5131,19 @@ const SPACE_DEF = defineSetting({
       q.addColorStop(0, rgba); q.addColorStop(1, 'rgba(0,0,0,0)');
       x.fillStyle = q; x.fillRect(px - rad, py - rad, rad * 2, rad * 2);
     };
-    blob(200, 150, 260, 'rgba(36,110,128,0.30)');
-    blob(560, 420, 300, 'rgba(120,40,110,0.26)');
-    blob(820, 110, 240, 'rgba(150,84,40,0.20)');
-    blob(420, 300, 200, 'rgba(70,60,160,0.22)');
-    // planet with an amber-lit limb
-    const px = 690, py = 205, pr = 92;
-    x.save();
-    x.beginPath(); x.arc(px, py, pr, 0, TAU); x.clip();
-    x.fillStyle = '#17123a'; x.fillRect(px - pr, py - pr, pr * 2, pr * 2);
-    const lg = x.createRadialGradient(px - pr * 0.55, py - pr * 0.6, 4, px - pr * 0.3, py - pr * 0.3, pr * 1.35);
-    lg.addColorStop(0, 'rgba(255,196,120,0.95)'); lg.addColorStop(0.35, 'rgba(214,112,86,0.55)'); lg.addColorStop(1, 'rgba(30,20,70,0)');
-    x.fillStyle = lg; x.fillRect(px - pr, py - pr, pr * 2, pr * 2);
-    for (let i = 0; i < 6; i++) {
-      x.fillStyle = `rgba(20,12,50,${0.10 + (i % 2) * 0.08})`;
-      x.fillRect(px - pr, py - pr + 16 + i * 28, pr * 2, 9 + (i % 3) * 5);
+    if (ocean) {   // (a bluer sky for the ocean world)
+      blob(180, 330, 300, 'rgba(36,90,170,0.30)');
+      blob(700, 140, 260, 'rgba(40,130,130,0.22)');
+      blob(830, 430, 280, 'rgba(110,50,140,0.24)');
+      blob(480, 220, 200, 'rgba(60,70,170,0.2)');
+    } else {
+      blob(200, 150, 260, 'rgba(36,110,128,0.30)');
+      blob(560, 420, 300, 'rgba(120,40,110,0.26)');
+      blob(820, 110, 240, 'rgba(150,84,40,0.20)');
+      blob(420, 300, 200, 'rgba(70,60,160,0.22)');
     }
-    x.restore();
-    x.save();
-    x.translate(px, py); x.rotate(-0.38);
-    x.strokeStyle = 'rgba(232,170,120,0.42)'; x.lineWidth = 6;
-    x.beginPath(); x.ellipse(0, 0, pr * 1.75, pr * 0.42, 0, Math.PI * 1.02, Math.PI * 1.98); x.stroke();
-    x.strokeStyle = 'rgba(150,120,200,0.25)'; x.lineWidth = 3;
-    x.beginPath(); x.ellipse(0, 0, pr * 1.95, pr * 0.5, 0, Math.PI * 1.02, Math.PI * 1.98); x.stroke();
-    x.restore();
+    // the planet (a track's planet: 'ringed', the default, or 'ocean'; see the track's planet field)
+    (PLANETS[(TR && TR.planet) || 'ringed'] || PLANETS.ringed)(x, W0, H0);
     return c;
   },
 
@@ -17300,6 +17355,7 @@ function trackFromCode(text) {
   const def = { id: '', name, custom: true, seed: (hsh >>> 0) % 997 + 3, points: d.points };
   if (d.setting && SETTINGS[d.setting]) def.setting = d.setting;
   if (typeof d.look === 'string' && d.look) def.look = d.look;   // (a variant of its world's look: see 'the circuits')
+  if (typeof d.planet === 'string' && d.planet) def.planet = d.planet;
   if (d.corrupt && Array.isArray(d.corrupt.at)) def.corrupt = { at: [+d.corrupt.at[0], +d.corrupt.at[1]], r: +d.corrupt.r || 1500 };
   for (const k of ['shortcuts', 'elevation', 'barricades', 'jumps', 'gaps', 'holes', 'loops', 'slingshots', 'landmarks']) if (Array.isArray(d[k]) && d[k].length) def[k] = d[k];   // (landmarks come without art: not drawn)
   // (its id comes from everything in it, not just its shape: a track edited in the editor and pasted again is a new
