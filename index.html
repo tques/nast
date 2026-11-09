@@ -1795,14 +1795,15 @@ TRACKS.push(
     landmarks: [{at: [-1175, 1230], r: 180, desc: 'Very big queen jelly. Looks old battered and mean.', art: 'queen-jelly'}]
   },
   {
-    id: 'tether-yards', name: 'Tether Yards', seed: 73,
+    id: 'tether-yards', name: 'Tether Yards', setting: 'space', look: 'cargo', seed: 73,   // (a cargo port: see the 'cargo' look of the space world)
     points: [[2076, -469], [2250, -370], [2490, -210], [2535, 95], [2785, 270], [2700, 540], [2490, 740], [2235, 885], [1840, 645], [1605, 925], [1415, 1185], [1140, 1275], [855, 1345], [570, 1390], [280, 1395], [-10, 1365], [-295, 1305], [-770, 1060], [-700, 860], [-380, 935], [-200, 830], [-280, 615], [-640, 410], [-1170, 460], [-1385, 890], [-1705, 960], [-1950, 800], [-2115, 565], [-2170, 280], [-2215, -10], [-2320, -280], [-2430, -550], [-2460, -835], [-2345, -1100], [-2115, -1275], [-1875, -1320], [-1695, -1225], [-1400, -805], [-1055, -885], [-985, -1325], [-630, -1450], [-355, -1340], [-110, -1240], [180, -1250], [475, -1265], [650, -580], [1080, -625], [1300, -1040], [1655, -1000], [1745, -660], [1995, -515]],
     shortcuts: [{from: [-1053, -887], to: [-120, -1242], target: [0.7178, 42]}],
     elevation: [{from: 0.19254, to: 0.24833, level: 1}, {from: 0.81292, to: 0.96255, level: -1}],
     barricades: [0.41354, 0.65439],
     jumps: [{at: 0.27422}, {at: 0.46471, side: 'left'}, {at: 0.51589, side: 'left'}],
     gaps: [{from: 0.2819, to: 0.30497}, {from: 0.24271, to: 0.24763}, {from: 0.47096, to: 0.49499}, {from: 0.51982, to: 0.54631}],
-    holes: [{at: 0.57354, side: 'left'}, {at: 0.60521, side: 'right'}]
+    holes: [{at: 0.57354, side: 'left'}, {at: 0.60521, side: 'right'}],
+    landmarks: [{at: [2942, 603], r: 230, desc: 'A cargo ship drifting past the track: a long hull with stacks of shipping containers on deck, the bridge and funnel at the stern, engines glowing, running lights blinking', art: 'cargo-ship'}, {at: [-1511, 574], r: 215, desc: 'A cargo ship drifting past the track: a long hull with stacks of shipping containers on deck, the bridge and funnel at the stern, engines glowing, running lights blinking', art: 'cargo-ship'}, {at: [-1469, -573], r: 240, desc: 'A cargo ship drifting past the track: a long hull with stacks of shipping containers on deck, the bridge and funnel at the stern, engines glowing, running lights blinking', art: 'cargo-ship'}, {at: [2009, -717], r: 85, desc: 'Loose shipping crates floating and tumbling slowly in the dark', art: 'crates-drift'}, {at: [1741, 1061], r: 85, desc: 'Shipping crates tumbling slowly, one split and leaking green fluid that drifts away in a stream', art: 'crates-leak-green'}, {at: [-436, 1452], r: 85, desc: 'Loose shipping crates floating and tumbling slowly in the dark', art: 'crates-drift'}, {at: [-603, 224], r: 85, desc: 'Shipping crates tumbling slowly, one split and leaking amber fluid that drifts away in a stream', art: 'crates-leak-amber'}, {at: [-2269, 684], r: 85, desc: 'Loose shipping crates floating and tumbling slowly in the dark', art: 'crates-drift'}, {at: [-2270, -713], r: 85, desc: 'Shipping crates tumbling slowly, one split and leaking cyan fluid that drifts away in a stream', art: 'crates-leak-cyan'}, {at: [-1311, -973], r: 85, desc: 'Loose shipping crates floating and tumbling slowly in the dark', art: 'crates-drift'}, {at: [1511, -871], r: 85, desc: 'Loose shipping crates floating and tumbling slowly in the dark', art: 'crates-drift'}]
   },
   // new tracks: one for each setting but deep space
   {
@@ -5050,7 +5051,7 @@ function paintRock(r, v, col, far, craters) {
 /* ================= setting: deep space =================
    The original world: a nebula with a ringed planet far below, stars at three depths, purple asteroids beside
    the lane (amber-lit), molten-looking asteroids drifting onto it, and gas clouds or ice over sunken stretches. */
-defineSetting({
+const SPACE_DEF = defineSetting({
   id: 'space', name: 'Deep space', words: { scenery: 'asteroids' },
   palette: {},   // the defaults (SETTING_DEFAULTS) are this setting's colours
 
@@ -5171,6 +5172,13 @@ defineSetting({
     }
   }
 });
+
+/* the space world with a cargo port's traffic far below the track (a track with look: 'cargo': Tether Yards): freighters,
+   tankers, loose crates (some leaking) and tugs on tethers drifting by, see cargoDrifter */
+defineSetting(Object.assign({}, SPACE_DEF, {
+  id: 'space~cargo', base: 'space',
+  drifters: { make: (seed) => cargoDrifter(seed), live: (g, art, time) => cargoLive(g, art, time), designs: 6, spacing: 430, heights: [-0.9, -2.0], drift: [15, -6], haze: [26, 30, 84], under: '#0a0818', glowColour: '#7ab8ff' }
+}));
 
 /* ================= setting: dune world =================
    A sand planet at dusk: a desert of dunes and wind ripples. Sandstone rocks (and the odd cactus or spiky plant)
@@ -9924,6 +9932,226 @@ LANDMARK_ART['alien-skeleton'] = (() => {
     }
   };
 })();
+/* ================= Tether Yards: a cargo port out in the dark =================
+   Cargo ships plod past under the track and beside it, crates float loose between them (some split, and leaking), tugs
+   tow strings of containers on tethers. Far below the track (a variant of the space world, look: 'cargo': small
+   freighters, tankers, crate clusters, leakers, tugs, drifting slowly, see SET.drifters) and beside it (landmarks:
+   cargo-ship, and clusters of tumbling crates, crates-drift and crates-leak-*). */
+const CONTAINER_COL = [[176, 66, 44], [44, 84, 170], [48, 138, 108], [206, 158, 44], [186, 190, 204], [214, 108, 36], [120, 60, 150]];
+const shadeC = (c, k) => 'rgb(' + c.map((q) => clamp(Math.round(q * k), 0, 255)).join(',') + ')';
+const FLUID = {
+  green: { col: '#7aff4a', hi: '#e0ffc0', glow: '#5aff3a' },
+  amber: { col: '#ffa626', hi: '#ffe6a0', glow: '#ff9a2a' },
+  cyan: { col: '#4ad8ff', hi: '#d0f8ff', glow: '#3ac8ff' }
+};
+/* a spray of droplets from (x, y) out along angle a, each drifting off, swelling thin, fading; in whatever space g is set to */
+function fluidSpray(g, x, y, a, time, fl, sc, n, reach) {
+  for (let i = 0; i < n; i++) {
+    const u = (time * 0.5 + i / n) % 1, sp = a + (hash2(i, 5, 9) - 0.5) * 0.8, d = u * reach * sc * (0.5 + hash2(i, 3, 9)), w = Math.sin(i * 2.3 + u * 5) * 5 * u * sc;
+    const px = x + Math.cos(sp) * d - Math.sin(sp) * w, py = y + Math.sin(sp) * d + Math.cos(sp) * w, r = (1 + 1.6 * hash2(i, 7, 9)) * (1 - 0.45 * u) * sc;
+    g.globalAlpha = Math.pow(1 - u, 0.7) * 0.95;
+    g.fillStyle = fl.col; g.beginPath(); g.arc(px, py, Math.max(0.8, r), 0, TAU); g.fill();
+    if (r > 1.6) { g.fillStyle = fl.hi; g.fillRect(Math.round(px - r * 0.4), Math.round(py - r * 0.5), 1, 1); }
+  }
+  g.globalAlpha = 1;
+}
+/* a container seen from above at (x, y), l long, w wide, turned ang: a dark edge, the roof, ribs across it, lit along one side */
+function flatContainer(g, x, y, l, w, ang, col) {
+  g.save(); g.translate(x, y); g.rotate(ang);
+  g.fillStyle = shadeC(col, 0.5); g.fillRect(-l / 2 - 1, -w / 2 - 1, l + 2, w + 2);
+  g.fillStyle = shadeC(col, 1); g.fillRect(-l / 2, -w / 2, l, w);
+  g.fillStyle = shadeC(col, 0.78); for (let k = 1; k < Math.max(3, Math.round(l / 5)); k++) g.fillRect(-l / 2 + (l * k) / Math.round(l / 5) - 0.5, -w / 2 + 1, 1, w - 2);
+  g.fillStyle = shadeC(col, 1.3); g.fillRect(-l / 2, -w / 2, l, 1.5);
+  g.restore();
+}
+/* the drifters under the track: designs 1..6 of a cargo port. Everything faces +x (the way it drifts) */
+function cargoDrifter(seed) {
+  const v = (seed - 1) % 6, R = rng(seed * 577 + 13), S = 340, c0 = S / 2, cv = mkCanvas(S, S), g = cv.getContext('2d');
+  const hullPath = (L, W2, grow) => { g.beginPath(); g.moveTo(-L / 2 - grow, -W2 / 2 - grow); g.lineTo(L / 2 - L * 0.16, -W2 / 2 - grow); g.quadraticCurveTo(L / 2 + grow, 0, L / 2 - L * 0.16, W2 / 2 + grow); g.lineTo(-L / 2 - grow, W2 / 2 + grow); g.closePath(); };
+  g.save(); g.translate(c0, c0);
+  if (v === 0 || v === 1) {   // a freighter: hull, rows of containers, the bridge at the stern
+    const L = v ? 270 : 300, W2 = v ? 56 : 64, cols = v ? 11 : 13, rows = 4, x0 = -L / 2 + 62, cw = (L / 2 - 34 - x0) / cols, rh = (W2 - 12) / rows;
+    hullPath(L, W2, 2); g.fillStyle = '#10141e'; g.fill(); hullPath(L, W2, 0); g.fillStyle = v ? '#3c3a52' : '#2e3a52'; g.fill();
+    for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) if (R() > 0.1) flatContainer(g, x0 + (c + 0.5) * cw, -W2 / 2 + 6 + (r + 0.5) * rh, cw - 1.5, rh - 1.5, 0, CONTAINER_COL[Math.floor(R() * CONTAINER_COL.length)]);
+    g.fillStyle = '#8a93aa'; g.fillRect(-L / 2 + 4, -W2 / 2 + 5, 46, W2 - 10); g.fillStyle = '#d0d8e8'; g.fillRect(-L / 2 + 4, -W2 / 2 + 5, 46, 2);
+    g.fillStyle = '#ffd86a'; for (let k = 0; k < 6; k++) g.fillRect(-L / 2 + 40, -W2 / 2 + 9 + k * 7, 3, 2);
+    g.fillStyle = '#5a6278'; g.fillRect(-L / 2 + 14, -4, 12, 8);   // the funnel
+    cv.glow = [c0 - L / 2 - 6, c0]; cv.lights = [[c0 + L / 2 - 30, c0 - W2 / 2], [c0 + L / 2 - 30, c0 + W2 / 2]];
+  } else if (v === 2) {   // a tanker: great round tanks along a spine
+    const L = 290, W2 = 52;
+    hullPath(L, W2, 2); g.fillStyle = '#10141e'; g.fill(); hullPath(L, W2, 0); g.fillStyle = '#463a3a'; g.fill();
+    for (let k = 0; k < 5; k++) { const tx = -L / 2 + 84 + k * 44; g.fillStyle = '#1a1c28'; g.beginPath(); g.arc(tx, 0, 20, 0, TAU); g.fill(); g.fillStyle = '#9a9eb0'; g.beginPath(); g.arc(tx, 0, 18, 0, TAU); g.fill(); g.fillStyle = '#d0d4e4'; g.beginPath(); g.arc(tx - 3, -3, 10, 0, TAU); g.fill(); }
+    g.fillStyle = '#6a7088'; g.fillRect(-L / 2 + 70, -2, L - 120, 4);
+    g.fillStyle = '#8a93aa'; g.fillRect(-L / 2 + 4, -W2 / 2 + 5, 50, W2 - 10); g.fillStyle = '#ffd86a'; for (let k = 0; k < 5; k++) g.fillRect(-L / 2 + 44, -W2 / 2 + 9 + k * 7, 3, 2);
+    cv.glow = [c0 - L / 2 - 6, c0]; cv.lights = [[c0 + L / 2 - 36, c0 - W2 / 2], [c0 + L / 2 - 36, c0 + W2 / 2]];
+  } else if (v === 3) {   // a cluster of loose containers
+    for (let k = 0; k < 7; k++) { const a = R() * TAU, d = 20 + R() * 70; flatContainer(g, Math.cos(a) * d, Math.sin(a) * d * 0.8, 40 + R() * 20, 17 + R() * 5, (R() - 0.5) * TAU, CONTAINER_COL[Math.floor(R() * CONTAINER_COL.length)]); }
+  } else if (v === 4) {   // a split container, leaking
+    flatContainer(g, 0, 0, 62, 24, 0.15, [176, 66, 44]); flatContainer(g, -44, 34, 54, 22, -0.5, [44, 84, 170]);
+    g.fillStyle = '#1a1214'; g.fillRect(24, -4, 10, 8);   // the split
+    cv.leaks = [[c0 + 34, c0, 0.15, 'green'], [c0 - 52, c0 + 24, 2.6, 'amber']];
+  } else {   // a tug on a tether, hauling a string of containers
+    g.fillStyle = '#10141e'; g.fillRect(-135, -15, 52, 30); g.fillStyle = '#6a7088'; g.fillRect(-133, -13, 48, 26); g.fillStyle = '#9aa2b8'; g.fillRect(-133, -13, 48, 2);
+    g.fillStyle = '#5ff4ff'; g.fillRect(-98, -5, 8, 10); g.fillStyle = '#ffb04a'; g.fillRect(-120, -3, 12, 6);
+    g.strokeStyle = '#c8d0e0'; g.lineWidth = 1; g.beginPath(); g.moveTo(-83, 0); g.lineTo(-60, 0); g.stroke();
+    for (let k = 0; k < 3; k++) flatContainer(g, -38 + k * 62, 0, 56, 22, 0, CONTAINER_COL[(k * 2 + seed) % CONTAINER_COL.length]);
+    cv.glow = [c0 - 138, c0];
+  }
+  g.restore();
+  return cv;
+}
+/* (the drifters' leaks, in the canvas's own coordinates: the lit ones glow) */
+function cargoLive(g, art, time) {
+  if (!art.leaks) return;
+  const S = art.top.width;
+  for (const [lx, ly, la, k] of art.leaks) fluidSpray(g, lx - S / 2, ly - S / 2, la, time, FLUID[k], 1.1, 26, 70);
+}
+
+/* ---------- beside the track: a freighter ---------- */
+LANDMARK_ART['cargo-ship'] = (() => {
+  const H = 0.34, N = 10;
+  // (a ship lies along the lane: its way is the lane's, at the nearest bit of it)
+  const along = (L0, R) => {
+    if (L0 && L0._ang != null) return L0._ang;
+    let bi = 0, bd = 1e18;
+    if (L0) for (let i = 0; i < T.N; i++) { const d = (T.x[i] - L0.at[0]) ** 2 + (T.y[i] - L0.at[1]) ** 2; if (d < bd) { bd = d; bi = i; } }
+    const a = L0 ? Math.atan2(T.ty[bi], T.tx[bi]) + (R > 220 ? 0 : Math.PI) : 0;
+    if (L0) L0._ang = a;
+    return a;
+  };
+  const lay = (R, L0) => {
+    const Rr = rng(Math.round(R) * 19 + 5), L = R * 1.8, Wd = R * 0.5, cols = 13, rows = 4, cells = [], x0 = -L / 2 + L * 0.24, x1 = L / 2 - L * 0.14, cw = (x1 - x0) / cols, rh = (Wd * 0.8) / rows;
+    for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) cells.push({ x: x0 + c * cw, y: -Wd * 0.4 + r * rh, w: cw, h: rh, n: Rr() < 0.1 ? 0 : 1 + Math.floor(Rr() * Rr() * 4.2), col: CONTAINER_COL[Math.floor(Rr() * CONTAINER_COL.length)] });
+    return { ang: along(L0, R), L, Wd, cells };
+  };
+  const hullPath = (g, L, W2, grow) => { g.beginPath(); g.moveTo(-L / 2 - grow, -W2 / 2 - grow); g.lineTo(L / 2 - L * 0.16, -W2 / 2 - grow); g.quadraticCurveTo(L / 2 + grow, 0, L / 2 - L * 0.16, W2 / 2 + grow); g.lineTo(-L / 2 - grow, W2 / 2 + grow); g.closePath(); };
+  return {
+    height: H, n: N, sizeK: 2.3, lit: true,
+    slice(g, k, n, S, R, L0) {
+      const c0 = S / 2, Y = lay(R, L0), { L, Wd } = Y;
+      g.save(); g.translate(c0, c0); g.rotate(Y.ang);
+      if (k <= 2) { hullPath(g, L, Wd, k === 0 ? 3 : 0); g.fillStyle = ['#10141e', '#2e3650', '#4c587a'][k]; g.fill(); }
+      if (k === 2) { g.fillStyle = '#6a7898'; g.fillRect(-L / 2, -Wd / 2, L * 0.9, 2); }   // (the deck's lit edge)
+      if (k >= 3) {
+        const lvl = k - 2;
+        for (const c of Y.cells) if (c.n >= lvl) {
+          const top = c.n === lvl;
+          g.fillStyle = shadeC(c.col, top ? 1.12 : 0.66); g.fillRect(c.x + 0.5, c.y + 0.5, c.w - 1, c.h - 1);
+          if (top) { g.fillStyle = shadeC(c.col, 0.8); for (let q = 1; q < 3; q++) g.fillRect(c.x + 0.5, c.y + 0.5 + (c.h * q) / 3, c.w - 1, 1); g.fillStyle = shadeC(c.col, 1.35); g.fillRect(c.x + 0.5, c.y + 0.5, c.w - 1, 1); }
+        }
+        // the bridge at the stern: a tower of decks with a funnel behind it, the top deck bright
+        const bx = -L / 2 + L * 0.02, bw = L * 0.17;
+        if (k <= 8) {   // (decks stepping in as it rises)
+          const sw = [0.86, 0.86, 0.86, 0.86, 0.72, 0.6, 0.5][Math.max(0, Math.min(6, k - 3))] * 0.5 * Wd, sl = bw * (k >= 7 ? 0.62 : 1);
+          g.fillStyle = k === 8 ? '#cfd6e6' : k === 7 ? '#8a93aa' : '#6a738c'; g.fillRect(bx, -sw, sl, sw * 2);
+          if (k === 8) { g.fillStyle = '#e8eef8'; g.fillRect(bx, -sw, sl, 2); g.fillStyle = '#3a4258'; g.fillRect(bx + sl * 0.7, -sw * 0.5, 2, sw); }
+        }
+        if (k >= 4 && k <= 9) { g.fillStyle = k === 9 ? '#c8c0b8' : '#5a5668'; g.fillRect(bx + 4, -3, bw * 0.3, 6); }   // (the funnel, taller than the deck)
+        if (k === 9) { g.fillStyle = '#d4503a'; g.fillRect(bx + 4, -3, bw * 0.3, 2); }
+      }
+      g.restore();
+    },
+    over(lc0, ec0, x, y, f, time, R, L) {
+      const Y = lay(R, L), X = L.at[0], Yy = L.at[1], ca = Math.cos(Y.ang), sa = Math.sin(Y.ang);
+      const W = (lx, ly, h) => LMP(h, X + lx * ca - ly * sa, Yy + lx * sa + ly * ca);
+      lc.setTransform(1, 0, 0, 1, 0, 0);
+      // its engines, a blue-white glare at the stern
+      const e = W(-Y.L / 2 - 4, 0, 0.1), fl = 0.8 + 0.2 * Math.sin(time * 9 + R);
+      glow(ec, '#7ab8ff', Math.round(Y.Wd * 0.7 * e[2]), e[0], e[1], 0.55 * fl); glow(ec, '#ffffff', Math.round(Y.Wd * 0.25 * e[2]), e[0], e[1], 0.5 * fl);
+      // the bridge's windows, a row facing the bow, and its running lights, red one side, green the other, blinking
+      for (let q = 0; q < 6; q++) { const p = W(-Y.L / 2 + Y.L * 0.17, -Y.Wd * 0.34 + q * Y.Wd * 0.136, 0.22); lc.fillStyle = hash2(q, Math.round(R), 3) > 0.2 ? '#ffd86a' : '#4a3a28'; lc.fillRect(Math.round(p[0]) - 1, Math.round(p[1]) - 1, 2, 2); }
+      for (const [sd, col] of [[-1, '#ff3a3a'], [1, '#4aff7a']]) {
+        const p = W(Y.L / 2 - Y.L * 0.2, sd * Y.Wd * 0.5, 0.05), on = ((time * 1.3 + (sd > 0 ? 0.5 : 0)) % 1.6) < 0.8;
+        lc.fillStyle = on ? col : '#2a2430'; lc.fillRect(Math.round(p[0]) - 1, Math.round(p[1]) - 1, 3, 3);
+        if (on) glow(ec, col, 8, p[0], p[1], 0.6);
+      }
+      setScale(1);
+    }
+  };
+})();
+
+/* ---------- beside the track: loose crates, tumbling slowly. A crate is a container drawn as a real box turning in three
+   dimensions (turning flat, and rolling about its length), each face lit by the way it faces; some are split, and leak. ---------- */
+const CRATE_HU = 0.003;   // (height levels per world unit, for a crate's thickness)
+const CRATE_FACES = [   // [corner indices, local normal], corners as bits (x, y, z) of a +-1/2 box
+  [[0, 1, 3, 2], [0, 0, -1], 'bot'], [[4, 5, 7, 6], [0, 0, 1], 'top'], [[0, 1, 5, 4], [0, -1, 0], 'long'], [[2, 3, 7, 6], [0, 1, 0], 'long'], [[0, 2, 6, 4], [-1, 0, 0], 'end'], [[1, 3, 7, 5], [1, 0, 0], 'end']
+];
+function crateLayout(R, L, leak) {
+  if (L._crates) return L._crates;
+  const Rr = rng(Math.round(L.at[0] * 7 + L.at[1] * 13) + Math.round(R)), n = 4 + Math.floor(Rr() * 3), list = [];
+  for (let i = 0; i < n; i++) {
+    const a = Rr() * TAU, d = Math.sqrt(Rr()) * R * 0.62;
+    list.push({ ox: Math.cos(a) * d, oy: Math.sin(a) * d, hb: 0.08 + Rr() * 0.14, yaw: Rr() * TAU, yawW: (Rr() - 0.5) * 0.4, roll: Rr() * TAU, rollW: (Rr() - 0.5) * 0.55, l: 44 + Rr() * 24, w: 20 + Rr() * 6, ph: Rr() * 10, col: CONTAINER_COL[Math.floor(Rr() * CONTAINER_COL.length)], leaks: !!leak && (i === 0 || (n > 5 && i === 3)) });
+  }
+  return (L._crates = list);
+}
+// a crate's pose at a moment: where its middle is, the turn matrices' angles
+function cratePose(c, t) { return { x: c.ox + Math.sin(t * 0.13 + c.ph) * 16, y: c.oy + Math.cos(t * 0.11 + c.ph * 1.3) * 16, h: c.hb + 0.015 * Math.sin(t * 0.8 + c.ph), yaw: c.yaw + c.yawW * t, roll: c.roll + c.rollW * t }; }
+/* a point (px, py, pz) of the crate's own frame, out to the world: [x, y, height] */
+function crateTo(c, P, X, Y, px, py, pz) {
+  const cr = Math.cos(P.roll), sr = Math.sin(P.roll), y1 = py * cr - pz * sr, z1 = py * sr + pz * cr, cy = Math.cos(P.yaw), sy = Math.sin(P.yaw);
+  return [X + P.x + px * cy - y1 * sy, Y + P.y + px * sy + y1 * cy, P.h + z1 * CRATE_HU];
+}
+function crateArt(leak) {
+  return {
+    height: 0, n: 1, sizeK: 2.6, lit: true,
+    slice() {},
+    over(lc0, ec0, x, y, f, time, R, L) {
+      if (offscreen(L.at[0], L.at[1], fscale(0.1), R * 2.2)) return;
+      const crates = crateLayout(R, L, leak), X = L.at[0], Y = L.at[1], fl = leak ? FLUID[leak] : null;
+      lc.setTransform(1, 0, 0, 1, 0, 0); lc.lineJoin = 'round';
+      const order = crates.map((c, i) => [cratePose(c, time).h, i]).sort((a, b) => a[0] - b[0]);
+      for (const [, i] of order) {
+        const c = crates[i], P = cratePose(c, time), hl = c.l / 2, hw = c.w / 2, hh = c.w / 2;
+        // its corners, in the world and on the screen
+        const V = [];
+        for (let b = 0; b < 8; b++) { const w = crateTo(c, P, X, Y, b & 1 ? hl : -hl, b & 2 ? hw : -hw, b & 4 ? hh : -hh); V.push(LMP(w[2], w[0], w[1]).concat(w[2])); }
+        const cr = Math.cos(P.roll), sr = Math.sin(P.roll), cy = Math.cos(P.yaw), sy = Math.sin(P.yaw);
+        const faces = CRATE_FACES.map((F) => {
+          const [nx, ny, nz] = F[1], y1 = ny * cr - nz * sr, z1 = ny * sr + nz * cr, wx = nx * cy - y1 * sy, wy = nx * sy + y1 * cy, wz = z1;
+          const lit = Math.max(0, wx * -0.5 + wy * -0.6 + wz * 0.65) / 0.98;
+          return { F, avg: F[0].reduce((a, k) => a + V[k][3], 0) / 4, k: 0.42 + 0.78 * lit, up: wz };
+        }).sort((a, b) => a.avg - b.avg);
+        for (const fc of faces) {
+          const q = fc.F[0].map((k) => V[k]);
+          if (fc.up < -0.05 && fc.F[2] === 'bot') continue;
+          lc.beginPath(); lc.moveTo(q[0][0], q[0][1]); for (let k = 1; k < 4; k++) lc.lineTo(q[k][0], q[k][1]); lc.closePath();
+          lc.fillStyle = shadeC(c.col, fc.k); lc.fill(); lc.strokeStyle = shadeC(c.col, 0.3); lc.lineWidth = 1; lc.stroke();
+          if (fc.F[2] === 'long' || fc.F[2] === 'top') {   // (corrugation: ribs across the face)
+            lc.strokeStyle = shadeC(c.col, fc.k * 0.7); lc.lineWidth = 1; lc.beginPath();
+            for (let j = 1; j < 8; j++) { const t = j / 8; lc.moveTo(q[0][0] + (q[1][0] - q[0][0]) * t, q[0][1] + (q[1][1] - q[0][1]) * t); lc.lineTo(q[3][0] + (q[2][0] - q[3][0]) * t, q[3][1] + (q[2][1] - q[3][1]) * t); }
+            lc.stroke();
+          } else if (fc.F[2] === 'end') {   // (the doors: two bars and a handle)
+            lc.strokeStyle = shadeC(c.col, fc.k * 0.55); lc.lineWidth = 1; lc.beginPath();
+            for (const t of [0.35, 0.65]) { lc.moveTo(q[0][0] + (q[3][0] - q[0][0]) * t, q[0][1] + (q[3][1] - q[0][1]) * t); lc.lineTo(q[1][0] + (q[2][0] - q[1][0]) * t, q[1][1] + (q[2][1] - q[1][1]) * t); }
+            lc.stroke();
+          }
+        }
+        // a split in its end, with the fluid coming out of it
+        if (c.leaks && fl) {
+          const split = (t) => crateTo(c, cratePose(c, t), X, Y, hl, 0, hh * 0.2), n = 34, reach = 130;
+          const e = split(time), pe = LMP(e[2], e[0], e[1]);
+          for (let q = 0; q < n; q++) {
+            const age = (time * 0.42 + q / n) % 1, ts = time - age * 2.4, S0 = split(ts), P0 = cratePose(c, ts), o1 = crateTo(c, P0, X, Y, hl + 20, 0, hh * 0.2);
+            const dx = o1[0] - S0[0], dy = o1[1] - S0[1], dl = Math.hypot(dx, dy) || 1, sp = (0.6 + hash2(q, 4, 11)) * reach * age, w = Math.sin(q * 2.3 + age * 5) * 8 * age + (hash2(q, 8, 11) - 0.5) * 10 * age;
+            const wx = S0[0] + (dx / dl) * sp - (dy / dl) * w, wy = S0[1] + (dy / dl) * sp + (dx / dl) * w, p = LMP(S0[2] + age * 0.03, wx, wy), r = (1.8 + 2.4 * hash2(q, 7, 11)) * (1 - 0.35 * age) * p[2];
+            lc.globalAlpha = Math.pow(1 - age, 0.7); lc.fillStyle = fl.col; lc.beginPath(); lc.arc(p[0], p[1], Math.max(0.9, r), 0, TAU); lc.fill();
+            if (r > 1.8) { lc.fillStyle = fl.hi; lc.fillRect(Math.round(p[0] - r * 0.4), Math.round(p[1] - r * 0.5), 1, 1); }
+            if (q % 2 === 0) glow(ec, fl.glow, Math.max(7, Math.round(r * 3.5)), p[0], p[1], 0.5 * (1 - age));
+          }
+          lc.globalAlpha = 1;
+          lc.fillStyle = '#1a1214'; lc.beginPath(); lc.arc(pe[0], pe[1], Math.max(1.5, 2.4 * pe[2]), 0, TAU); lc.fill();
+          glow(ec, fl.glow, Math.round(18 * pe[2]), pe[0], pe[1], 0.4 + 0.12 * Math.sin(time * 3 + c.ph));
+        }
+      }
+      setScale(1);
+    }
+  };
+}
+LANDMARK_ART['crates-drift'] = crateArt(null);
+LANDMARK_ART['crates-leak-green'] = crateArt('green');
+LANDMARK_ART['crates-leak-amber'] = crateArt('amber');
+LANDMARK_ART['crates-leak-cyan'] = crateArt('cyan');
 function landmarks() { return (TRACK.landmarks || []).filter((L) => L && L.art && LANDMARK_ART[L.art] && Array.isArray(L.at)); }
 function landmarkSlices(L) {
   const A = LANDMARK_ART[L.art], R = Math.max(8, +L.r || 60), key = L.art + ':' + R;
@@ -11830,7 +12058,7 @@ function drifterArt(v, hq) {
   const under = mkCanvas(base.width, base.height), ux = under.getContext('2d');
   ux.drawImage(base, 0, 0); ux.globalCompositeOperation = 'source-in'; ux.fillStyle = D.under || '#2a2450'; ux.fillRect(0, 0, under.width, under.height);
   ux.globalCompositeOperation = 'source-atop'; ux.fillStyle = 'rgba(' + hz.join(',') + ',' + (k * 0.8).toFixed(2) + ')'; ux.fillRect(0, 0, under.width, under.height);
-  return (DECOR_CACHE[key] = { top, under, rotor: base.rotor, glow: base.glow });
+  return (DECOR_CACHE[key] = { top, under, rotor: base.rotor, glow: base.glow, leaks: base.leaks, lights: base.lights });
 }
 function drawLandmarks(time) {
   for (const m of DRIFT.marks) {
